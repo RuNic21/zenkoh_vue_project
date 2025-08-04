@@ -1,0 +1,74 @@
+# Vue コンポーネント開発ルール
+
+## コンポーネント構造
+
+```vue
+<script setup>
+// コンポーネント説明: このコンポーネントの目的と機能を説明してください
+// 必要な依存関係をインポートします
+import { ref, computed } from "vue";
+
+// props定義: 親コンポーネントから受け取るデータ
+const props = defineProps({
+  // prop名: propの用途説明
+  propName: {
+    type: String,
+    required: true,
+    default: "",
+  },
+});
+
+// リアクティブデータ定義
+const reactiveData = ref("");
+
+// 計算されたプロパティ定義
+const computedValue = computed(() => {
+  // 計算ロジック説明
+  return reactiveData.value;
+});
+
+// メソッド定義
+const handleEvent = () => {
+  // イベント処理ロジック説明
+};
+</script>
+
+<template>
+  <!-- コンポーネントルート要素 -->
+  <div class="component-name">
+    <!-- セクション別説明コメント -->
+    <header class="component-header">
+      <!-- ヘッダー内容 -->
+    </header>
+
+    <main class="component-main">
+      <!-- メインコンテンツ -->
+    </main>
+  </div>
+</template>
+
+<style scoped>
+/* コンポーネントスタイリング */
+.component-name {
+  /* レイアウトスタイル */
+}
+
+.component-header {
+  /* ヘッダースタイル */
+}
+
+.component-main {
+  /* メインコンテンツスタイル */
+}
+</style>
+
+## 日本語テキストルール -
+すべてのユーザーに表示されるテキストは日本語で記述してください - ボタンテキスト:
+"送信" (送信), "キャンセル" (キャンセル), "確認" (確認) - メッセージ:
+"処理中です..." (処理中です...), "完了しました" (完了しました) -
+エラーメッセージ: "エラーが発生しました" (エラーが発生しました) -
+成功メッセージ: "正常に処理されました" (正常に処理されました) ## エラー処理 -
+try-catchブロックを使用してエラーを処理してください -
+ユーザーに親しみやすい日本語エラーメッセージを表示してください -
+ネットワークエラー、バリデーションエラーなどを区別して処理してください ---
+```

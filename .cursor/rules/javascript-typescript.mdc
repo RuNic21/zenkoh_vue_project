@@ -1,0 +1,100 @@
+# JavaScript/TypeScript 開発ルール
+
+## 基本スタイル
+
+- セミコロン(;)を常に使用してください
+- 大きい引用符(")を使用してください（小さい引用符の代わりに）
+- インデントは 2 スペースを使用してください
+
+## Import/Export ルール
+
+```javascript
+// 正しいimport文
+import { createApp } from "vue";
+import App from "./App.vue";
+import "./assets/main.css";
+
+// 正しいexport文
+export default App;
+export { createApp };
+```
+
+## 関数定義
+
+```javascript
+// アロー関数使用
+const handleClick = () => {
+  // 関数ロジック説明
+  console.log("クリックイベント処理");
+};
+
+// async関数
+const fetchData = async () => {
+  try {
+    // データ取得ロジック
+    const response = await fetch("/api/data");
+    return await response.json();
+  } catch (error) {
+    // エラー処理ロジック
+    console.error("データ取得失敗:", error);
+    throw error;
+  }
+};
+```
+
+## 変数名ルール
+
+- 変数名は明確で理解しやすく記述してください
+- camelCase を使用してください
+- boolean 変数は is、has、can などで開始してください
+
+```javascript
+// 良い変数名例
+const userName = "田中太郎";
+const isLoggedIn = true;
+const hasPermission = false;
+const canEdit = true;
+const userList = [];
+const handleSubmit = () => {};
+```
+
+## エラー処理
+
+```javascript
+// try-catchブロック使用
+try {
+  // 危険な作業
+  const result = await riskyOperation();
+  return result;
+} catch (error) {
+  // エラーログ
+  console.error("作業失敗:", error);
+  // ユーザーにエラーメッセージ表示
+  showErrorMessage("エラーが発生しました");
+}
+```
+
+## コメントルール
+
+- すべての関数とクラスに日本語コメントを追加してください
+- 複雑なロジックには詳細な説明を追加してください
+- TODO コメントを使用して今後の作業を表示してください
+
+```javascript
+/**
+ * ユーザーデータを取得する関数
+ * @param {string} userId - ユーザーID
+ * @returns {Promise<Object>} ユーザーデータ
+ */
+const fetchUserData = async (userId) => {
+  // API呼び出しロジック
+  const response = await fetch(`/api/users/${userId}`);
+  return response.json();
+};
+```
+
+description:
+globs:
+alwaysApply: false
+
+---

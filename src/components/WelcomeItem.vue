@@ -1,0 +1,101 @@
+<template>
+  <!-- 歓迎アイテムコンテナ -->
+  <div class="item">
+    <!-- アイコンエリア -->
+    <i>
+      <slot name="icon"></slot>
+    </i>
+    <!-- 詳細内容エリア -->
+    <div class="details">
+      <!-- タイトル -->
+      <h3>
+        <slot name="heading"></slot>
+      </h3>
+      <!-- メインコンテンツ -->
+      <slot></slot>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+/* アイテムコンテナスタイリング */
+.item {
+  margin-top: 2rem;
+  display: flex;
+  position: relative;
+}
+
+/* 詳細内容エリアスタイリング */
+.details {
+  flex: 1;
+  margin-left: 1rem;
+}
+
+/* アイコンスタイリング */
+i {
+  display: flex;
+  place-items: center;
+  place-content: center;
+  width: 32px;
+  height: 32px;
+
+  color: var(--color-text);
+}
+
+/* タイトルスタイリング */
+h3 {
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin-bottom: 0.4rem;
+  color: var(--color-heading);
+}
+
+/* デスクトップレスポンシブスタイリング */
+@media (min-width: 1024px) {
+  .item {
+    margin-top: 0;
+    padding: 0.4rem 0 1rem calc(var(--section-gap) / 2);
+  }
+
+  i {
+    top: calc(50% - 25px);
+    left: -26px;
+    position: absolute;
+    border: 1px solid var(--color-border);
+    background: var(--color-background);
+    border-radius: 8px;
+    width: 50px;
+    height: 50px;
+  }
+
+  /* 左側接続線（上側） */
+  .item:before {
+    content: " ";
+    border-left: 1px solid var(--color-border);
+    position: absolute;
+    left: 0;
+    bottom: calc(50% + 25px);
+    height: calc(50% - 25px);
+  }
+
+  /* 左側接続線（下側） */
+  .item:after {
+    content: " ";
+    border-left: 1px solid var(--color-border);
+    position: absolute;
+    left: 0;
+    top: calc(50% + 25px);
+    height: calc(50% - 25px);
+  }
+
+  /* 最初のアイテムの上側接続線を非表示 */
+  .item:first-of-type:before {
+    display: none;
+  }
+
+  /* 最後のアイテムの下側接続線を非表示 */
+  .item:last-of-type:after {
+    display: none;
+  }
+}
+</style>

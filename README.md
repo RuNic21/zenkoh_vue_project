@@ -1,65 +1,95 @@
 # Zenkoh Vue プロジェクト
 
-Vue 3とViteを使用した現代的なウェブアプリケーションプロジェクトです。
+Vue.js 기반의 웹 애플리케이션 프로젝트입니다.
 
-## プロジェクト概要
+## 🚀 クイックスタート
 
-このプロジェクトはVue 3のComposition APIとViteビルドツールを使用して開発されました。
+### 開発サーバー起動
 
-- **Vue 3**: 最新のVue.jsフレームワーク
-- **Vite**: 高速な開発サーバーとビルドツール
-- **Composition API**: Vue 3の新しいコンポーネント作成方式
-
-## 開発環境設定
-
-### 推奨IDE設定
-
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)拡張機能を使用してください。
-(Veturは無効化することを推奨します)
-
-### 設定カスタマイズ
-
-[Vite設定参照](https://vite.dev/config/)を確認してください。
-
-## プロジェクト設定
-
-### 依存関係インストール
-
-```sh
-npm install
-```
-
-### 開発サーバー実行（ホットリロード含む）
-
-```sh
+```bash
 npm run dev
 ```
 
-### 本番用ビルド
+### ビルド
 
-```sh
+```bash
 npm run build
 ```
 
-### ビルド結果プレビュー
+### プレビュー
 
-```sh
+```bash
 npm run preview
 ```
 
-## プロジェクト構造
+## 📊 Material Dashboard
+
+このプロジェクトには美しい Material Dashboard テンプレートが含まれています。
+
+### ダッシュボードへのアクセス方法
+
+1. **ブラウザで直接アクセス**: `dashboard.html` ファイルを開く
+2. **メイン画面から**: 右上の「📊 ダッシュボード」ボタンをクリック
+3. **URL 直接入力**: `/dashboard.html`
+
+### 利用可能なページ
+
+- 📈 **メインダッシュボード** - 主要な統計情報とグラフ
+- 📋 **テーブル** - データテーブルとリスト表示
+- 💳 **請求管理** - 請求書と支払い管理
+- 👤 **プロフィール** - ユーザープロフィール設定
+- 🔐 **サインイン** - ログインフォーム
+- 📝 **サインアップ** - 新規登録フォーム
+
+### Material Dashboard 開発コマンド
+
+```bash
+# ダッシュボード起動（依存関係インストール + 起動）
+npm run dashboard
+
+# SCSSコンパイル
+npm run dashboard:dev
+
+# SCSS監視モード
+npm run dashboard:watch
+```
+
+## 🛠️ 技術スタック
+
+- **フロントエンド**: Vue.js 3
+- **ビルドツール**: Vite
+- **UI フレームワーク**: Bootstrap 5
+- **アイコン**: Font Awesome, Material Icons
+- **チャート**: Chart.js
+- **ダッシュボード**: Material Dashboard 3
+
+## 📁 プロジェクト構造
 
 ```
-src/
-├── components/     # Vueコンポーネント
-├── assets/        # 静的ファイル（画像、CSSなど）
-├── App.vue        # ルートコンポーネント
-└── main.js        # アプリケーションエントリーポイント
+workspace_zenkoh/
+├── src/                    # Vue.js ソースコード
+├── material-dashboard-master/  # Material Dashboard テンプレート
+├── dashboard.html          # ダッシュボードアクセスページ
+├── index.html             # メインHTMLファイル
+└── package.json           # プロジェクト設定
 ```
 
-## 開発ガイドライン
+## 🌟 特徴
 
-- すべてのコンポーネントに日本語コメントを追加します
-- 変数名は明確で理解しやすく記述します
-- エラー処理を事前に考慮して安全なコードを記述します
-- 画面に表示されるテキストは日本語で記述します
+- **モダンな UI**: Material Design 3 に基づいた美しいインターフェース
+- **レスポンシブ**: すべてのデバイスで最適化された表示
+- **豊富なコンポーネント**: チャート、テーブル、フォームなど
+- **カスタマイズ可能**: SCSS ファイルでスタイルを自由に調整
+- **日本語対応**: ユーザーインターフェースが日本語化
+
+## 📝 注意事項
+
+- Material Dashboard は独立した HTML テンプレートです
+- Vue.js アプリケーションとは別のページとして動作します
+- ダッシュボードの機能を Vue.js に統合したい場合は、コンポーネント化が必要です
+
+## 🔗 リンク
+
+- [Material Dashboard 公式サイト](https://www.creative-tim.com/product/material-dashboard)
+- [Vue.js 公式ドキュメント](https://vuejs.org/)
+- [Vite 公式ドキュメント](https://vitejs.dev/)

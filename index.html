@@ -5,8 +5,30 @@
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Zenkoh Vue プロジェクト</title>
+    <style>
+      .dashboard-link {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 25px;
+        text-decoration: none;
+        font-family: "Inter", sans-serif;
+        font-weight: 500;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        transition: all 0.3s ease;
+        z-index: 1000;
+      }
+      .dashboard-link:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      }
+    </style>
   </head>
   <body>
+    <a href="dashboard.html" class="dashboard-link">📊 ダッシュボード</a>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
   </body>

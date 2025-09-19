@@ -1,0 +1,21 @@
+# .cursor/rules インデックス
+
+各ルールの役割と参照先をまとめています。新規ルールの追加・更新時は本インデックスも更新してください。
+
+## 基本ガイド
+- coding-style.mdc — 日本語コメント方針、UI テキスト日本語、セミコロン/ダブルクォート、既存インデント遵守
+- javascript-typescript.mdc — JS/TS 基本スタイル、エラー処理、import/export
+- vue-components.mdc — <script setup> 推奨、props/emit コメント、テンプレート意図明記、scoped
+- project-guidelines-ja.mdc — プロジェクト構成、Material Dashboard 統合、UI 文言基準
+- japanese-ui-guidelines.mdc — ボタン/メッセージ/フォーム/テーブル/状態/空/ツールチップ/日付の標準文言
+
+## データ/アーキテクチャ（重要）
+- project-data-architecture.mdc — 型定義・UI ヘルパー・リポジトリ・ストア・画面連携・Supabase 置換方針
+
+## 運用ルール
+- 既存ルール改訂時は互換維持と移行手順を記載
+- 画面文言は日本語、例外時は根拠を明記
+- 型/ヘルパーは重複定義せず既存へ集約
+
+## 変更履歴（要約）
+- 2025-09: project-data-architecture.mdc 追加（Supabase 連携準備）

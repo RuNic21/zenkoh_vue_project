@@ -1,16 +1,38 @@
 <script setup>
 // プロジェクト管理スケジューラー: メインアプリケーションコンポーネント
 import { ref, computed, onMounted, watch } from "vue";
+import { useScheduleStore } from "./store/schedule";
+import { getStatusBadgeClass, getProgressBarClass } from "./utils/uiHelpers";
 import MainLayout from "./layouts/MainLayout.vue";
 import ScheduleList from "./pages/ScheduleList.vue";
 import ScheduleDetail from "./pages/ScheduleDetail.vue";
 
 // 現在のページを管理するリアクティブデータ
 const currentPage = ref("dashboard");
+// 共有ストアを初期化
+const store = useScheduleStore();
 
 // ページ切り替えメソッド
 const navigateToPage = (pageName) => {
   currentPage.value = pageName;
+};
+
+// ダッシュボードの「詳細を見る」クリック時の処理
+// 目的: プロジェクト名から該当スケジュールを推測して選択→詳細へ
+const handleViewProjectDetail = (project) => {
+  try {
+    const list = store.schedules.value || [];
+    const target = list.find((s) => typeof s.title === "string" && s.title.startsWith(project.name));
+    if (target) {
+      store.selectSchedule(target.id);
+      return;
+    }
+    // 一致が無ければページのみ遷移
+    currentPage.value = "schedule-detail";
+  } catch (e) {
+    console.error("詳細遷移に失敗しました", e);
+    currentPage.value = "schedule-detail";
+  }
 };
 
 // 現在のページコンポーネントを計算
@@ -25,9 +47,29 @@ const currentComponent = computed(() => {
   }
 });
 
+// プロジェクト進捗のサンプルデータ（ダッシュボード表示用）
+// 目的: 主要プロジェクトの進捗を一覧で可視化し、状況を素早く把握する
+const projectProgressList = ref([
+  { id: 1, name: "プロジェクトA", owner: "田中", progress: 72, status: "進行中", dueDate: "2025-09-30" },
+  { id: 2, name: "プロジェクトB", owner: "佐藤", progress: 45, status: "進行中", dueDate: "2025-10-15" },
+  { id: 3, name: "プロジェクトC", owner: "鈴木", progress: 100, status: "完了", dueDate: "2025-09-10" },
+  { id: 4, name: "プロジェクトD", owner: "高橋", progress: 20, status: "遅延", dueDate: "2025-09-25" },
+]);
+
+// クラス算出ロジックはユーティリティへ集約
+
 // アプリケーション初期化
 onMounted(() => {
   console.log("プロジェクト管理スケジューラーが起動しました");
+  // 初回ロードでモックデータをロード（将来 Supabase に置換）
+  store.loadAll().catch((e) => console.error("初期データの読み込みに失敗", e));
+});
+
+// ストアでスケジュールが選択されたら詳細ページへ遷移
+watch(() => store.selectedScheduleId.value, (id) => {
+  if (id != null) {
+    currentPage.value = "schedule-detail";
+  }
 });
 </script>
 
@@ -212,96 +254,74 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- クイックアクションとアクティビティ -->
-            <div class="row">
-              <!-- クイックアクションカード -->
-              <div class="col-lg-8 col-md-6 mb-4">
-                <div class="card">
-                  <div class="card-header pb-0">
-                    <div class="row">
-                      <div class="col-lg-6 col-7">
-                        <h6>クイックアクション</h6>
-                        <p class="text-sm mb-0">
-                          <i class="fa fa-plus text-info" aria-hidden="true"></i>
-                          <span class="font-weight-bold ms-1">新しいプロジェクト</span>を作成
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="card-body px-0 pb-2">
-                    <div class="row p-3">
-                      <div class="col-md-6 mb-3">
-                        <button 
-                          class="btn btn-outline-primary w-100"
-                          @click="navigateToPage('schedule-list')"
-                        >
-                          <i class="material-symbols-rounded me-2">schedule</i>
-                          スケジュール一覧
-                        </button>
-                      </div>
-                      <div class="col-md-6 mb-3">
-                        <button class="btn btn-outline-success w-100">
-                          <i class="material-symbols-rounded me-2">add</i>
-                          新しいプロジェクト
-                        </button>
-                      </div>
-                      <div class="col-md-6 mb-3">
-                        <button class="btn btn-outline-info w-100">
-                          <i class="material-symbols-rounded me-2">task</i>
-                          タスク管理
-                        </button>
-                      </div>
-                      <div class="col-md-6 mb-3">
-                        <button class="btn btn-outline-warning w-100">
-                          <i class="material-symbols-rounded me-2">analytics</i>
-                          レポート
-                        </button>
-                      </div>
+
+          </div>
+
+          <!-- プロジェクト別進捗の一覧表示 -->
+          <div v-if="currentPage === 'dashboard'" class="row">
+            <div class="col-12">
+              <div class="card">
+                <div class="card-header pb-0">
+                  <div class="row">
+                    <div class="col-lg-6 col-8">
+                      <h6>プロジェクト別進捗</h6>
+                      <p class="text-sm mb-0">
+                        <i class="fa fa-chart-line text-info" aria-hidden="true"></i>
+                        <span class="font-weight-bold ms-1">主要プロジェクト</span>の進捗状況
+                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <!-- 最近のアクティビティ -->
-              <div class="col-lg-4 col-md-6">
-                <div class="card h-100">
-                  <div class="card-header pb-0">
-                    <h6>最近のアクティビティ</h6>
-                    <p class="text-sm">
-                      <i class="fa fa-clock text-info" aria-hidden="true"></i>
-                      <span class="font-weight-bold">リアルタイム</span>更新
-                    </p>
-                  </div>
-                  <div class="card-body p-3">
-                    <div class="timeline timeline-one-side">
-                      <div class="timeline-block mb-3">
-                        <span class="timeline-step">
-                          <i class="material-symbols-rounded text-success text-gradient">check_circle</i>
-                        </span>
-                        <div class="timeline-content">
-                          <h6 class="text-dark text-sm font-weight-bold mb-0">プロジェクトA完了</h6>
-                          <p class="text-secondary font-weight-bold text-xs mt-1 mb-0">2時間前</p>
-                        </div>
-                      </div>
-                      <div class="timeline-block mb-3">
-                        <span class="timeline-step">
-                          <i class="material-symbols-rounded text-primary text-gradient">add</i>
-                        </span>
-                        <div class="timeline-content">
-                          <h6 class="text-dark text-sm font-weight-bold mb-0">新しいタスク追加</h6>
-                          <p class="text-secondary font-weight-bold text-xs mt-1 mb-0">4時間前</p>
-                        </div>
-                      </div>
-                      <div class="timeline-block mb-3">
-                        <span class="timeline-step">
-                          <i class="material-symbols-rounded text-warning text-gradient">schedule</i>
-                        </span>
-                        <div class="timeline-content">
-                          <h6 class="text-dark text-sm font-weight-bold mb-0">スケジュール更新</h6>
-                          <p class="text-secondary font-weight-bold text-xs mt-1 mb-0">1日前</p>
-                        </div>
-                      </div>
-                    </div>
+                <div class="card-body px-0 pt-0 pb-2">
+                  <div class="table-responsive p-0">
+                    <table class="table align-items-center mb-0">
+                      <thead>
+                        <tr>
+                          <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">プロジェクト名</th>
+                          <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">担当者</th>
+                          <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">進捗</th>
+                          <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">状態</th>
+                          <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">期限</th>
+                          <th class="text-secondary opacity-7"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="project in projectProgressList" :key="project.id">
+                          <td>
+                            <div class="d-flex px-3 py-1">
+                              <div class="d-flex flex-column justify-content-center">
+                                <h6 class="mb-0 text-sm">{{ project.name }}</h6>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <p class="text-xs font-weight-bold mb-0">{{ project.owner }}</p>
+                          </td>
+                          <td class="align-middle text-center">
+                            <div class="d-flex flex-column align-items-center justify-content-center px-2">
+                              <span class="text-xs font-weight-bold mb-1">{{ project.progress }}%</span>
+                              <div class="progress w-100" style="max-width:160px;">
+                                <div :class="getProgressBarClass(project.progress)" :style="{ width: project.progress + '%' }" role="progressbar" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="project.progress"></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td class="align-middle text-center">
+                            <span :class="getStatusBadgeClass(project.status)">{{ project.status }}</span>
+                          </td>
+                          <td class="align-middle text-center">
+                            <span class="text-secondary text-xs font-weight-normal">{{ project.dueDate }}</span>
+                          </td>
+                          <td class="align-middle">
+                            <button 
+                              class="btn btn-sm bg-gradient-primary mb-0" 
+                              @click="handleViewProjectDetail(project)"
+                            >
+                              詳細を見る
+                            </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>

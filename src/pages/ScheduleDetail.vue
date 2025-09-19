@@ -1,46 +1,46 @@
 <script setup>
 // スケジュール詳細ページ: 個別スケジュールの詳細表示・編集
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
+import { useScheduleStore } from "../store/schedule";
 
-// スケジュール詳細データの管理
-const scheduleDetail = ref({
-  id: 1,
-  title: "プロジェクトA - 初期設計",
-  description: "システムの基本設計とアーキテクチャの検討",
-  startDate: "2024-01-15",
-  endDate: "2024-01-30",
-  status: "進行中",
-  priority: "高",
-  assignee: "田中太郎",
-  progress: 65,
-  category: "開発",
-  tags: ["設計", "アーキテクチャ", "要件定義"],
-  notes: "システムの基本設計を完了し、アーキテクチャの検討を進めています。",
-  attachments: [
-    { name: "設計書_v1.0.pdf", size: "2.3MB", type: "pdf" },
-    { name: "要件定義書.docx", size: "1.8MB", type: "docx" }
-  ],
-  comments: [
-    {
-      id: 1,
-      author: "佐藤花子",
-      content: "設計書のレビューが完了しました。",
-      timestamp: "2024-01-20 14:30",
-      avatar: "SH"
-    },
-    {
-      id: 2,
-      author: "鈴木一郎",
-      content: "アーキテクチャの検討について質問があります。",
-      timestamp: "2024-01-21 09:15",
-      avatar: "SI"
-    }
-  ]
+// 共有ストアから選択中スケジュールを参照（欠損プロパティを安全に補完）
+const store = useScheduleStore();
+const scheduleDetail = computed(() => {
+  const base = {
+    id: 0,
+    title: "スケジュール未選択",
+    description: "左の一覧からスケジュールを選択してください",
+    startDate: "",
+    endDate: "",
+    status: "予定",
+    priority: "中",
+    assignee: "",
+    progress: 0,
+    category: "",
+    tags: [],
+    notes: "",
+    attachments: [],
+    comments: [],
+  };
+  const src = store.selectedSchedule || {};
+  return { ...base, ...src, 
+    // 配列/文字列系は欠損時に既定値を強制
+    tags: Array.isArray(src.tags) ? src.tags : base.tags,
+    attachments: Array.isArray(src.attachments) ? src.attachments : base.attachments,
+    comments: Array.isArray(src.comments) ? src.comments : base.comments,
+    notes: typeof src.notes === "string" ? src.notes : base.notes,
+    category: typeof src.category === "string" ? src.category : base.category,
+  };
 });
 
 // 編集モードの管理
 const isEditMode = ref(false);
 const editForm = ref({ ...scheduleDetail.value });
+
+// 選択スケジュールが変わったら編集フォームを同期
+watch(scheduleDetail, (val) => {
+  editForm.value = { ...val };
+});
 
 // 新しいコメントの入力
 const newComment = ref("");
@@ -85,7 +85,8 @@ const toggleEditMode = () => {
 
 // 保存処理
 const saveChanges = () => {
-  scheduleDetail.value = { ...editForm.value };
+  // ストアに保存し、単一ソースを更新
+  store.updateSchedule({ ...editForm.value });
   isEditMode.value = false;
   console.log("スケジュールが保存されました");
 };
@@ -120,7 +121,11 @@ const handleFileUpload = (event) => {
       size: (file.size / 1024 / 1024).toFixed(1) + "MB",
       type: file.name.split('.').pop()
     };
-    scheduleDetail.value.attachments.push(attachment);
+    // 編集フォームに追加し、保存時にストアへ反映
+    if (!Array.isArray(editForm.value.attachments)) {
+      editForm.value.attachments = [];
+    }
+    editForm.value.attachments.push(attachment);
   }
 };
 

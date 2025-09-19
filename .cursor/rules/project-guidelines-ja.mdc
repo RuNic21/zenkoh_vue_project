@@ -48,66 +48,14 @@ zenkoh_vue_project/
 - コンポーネント: `card`, `card-header`, `card-body`, `card-footer`, `badge`, `progress` を遵守
 - JS: Bootstrap, Chart.js, Perfect Scrollbar, MD JS を index.html から読み込み
 
-## 日本語 UI テキスト・UX ガイド
-- 画面上のすべてのテキストは日本語
-- ボタン: 「保存」「キャンセル」「確認」「削除」「編集」「追加」
-- メッセージ: 「処理中です…」「完了しました」「変更が適用されました」
-- エラー: 「エラーが発生しました」「バリデーションに失敗しました」「ネットワーク接続を確認してください」
-- フォーム例:
-```html
-<label class="form-label">タイトル</label>
-<input placeholder="プロジェクトタイトルを入力してください">
-<label class="form-label">説明</label>
-<textarea placeholder="プロジェクトの説明を入力してください"></textarea>
-```
-- 状態/優先度: 「進行中/完了/予定/遅延」「高/中/低」
-- 空状態サンプル:
-```html
-<div class="text-center">
-  <h5 class="text-muted">スケジュールがありません</h5>
-  <p class="text-muted">スケジュールを追加するか、フィルターを調整してください。</p>
-  <button class="btn bg-gradient-primary">新しいスケジュールを追加</button>
-</div>
-```
+## 日本語 UI テキスト・UX ガイド（参照）
+- 重複を避けるため詳細は `japanese-ui-guidelines.mdc` を参照
 
-## Vue 3 Composition API パターン
-- `<script setup>` を使用。変数名は意味的で明確に
-- 典型構成:
-```vue
-<script setup>
-import { ref, computed, onMounted, watch } from "vue";
-const props = defineProps({
-  propName: { type: String, required: false, default: "" }
-});
-const emit = defineEmits(["navigate","update","delete"]);
-const state = ref("");
-const derived = computed(() => state.value);
-const handleClick = () => emit("update", state.value);
-onMounted(() => console.log("マウントしました"));
-</script>
-```
-- ローディング/エラーの基本状態:
-```ts
-const isLoading = ref(false);
-const errorMessage = ref("");
-```
-- フィルタ/検索は `computed` で表現
-- フォーム検証例:
-```ts
-const validateForm = () => {
-  const errors = {} as Record<string,string>;
-  if (!title.value.trim()) errors.title = "タイトルを入力してください";
-  return errors;
-};
-```
-- API 呼び出しは try/catch/finally を徹底し、日本語メッセージを返す
+## Vue 3 Composition API パターン（参照）
+- 重複を避けるため詳細は `vue-components.mdc` を参照
 
-## コーディング実務ルール
-- 変数/関数は意味的に明確な命名
-- 深いネストは避け、ガード節を優先
-- 例外は握りつぶさない（ユーザーに日本語で通知）
-- スタイルは関連箇所のみ `scoped` で調整、既存の MD クラスを優先
-- レスポンシブ: 主要ブレークポイント（sm, md, lg, xl）を意識したカラム設計
+## コーディング実務ルール（参照）
+- 重複を避けるため詳細は `coding-style.mdc` を参照
 
 ## よく使う UI フラグメント
 - 統計カード（4 枚横並び）: `col-xl-3 col-sm-6`

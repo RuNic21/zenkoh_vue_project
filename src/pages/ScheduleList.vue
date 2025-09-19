@@ -1,43 +1,12 @@
 <script setup>
 // スケジュール一覧ページ: プロジェクトのスケジュールを一覧表示・管理
 import { ref, computed, onMounted } from "vue";
+import { useScheduleStore } from "../store/schedule";
+import { getStatusBadgeClass, getProgressBarClass } from "../utils/uiHelpers";
 
-// スケジュールデータの管理
-const schedules = ref([
-  {
-    id: 1,
-    title: "プロジェクトA - 初期設計",
-    description: "システムの基本設計とアーキテクチャの検討",
-    startDate: "2024-01-15",
-    endDate: "2024-01-30",
-    status: "進行中",
-    priority: "高",
-    assignee: "田中太郎",
-    progress: 65
-  },
-  {
-    id: 2,
-    title: "プロジェクトB - 開発フェーズ",
-    description: "フロントエンドとバックエンドの実装",
-    startDate: "2024-01-20",
-    endDate: "2024-02-15",
-    status: "進行中",
-    priority: "中",
-    assignee: "佐藤花子",
-    progress: 40
-  },
-  {
-    id: 3,
-    title: "プロジェクトC - テスト",
-    description: "システム全体のテストとバグ修正",
-    startDate: "2024-02-01",
-    endDate: "2024-02-20",
-    status: "予定",
-    priority: "低",
-    assignee: "鈴木一郎",
-    progress: 0
-  }
-]);
+// 共有ストアからスケジュールを取得
+const store = useScheduleStore();
+const schedules = store.schedules;
 
 // フィルター状態の管理
 const filterStatus = ref("all");
@@ -103,7 +72,10 @@ const addNewSchedule = () => {
 
 // スケジュール編集
 const editSchedule = (scheduleId) => {
-  console.log(`スケジュール ${scheduleId} を編集します`);
+  // 一覧から選択して詳細へ遷移できるように選択IDをセット
+  store.selectSchedule(scheduleId);
+  // ルート未使用のため、親（App）に任せず一覧内では詳細ボタンでナビゲートする想定
+  // 実際の遷移は App 側の「詳細を見る」ボタンやナビゲーションに合わせて行う
 };
 
 // スケジュール削除
@@ -111,6 +83,11 @@ const deleteSchedule = (scheduleId) => {
   if (confirm("このスケジュールを削除しますか？")) {
     schedules.value = schedules.value.filter(s => s.id !== scheduleId);
   }
+};
+
+// 詳細表示（選択して App 側のウォッチで詳細へ遷移）
+const viewDetails = (scheduleId) => {
+  store.selectSchedule(scheduleId);
 };
 
 // コンポーネント初期化
@@ -231,7 +208,7 @@ onMounted(() => {
             <div class="d-flex justify-content-between align-items-center mb-3">
               <span 
                 class="badge badge-sm"
-                :class="getStatusColor(schedule.status)"
+                :class="getStatusBadgeClass(schedule.status)"
               >
                 {{ schedule.status }}
               </span>
@@ -262,7 +239,7 @@ onMounted(() => {
               </div>
               <div class="progress">
                 <div 
-                  class="progress-bar bg-gradient-primary" 
+                  :class="getProgressBarClass(schedule.progress)" 
                   :style="{ width: schedule.progress + '%' }"
                   role="progressbar"
                 ></div>
@@ -292,7 +269,7 @@ onMounted(() => {
                 <i class="material-symbols-rounded me-1">edit</i>
                 編集
               </button>
-              <button class="btn btn-outline-info btn-sm">
+              <button class="btn btn-outline-info btn-sm" @click="viewDetails(schedule.id)">
                 <i class="material-symbols-rounded me-1">visibility</i>
                 詳細
               </button>

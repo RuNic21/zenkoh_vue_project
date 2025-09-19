@@ -1,0 +1,36 @@
+# Zenkoh Project Scheduler: データ/アーキテクチャ ルール（Supabase 連携準備）
+
+本ドキュメントは、現状の実装構成と将来の Supabase 連携を円滑に行うためのルールをまとめたものです。
+
+## 構成サマリ
+- **データ型定義**: `src/types/schedule.ts`
+  - `ScheduleItem`, `ScheduleStatus`, `SchedulePriority`, `ScheduleAttachment`, `ScheduleComment`
+- **UI ヘルパー**: `src/utils/uiHelpers.ts`
+  - `getStatusBadgeClass(status)`, `getProgressBarClass(progress)`
+- **リポジトリ**: `src/services/scheduleService.ts`
+  - `ScheduleRepository`（list/getById/create/update/remove）
+  - `createMockScheduleRepository()`（シード/遅延モック）
+- **ストア**: `src/store/schedule.ts`
+  - 状態: `schedules`, `selectedScheduleId`, `selectedSchedule`
+  - 同期: `selectSchedule`, `updateSchedule`, `addSchedule`, `removeSchedule`
+  - 非同期: `loadAll`, `save`, `create`, `delete`
+- **画面**
+  - `src/App.vue`: 初回 `loadAll`、選択監視→詳細遷移、ダッシュボードの詳細ナビゲーション
+  - `src/pages/ScheduleList.vue`: ストア表示、`selectSchedule`で詳細へ
+  - `src/pages/ScheduleDetail.vue`: `selectedSchedule`参照、不足値補完、安全化
+
+## 実装ルール
+- 型/契約は `src/types/schedule.ts` を基準（日付は `YYYY-MM-DD`）
+- ステータス/進捗のクラスは `uiHelpers` を必ず使用
+- 配列/オプショナルは undefined 対策（既定値補完）
+- ルータ未導入: `selectedScheduleId` の変更で詳細へ（将来 `vue-router` に置換）
+
+## Supabase 置換方針
+1. `createSupabaseScheduleRepository()` を `src/services/scheduleService.ts` に追加
+2. ストアの非同期 API 内でモックを Supabase 実装に差し替え
+3. 型差異はサービス層で相互変換（snake_case 等）
+
+## 推奨タスク
+- ダッシュボード進捗テーブルをストア由来の computed に移行
+- `vue-router` 導入（URL 直遷移）
+- Supabase リポジトリ実装と `.env` 設定

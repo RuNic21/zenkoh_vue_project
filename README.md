@@ -2,6 +2,24 @@
 
 Zenkoh のプロジェクト/スケジュール管理用 Web アプリケーションです。Vue 3（Composition API）と Vite、Material Dashboard 3 を統合しています。
 
+## 🧱 アーキテクチャ概要（Supabase 連携準備済み）
+
+- 型定義: `src/types/schedule.ts`（画面/サービス共通契約）
+- UI ヘルパー: `src/utils/uiHelpers.ts`（ステータス/進捗のクラス一元管理）
+- リポジトリ: `src/services/scheduleService.ts`
+  - `ScheduleRepository` インターフェース（list/getById/create/update/remove）
+  - `createMockScheduleRepository()` によるモック（シード + 疑似遅延）
+- ストア: `src/store/schedule.ts`
+  - 状態: `schedules`, `selectedScheduleId`, `selectedSchedule`
+  - 同期操作: `selectSchedule`, `updateSchedule`, `addSchedule`, `removeSchedule`
+  - 非同期操作: `loadAll`, `save`, `create`, `delete`（内部でモックを呼び出し。後日 Supabase に差し替え）
+- 画面連携:
+  - `App.vue`: 初回 `loadAll()`、選択監視で詳細へ遷移、ダッシュボードから詳細遷移
+  - `pages/ScheduleList.vue`: ストア一覧表示、`selectSchedule(id)` で詳細へ
+  - `pages/ScheduleDetail.vue`: 選択データ参照。欠損値は既定値で補完し安全化
+
+詳しくは `.cursor/rules/project-data-architecture.mdc` を参照してください。
+
 ## 🚀 クイックスタート
 
 ### 開発サーバー起動
@@ -73,6 +91,17 @@ zenkoh_vue_project/
 └── material-dashboard-master/ # テンプレート原本（参照/別起動）
 ```
 
+## 🧪 モックデータの動作（本番データ未接続時）
+
+- 初回マウント時に `store.loadAll()` がモックリポジトリからデータを読み込みます。
+- 保存/作成/削除は `store.save/create/delete` を利用してください（画面からはストア API 経由で呼び出します）。
+
+## 🔄 後日 Supabase に切り替える手順（概要）
+
+1. `src/services/scheduleService.ts` に `createSupabaseScheduleRepository()` を実装します。
+2. `src/store/schedule.ts` の非同期 API で、モックの代わりに Supabase 用リポジトリを使用します。
+3. 必要に応じて `.env`（URL/anon key など）を設定し、スキーマ差異はサービス層で吸収します。
+
 ## 🛠️ 技術スタック
 
 - **フロントエンド**: Vue 3
@@ -94,6 +123,10 @@ zenkoh_vue_project/
 - Material Dashboard は「独立した HTML テンプレート」です。Vue アプリとは別に動作します。
 - Vue へフル統合する際は、必要なセクションをコンポーネント化してください。
 - 画面に表示される文言は日本語で統一しています。
+
+## 📚 ルール/ガイドライン
+
+- `.cursor/rules/INDEX.mdc` から各種ルール（UI テキスト・コーディング規約・Vue パターン・データ/アーキテクチャ）を参照できます。
 
 ## 🔗 リンク
 

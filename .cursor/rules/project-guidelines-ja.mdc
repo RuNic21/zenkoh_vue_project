@@ -1,0 +1,133 @@
+---
+alwaysApply: true
+description: プロジェクト全体の開発ガイド（構成・UI・Material Dashboard・Vue パターン）
+---
+
+# Zenkoh Project Scheduler 開発ガイド（日本語統合版）
+
+## プロジェクト概要
+- 名称: Zenkoh Project Scheduler
+- 技術: Vue 3 + Composition API + Vite + Material Dashboard 3.2.0
+- 目的: プロジェクト管理とスケジュール管理のための Web アプリケーション
+
+## ディレクトリ構成（必読）
+```
+zenkoh_vue_project/
+├─ index.html                # エントリ HTML（MD CSS/JS を読み込み）
+├─ package.json              # 依存関係とスクリプト
+├─ src/
+│  ├─ main.js               # Vue エントリ。MD CSS を import
+│  ├─ App.vue               # ルート。ダッシュボードとページ切替
+│  ├─ layouts/MainLayout.vue# サイドバー + ナビゲーション
+│  ├─ pages/
+│  │  ├─ ScheduleList.vue  # スケジュール一覧
+│  │  └─ ScheduleDetail.vue# スケジュール詳細
+│  ├─ assets/
+│  │  ├─ css/              # material-dashboard.css 他
+│  │  ├─ js/               # material-dashboard.min.js, plugins
+│  │  ├─ img/, fonts/      # 画像/フォント
+│  │  └─ scss/             # SCSS ソース（必要に応じ）
+│  └─ ...
+└─ material-dashboard-master/ # 原本テンプレート（参照用）
+```
+
+## Material Dashboard 統合（必須クラス・読み込み順）
+- index.html で MD CSS/JS, Google Fonts, Icons を読み込み
+- main.js で `material-dashboard.css`, `nucleo-icons.css`, `nucleo-svg.css` を import
+- レイアウト構造:
+```html
+<div class="g-sidenav-show bg-gray-100">
+  <aside class="sidenav navbar navbar-vertical navbar-expand-xs border-radius-lg fixed-start ms-2 bg-white my-2"></aside>
+  <main class="main-content position-relative max-height-vh-100 h-100 border-radius-lg">
+    <nav class="navbar navbar-main navbar-expand-lg px-0 mx-3 shadow-none border-radius-xl"></nav>
+    <div class="container-fluid py-4"></div>
+  </main>
+</div>
+```
+- グリッド: `row`, `col-xl-3 col-sm-6`, `col-lg-8 col-md-6` などの組合せを使用
+- コンポーネント: `card`, `card-header`, `card-body`, `card-footer`, `badge`, `progress` を遵守
+- JS: Bootstrap, Chart.js, Perfect Scrollbar, MD JS を index.html から読み込み
+
+## 日本語 UI テキスト・UX ガイド
+- 画面上のすべてのテキストは日本語
+- ボタン: 「保存」「キャンセル」「確認」「削除」「編集」「追加」
+- メッセージ: 「処理中です…」「完了しました」「変更が適用されました」
+- エラー: 「エラーが発生しました」「バリデーションに失敗しました」「ネットワーク接続を確認してください」
+- フォーム例:
+```html
+<label class="form-label">タイトル</label>
+<input placeholder="プロジェクトタイトルを入力してください">
+<label class="form-label">説明</label>
+<textarea placeholder="プロジェクトの説明を入力してください"></textarea>
+```
+- 状態/優先度: 「進行中/完了/予定/遅延」「高/中/低」
+- 空状態サンプル:
+```html
+<div class="text-center">
+  <h5 class="text-muted">スケジュールがありません</h5>
+  <p class="text-muted">スケジュールを追加するか、フィルターを調整してください。</p>
+  <button class="btn bg-gradient-primary">新しいスケジュールを追加</button>
+</div>
+```
+
+## Vue 3 Composition API パターン
+- `<script setup>` を使用。変数名は意味的で明確に
+- 典型構成:
+```vue
+<script setup>
+import { ref, computed, onMounted, watch } from "vue";
+const props = defineProps({
+  propName: { type: String, required: false, default: "" }
+});
+const emit = defineEmits(["navigate","update","delete"]);
+const state = ref("");
+const derived = computed(() => state.value);
+const handleClick = () => emit("update", state.value);
+onMounted(() => console.log("マウントしました"));
+</script>
+```
+- ローディング/エラーの基本状態:
+```ts
+const isLoading = ref(false);
+const errorMessage = ref("");
+```
+- フィルタ/検索は `computed` で表現
+- フォーム検証例:
+```ts
+const validateForm = () => {
+  const errors = {} as Record<string,string>;
+  if (!title.value.trim()) errors.title = "タイトルを入力してください";
+  return errors;
+};
+```
+- API 呼び出しは try/catch/finally を徹底し、日本語メッセージを返す
+
+## コーディング実務ルール
+- 変数/関数は意味的に明確な命名
+- 深いネストは避け、ガード節を優先
+- 例外は握りつぶさない（ユーザーに日本語で通知）
+- スタイルは関連箇所のみ `scoped` で調整、既存の MD クラスを優先
+- レスポンシブ: 主要ブレークポイント（sm, md, lg, xl）を意識したカラム設計
+
+## よく使う UI フラグメント
+- 統計カード（4 枚横並び）: `col-xl-3 col-sm-6`
+- 2 カラム: 左 `col-lg-8 col-md-6` / 右 `col-lg-4 col-md-6`
+- 進捗バー:
+```html
+<div class="progress"><div class="progress-bar bg-gradient-primary" style="width:65%"></div></div>
+```
+- バッジ:
+```html
+<span class="badge bg-gradient-success">完了</span>
+```
+
+## 品質・ビルド
+- 開発: `npm run dev`
+- ビルド: `npm run build`
+- プレビュー: `npm run preview`
+- 画像/CSS/JS を最適化、不要アセットの削減
+
+## 注意事項
+- Material Dashboard のクラス体系を尊重
+- 画面文言は日本語、コード内コメントも日本語
+- 必要以上に複雑にしない。読みやすさを最優先

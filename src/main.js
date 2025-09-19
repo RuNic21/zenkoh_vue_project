@@ -1,6 +1,8 @@
 // Vueアプリケーションのメインエントリーポイント
-// グローバルCSSスタイルをインポートします
-import "./assets/main.css";
+// Material Dashboard CSSをインポートします
+import "./assets/css/material-dashboard.css";
+import "./assets/css/nucleo-icons.css";
+import "./assets/css/nucleo-svg.css";
 
 // Vue 3のcreateApp関数をインポートします
 import { createApp } from "vue";

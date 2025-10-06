@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 // プロジェクト管理スケジューラー: メインアプリケーションコンポーネント
 import { ref, computed, onMounted, watch } from "vue";
 import { useScheduleStore } from "./store/schedule";
@@ -6,6 +6,8 @@ import { getStatusBadgeClass, getProgressBarClass } from "./utils/uiHelpers";
 import MainLayout from "./layouts/MainLayout.vue";
 import ScheduleList from "./pages/ScheduleList.vue";
 import ScheduleDetail from "./pages/ScheduleDetail.vue";
+// Supabase クライアント（ダッシュボード一覧をDBから取得するために使用）
+import { supabase } from "./services/supabaseClient";
 
 // 現在のページを管理するリアクティブデータ
 const currentPage = ref("dashboard");
@@ -47,14 +49,77 @@ const currentComponent = computed(() => {
   }
 });
 
-// プロジェクト進捗のサンプルデータ（ダッシュボード表示用）
-// 目的: 主要プロジェクトの進捗を一覧で可視化し、状況を素早く把握する
-const projectProgressList = ref([
-  { id: 1, name: "プロジェクトA", owner: "田中", progress: 72, status: "進行中", dueDate: "2025-09-30" },
-  { id: 2, name: "プロジェクトB", owner: "佐藤", progress: 45, status: "進行中", dueDate: "2025-10-15" },
-  { id: 3, name: "プロジェクトC", owner: "鈴木", progress: 100, status: "完了", dueDate: "2025-09-10" },
-  { id: 4, name: "プロジェクトD", owner: "高橋", progress: 20, status: "遅延", dueDate: "2025-09-25" },
-]);
+// ダッシュボード表示用: DB の projects / tasks / users を用いて進捗一覧を構築
+// 仕様: 進捗 = 同一プロジェクトの tasks.progress_percent の平均（小数点四捨五入）
+//       担当者 = projects.owner_user_id に紐づく users.display_name（無ければ "-"）
+//       期限 = projects.end_date（無ければ "-"）
+interface ProjectProgressRow {
+  id: number;
+  name: string;
+  owner: string;
+  progress: number;
+  status: string;
+  dueDate: string;
+}
+const projectProgressList = ref<ProjectProgressRow[]>([]);
+
+// DB からダッシュボード用データを読み込む
+const loadDashboardFromDb = async (): Promise<void> => {
+  try {
+    // 1) プロジェクト一覧を取得（最新10件）
+    const { data: projects, error: projErr } = await supabase
+      .from("projects")
+      .select("id,name,owner_user_id,end_date")
+      .order("id", { ascending: false })
+      .limit(10);
+    if (projErr) throw new Error(projErr.message);
+    const projectIds = (projects ?? []).map((p) => p.id);
+
+    // 2) 対象プロジェクトのタスク進捗をまとめて取得
+    const { data: tasks, error: taskErr } = await supabase
+      .from("tasks")
+      .select("project_id,progress_percent")
+      .in("project_id", projectIds.length > 0 ? projectIds : [-1]);
+    if (taskErr) throw new Error(taskErr.message);
+
+    // 3) owner ユーザー名を一括取得
+    const ownerIds = Array.from(
+      new Set((projects ?? []).map((p) => p.owner_user_id).filter((v) => v != null))
+    ) as number[];
+    let ownersMap: Record<number, string> = {};
+    if (ownerIds.length > 0) {
+      const { data: owners, error: userErr } = await supabase
+        .from("users")
+        .select("id,display_name")
+        .in("id", ownerIds);
+      if (userErr) throw new Error(userErr.message);
+      ownersMap = (owners ?? []).reduce((acc, u) => {
+        acc[u.id as number] = (u.display_name as string) ?? "-";
+        return acc;
+      }, {} as Record<number, string>);
+    }
+
+    // 4) 集計して表示用配列を構築
+    const progressByProject = new Map<number, { sum: number; count: number }>();
+    for (const t of tasks ?? []) {
+      const key = t.project_id as number;
+      const cur = progressByProject.get(key) ?? { sum: 0, count: 0 };
+      progressByProject.set(key, { sum: cur.sum + (t.progress_percent as number), count: cur.count + 1 });
+    }
+
+    projectProgressList.value = (projects ?? []).map((p) => {
+      const agg = progressByProject.get(p.id) ?? { sum: 0, count: 0 };
+      const avg = agg.count > 0 ? Math.round(agg.sum / agg.count) : 0;
+      const status = avg >= 100 ? "完了" : "進行中";
+      const owner = p.owner_user_id != null ? ownersMap[p.owner_user_id as number] ?? "-" : "-";
+      const due = p.end_date ? String(p.end_date) : "-";
+      return { id: p.id, name: p.name as string, owner, progress: avg, status, dueDate: due };
+    });
+  } catch (e) {
+    console.error("ダッシュボードの読み込みに失敗", e);
+    projectProgressList.value = [];
+  }
+};
 
 // クラス算出ロジックはユーティリティへ集約
 
@@ -63,6 +128,8 @@ onMounted(() => {
   console.log("プロジェクト管理スケジューラーが起動しました");
   // 初回ロードでモックデータをロード（将来 Supabase に置換）
   store.loadAll().catch((e) => console.error("初期データの読み込みに失敗", e));
+  // ダッシュボードを DB から取得
+  loadDashboardFromDb();
 });
 
 // ストアでスケジュールが選択されたら詳細ページへ遷移

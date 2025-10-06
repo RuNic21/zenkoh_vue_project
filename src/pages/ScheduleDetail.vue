@@ -1,11 +1,12 @@
-<script setup>
+<script setup lang="ts">
 // スケジュール詳細ページ: 個別スケジュールの詳細表示・編集
 import { ref, computed, onMounted, watch } from "vue";
 import { useScheduleStore } from "../store/schedule";
+import { supabase } from "../services/supabaseClient";
 
 // 共有ストアから選択中スケジュールを参照（欠損プロパティを安全に補完）
 const store = useScheduleStore();
-const scheduleDetail = computed(() => {
+const scheduleDetail = computed<any>(() => {
   const base = {
     id: 0,
     title: "スケジュール未選択",
@@ -22,7 +23,7 @@ const scheduleDetail = computed(() => {
     attachments: [],
     comments: [],
   };
-  const src = store.selectedSchedule || {};
+  const src: any = store.selectedSchedule || {};
   return { ...base, ...src, 
     // 配列/文字列系は欠損時に既定値を強制
     tags: Array.isArray(src.tags) ? src.tags : base.tags,
@@ -84,11 +85,31 @@ const toggleEditMode = () => {
 };
 
 // 保存処理
-const saveChanges = () => {
-  // ストアに保存し、単一ソースを更新
-  store.updateSchedule({ ...editForm.value });
-  isEditMode.value = false;
-  console.log("スケジュールが保存されました");
+const saveChanges = async () => {
+  try {
+    // DB 更新（tasks）
+    const id = scheduleDetail.value.id as number;
+    const payload: Record<string, unknown> = {
+      task_name: editForm.value.title,
+      description: editForm.value.description,
+      planned_start: editForm.value.startDate || null,
+      planned_end: editForm.value.endDate || null,
+      progress_percent: editForm.value.progress,
+    };
+    const { error } = await supabase
+      .from("tasks")
+      .update(payload)
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+
+    // ストアも更新
+    store.updateSchedule({ ...editForm.value });
+    isEditMode.value = false;
+    console.log("スケジュールが保存されました");
+  } catch (e) {
+    console.error("保存に失敗", e);
+    alert("保存に失敗しました");
+  }
 };
 
 // キャンセル処理

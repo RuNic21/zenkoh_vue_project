@@ -1,0 +1,292 @@
+---
+description: データベース統合ルール（選択的参照）
+---
+
+# データベース統合ルール (Database Integration Rules)
+
+## 📋 概要
+
+Zenkoh Project Scheduler の Supabase データベース統合に関する開発ルールとガイドラインです。
+
+## 🏗️ アーキテクチャ原則
+
+### 1. 階層化されたデータアクセス
+```
+UI Layer (Vue Components)
+    ↓
+Store Layer (Pinia/Reactive Store)
+    ↓
+Service Layer (taskService, projectService)
+    ↓
+Adapter Layer (taskAdapter)
+    ↓
+Database Layer (Supabase)
+```
+
+### 2. 型システム構造
+- **DB型**: `src/types/db/*.ts` (自動生成、編集禁止)
+- **ビジネス型**: `src/types/task.ts`, `src/types/project.ts` (手動定義)
+- **UI型**: `src/types/schedule.ts` (画面表示用)
+
+## 🔧 開発ルール
+
+### 1. データベースアクセスルール
+
+#### ✅ 正しい方法
+```typescript
+// Store経由でのアクセス
+const store = useScheduleStore();
+await store.loadAll(); // DBからデータロード
+await store.save(item); // DBに保存
+await store.create(newItem); // 新規項目作成
+await store.delete(id); // 削除
+```
+
+#### ❌ 避けるべき方法
+```typescript
+// 直接Supabase呼び出し（コンポーネントから）
+const { data } = await supabase.from("tasks").select("*");
+
+// 直接サービス呼び出し（コンポーネントから）
+const tasks = await listTasks();
+```
+
+### 2. 型変換ルール
+
+#### Task ↔ ScheduleItem 変換
+```typescript
+// DB → UI 変換
+import { taskToScheduleItem } from "../utils/taskAdapter";
+const scheduleItem = taskToScheduleItem(task, users);
+
+// UI → DB 変換
+import { scheduleItemToTaskUpdate } from "../utils/taskAdapter";
+const taskUpdate = scheduleItemToTaskUpdate(scheduleItem);
+```
+
+#### 状態/優先度マッピング
+```typescript
+// DB状態 → 日本語UI
+"NOT_STARTED" → "予定"
+"IN_PROGRESS" → "進行中"
+"DONE" → "完了"
+"DELAYED" → "遅延"
+
+// 優先度マッピング
+"HIGH" → "高"
+"MEDIUM" → "中"
+"LOW" → "低"
+```
+
+### 3. エラー処理ルール
+
+#### サービスレイヤーエラー処理
+```typescript
+export async function createTask(payload: TaskInsert): Promise<Task | null> {
+  try {
+    const { data, error } = await supabase
+      .from("tasks")
+      .insert([payload])
+      .select("*")
+      .single();
+    
+    if (error) {
+      console.error("タスク作成に失敗:", error.message);
+      return null; // null返却で失敗表示
+    }
+    return data as Task;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("タスク作成時に予期せぬエラー:", msg);
+    return null;
+  }
+}
+```
+
+#### UIエラー処理
+```typescript
+const saveChanges = async () => {
+  try {
+    await store.save({ ...editForm.value });
+    // 成功処理
+  } catch (e) {
+    console.error("保存に失敗", e);
+    alert("保存に失敗しました"); // ユーザーフレンドリーなメッセージ
+  }
+};
+```
+
+## 📊 データベーススキーマルール
+
+### 1. テーブル関係
+- **PROJECTS** → **TASKS** (1:N)
+- **TASKS** → **TASK_MEMBERS** (1:N)
+- **USERS** → **TASK_MEMBERS** (1:N)
+- **PROJECTS** → **BOARDS** (1:N)
+- **BOARDS** → **BOARD_COLUMNS** (1:N)
+
+### 2. 必須フィールドルール
+```typescript
+// Task作成時の必須フィールド
+interface TaskInsert {
+  project_id: number;     // 必須
+  task_name: string;      // 必須
+  // 残りは選択項目
+  status?: string;        // デフォルト値: "NOT_STARTED"
+  priority?: string;      // デフォルト値: "MEDIUM"
+  progress_percent?: number; // デフォルト値: 0
+}
+```
+
+### 3. 日付形式ルール
+- **DB保存**: ISO 8601形式 (`2024-01-15T00:00:00.000Z`)
+- **UI表示**: YYYY-MM-DD形式 (`2024-01-15`)
+- **変換**: `taskAdapter.ts`で自動処理
+
+## 🛠️ 開発ツール使用方法
+
+### 1. 型生成
+```bash
+# Supabaseから型自動生成
+npm run types:gen
+
+# CSVから型生成
+npm run types:fromcsv
+```
+
+### 2. データベーステスト
+```bash
+# 環境変数テスト
+npm run test:env
+
+# CRUDテスト
+npm run test:crud:all
+
+# 特定テーブルテスト
+npm run test:projects
+npm run test:tasks
+```
+
+### 3. シードデータ管理
+```bash
+# 全体シードデータ生成
+npm run seed:all
+
+# 特定テーブルシード
+npm run seed:projects
+npm run seed:tasks
+
+# CSVエクスポート
+npm run export:csv
+```
+
+## 🔍 デバッグガイド
+
+### 1. データベース接続確認
+```bash
+npm run test:env
+# 出力: "接続に成功しました" または エラーメッセージ
+```
+
+### 2. テーブルデータ確認
+```bash
+npm run debug:count
+# 各テーブルのレコード数出力
+```
+
+### 3. ブラウザ開発者ツール
+```javascript
+// Store状態確認
+console.log(store.schedules.value);
+
+// 選択されたスケジュール確認
+console.log(store.selectedSchedule.value);
+```
+
+## 📝 コード作成ガイドライン
+
+### 1. 新しいサービス関数作成
+```typescript
+// src/services/taskService.ts
+export async function newTaskFunction(params: SomeType): Promise<ResultType | null> {
+  try {
+    // Supabaseクエリ
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("some_field", params.value);
+    
+    if (error) {
+      console.error("作業失敗:", error.message);
+      return null;
+    }
+    
+    return data as ResultType;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("予期せぬエラー:", msg);
+    return null;
+  }
+}
+```
+
+### 2. 新しいアダプター関数作成
+```typescript
+// src/utils/taskAdapter.ts
+export function newAdapterFunction(dbItem: DbType): UiType {
+  return {
+    // フィールドマッピング
+    uiField: dbItem.dbField || "デフォルト値",
+    // 日付変換
+    dateField: formatDate(dbItem.dateField),
+    // 状態変換
+    statusField: mapStatusToJa(dbItem.statusField),
+  };
+}
+```
+
+### 3. Store関数追加
+```typescript
+// src/store/schedule.ts
+export const useScheduleStore = () => ({
+  // 既存関数...
+  
+  async newStoreFunction(params: SomeType) {
+    try {
+      const result = await newTaskFunction(params);
+      if (result) {
+        // Store状態更新
+        this.updateLocalState(result);
+        console.log("作業完了:", result.id);
+      }
+    } catch (error) {
+      console.error("Store作業失敗:", error);
+      throw error;
+    }
+  },
+});
+```
+
+## 🚨 注意事項
+
+### 1. 型ファイル編集禁止
+- `src/types/db/*.ts` ファイルは自動生成されるため **絶対に編集しないでください**
+- スキーマ変更時は `npm run types:gen` で再生成
+
+### 2. 直接DBアクセス禁止
+- コンポーネントから `supabase.from()` 直接呼び出し禁止
+- 必ずStoreやServiceレイヤーを通してアクセス
+
+### 3. Mockデータ使用禁止
+- `createMockScheduleRepository()` は DEPRECATED
+- 実際のDBサービスを使用してください
+
+### 4. 環境変数必須
+- `.env.local` に `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` 設定必須
+- 環境変数なしではDB接続不可
+
+## 📚 関連ドキュメント
+
+- [データベーススキーマドキュメント](../docs/database-schema.md)
+- [フロントエンドアーキテクチャ](./frontend-architecture.mdc)
+- [コーディングスタイルガイド](./coding-style.mdc)

@@ -1,46 +1,17 @@
 // スケジュールのシンプルな共有ストア（Pinia 不使用のリアクティブ単一モジュール）
 // 目的: 一覧/詳細/ダッシュボード間で同一データを共有し、一貫した状態を保つ
+// 新規: Task ベースの DB 連携に変更
 
 import { ref, computed } from "vue";
 import type { ScheduleItem } from "../types/schedule";
-import { createMockScheduleRepository } from "../services/scheduleService";
+import { listTasksWithProject, createTask, updateTask, deleteTask } from "../services/taskService";
+import { listUsers } from "../services/dbServices";
+import { tasksToScheduleItems, scheduleItemToTaskInsert, scheduleItemToTaskUpdate } from "../utils/taskAdapter";
+import type { TaskWithProject } from "../types/task";
+import type { Users } from "../types/db/users";
 
-// 初期スケジュールデータ（デモ用）
-const schedules = ref<ScheduleItem[]>([
-  {
-    id: 1,
-    title: "プロジェクトA - 初期設計",
-    description: "システムの基本設計とアーキテクチャの検討",
-    startDate: "2024-01-15",
-    endDate: "2024-01-30",
-    status: "進行中",
-    priority: "高",
-    assignee: "田中太郎",
-    progress: 65,
-  },
-  {
-    id: 2,
-    title: "プロジェクトB - 開発フェーズ",
-    description: "フロントエンドとバックエンドの実装",
-    startDate: "2024-01-20",
-    endDate: "2024-02-15",
-    status: "進行中",
-    priority: "中",
-    assignee: "佐藤花子",
-    progress: 40,
-  },
-  {
-    id: 3,
-    title: "プロジェクトC - テスト",
-    description: "システム全体のテストとバグ修正",
-    startDate: "2024-02-01",
-    endDate: "2024-02-20",
-    status: "予定",
-    priority: "低",
-    assignee: "鈴木一郎",
-    progress: 0,
-  },
-]);
+// スケジュールデータ（DB から取得）
+const schedules = ref<ScheduleItem[]>([]);
 
 // 選択中スケジュールID（一覧→詳細の連携に使用）
 const selectedScheduleId = ref<number | null>(null);
@@ -92,26 +63,95 @@ export const useScheduleStore = () => ({
   updateSchedule,
   addSchedule,
   removeSchedule,
+  
+  // DB から全スケジュールを読み込み
   async loadAll() {
-    const repo = createMockScheduleRepository();
-    const list = await repo.list();
-    schedules.value = list;
+    try {
+      // タスクとプロジェクト情報を JOIN して取得
+      const tasks = await listTasksWithProject();
+      
+      // ユーザー情報も取得（担当者名表示用）
+      const users = await listUsers();
+      
+      // Task を ScheduleItem に変換
+      const scheduleItems = tasksToScheduleItems(tasks, users);
+      
+      schedules.value = scheduleItems;
+      console.log("スケジュールデータを DB から読み込みました:", scheduleItems.length, "件");
+    } catch (error) {
+      console.error("スケジュールデータの読み込みに失敗:", error);
+      schedules.value = [];
+    }
   },
+  
+  // スケジュールを保存（更新）
   async save(item: ScheduleItem) {
-    const repo = createMockScheduleRepository();
-    await repo.update(item);
-    updateSchedule(item);
+    try {
+      // ScheduleItem を TaskUpdate に変換
+      const taskUpdate = scheduleItemToTaskUpdate(item);
+      
+      // DB を更新
+      const updatedTask = await updateTask(item.id, taskUpdate);
+      
+      if (updatedTask) {
+        // ストアも更新
+        updateSchedule(item);
+        console.log("スケジュールを保存しました:", item.id);
+      } else {
+        throw new Error("タスクの更新に失敗しました");
+      }
+    } catch (error) {
+      console.error("スケジュールの保存に失敗:", error);
+      throw error;
+    }
   },
+  
+  // 新しいスケジュールを作成
   async create(item: Omit<ScheduleItem, "id">) {
-    const repo = createMockScheduleRepository();
-    const created = await repo.create(item);
-    schedules.value.push(created);
-    return created;
+    try {
+      // デフォルトプロジェクト ID（必要に応じて動的に設定）
+      const defaultProjectId = 2; // サンプルデータのプロジェクト ID
+      
+      // ScheduleItem を TaskInsert に変換
+      const taskInsert = scheduleItemToTaskInsert(item, defaultProjectId);
+      
+      // DB に作成
+      const createdTask = await createTask(taskInsert);
+      
+      if (createdTask) {
+        // 作成されたタスクを ScheduleItem に変換してストアに追加
+        const users = await listUsers();
+        const scheduleItem = tasksToScheduleItems([createdTask], users)[0];
+        
+        schedules.value.push(scheduleItem);
+        console.log("新しいスケジュールを作成しました:", scheduleItem.id);
+        return scheduleItem;
+      } else {
+        throw new Error("タスクの作成に失敗しました");
+      }
+    } catch (error) {
+      console.error("スケジュールの作成に失敗:", error);
+      throw error;
+    }
   },
+  
+  // スケジュールを削除
   async delete(id: number) {
-    const repo = createMockScheduleRepository();
-    await repo.remove(id);
-    removeSchedule(id);
+    try {
+      // DB から削除
+      const success = await deleteTask(id);
+      
+      if (success) {
+        // ストアからも削除
+        removeSchedule(id);
+        console.log("スケジュールを削除しました:", id);
+      } else {
+        throw new Error("タスクの削除に失敗しました");
+      }
+    } catch (error) {
+      console.error("スケジュールの削除に失敗:", error);
+      throw error;
+    }
   },
 });
 

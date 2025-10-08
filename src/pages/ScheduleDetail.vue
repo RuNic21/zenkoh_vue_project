@@ -2,7 +2,6 @@
 // スケジュール詳細ページ: 個別スケジュールの詳細表示・編集
 import { ref, computed, onMounted, watch } from "vue";
 import { useScheduleStore } from "../store/schedule";
-import { supabase } from "../services/supabaseClient";
 
 // 共有ストアから選択中スケジュールを参照（欠損プロパティを安全に補完）
 const store = useScheduleStore();
@@ -84,26 +83,10 @@ const toggleEditMode = () => {
   }
 };
 
-// 保存処理
+// 保存処理（ストア経由）
 const saveChanges = async () => {
   try {
-    // DB 更新（tasks）
-    const id = scheduleDetail.value.id as number;
-    const payload: Record<string, unknown> = {
-      task_name: editForm.value.title,
-      description: editForm.value.description,
-      planned_start: editForm.value.startDate || null,
-      planned_end: editForm.value.endDate || null,
-      progress_percent: editForm.value.progress,
-    };
-    const { error } = await supabase
-      .from("tasks")
-      .update(payload)
-      .eq("id", id);
-    if (error) throw new Error(error.message);
-
-    // ストアも更新
-    store.updateSchedule({ ...editForm.value });
+    await store.save({ ...editForm.value });
     isEditMode.value = false;
     console.log("スケジュールが保存されました");
   } catch (e) {

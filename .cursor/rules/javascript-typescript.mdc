@@ -1,7 +1,6 @@
 ---
-alwaysApply: false
 globs: *.js,*.ts,*.tsx
-description: JavaScript/TypeScript ガイド（日本語）
+description: JavaScript/TypeScript ガイド（ファイルタイプ別適用）
 ---
 
 # JavaScript/TypeScript ガイド（日本語）

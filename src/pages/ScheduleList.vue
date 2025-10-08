@@ -3,74 +3,20 @@
 import { ref, computed, onMounted } from "vue";
 import { useScheduleStore } from "../store/schedule";
 import { getStatusBadgeClass, getProgressBarClass } from "../utils/uiHelpers";
-import { supabase } from "../services/supabaseClient";
 import type { ScheduleItem } from "../types/schedule";
 
 // 共有ストア（DB値に置き換えて利用）
 const store = useScheduleStore();
 const schedules = store.schedules;
 
-// DB→UI 変換ヘルパ
-const mapStatusToJa = (status: string | null | undefined): string => {
-  const s = (status || "").toUpperCase();
-  if (s === "NOT_STARTED" || s === "TODO") return "予定";
-  if (s === "IN_PROGRESS" || s === "DOING") return "進行中";
-  if (s === "DONE" || s === "COMPLETED") return "完了";
-  if (s === "DELAYED" || s === "HOLD") return "遅延";
-  return "進行中";
-};
+// マッピング関数は taskAdapter.ts に移動済み
 
-const mapPriorityToJa = (p: string | null | undefined): string => {
-  const s = (p || "").toUpperCase();
-  if (s === "HIGH") return "高";
-  if (s === "LOW") return "低";
-  return "中";
-};
-
-// DBからスケジュール（=tasks）を読み込み、ストアへ反映
+// DBからスケジュールを読み込み（ストア経由）
 const loadSchedulesFromDb = async (): Promise<void> => {
   try {
-    const { data: rows, error } = await supabase
-      .from("tasks")
-      .select("id,task_name,description,planned_start,planned_end,progress_percent,primary_assignee_id,status,priority")
-      .order("id", { ascending: false })
-      .limit(100);
-    if (error) throw new Error(error.message);
-
-    const userIds = Array.from(
-      new Set((rows ?? []).map((r) => r.primary_assignee_id).filter((v) => v != null))
-    ) as number[];
-    let idToName: Record<number, string> = {};
-    if (userIds.length > 0) {
-      const { data: users, error: userErr } = await supabase
-        .from("users")
-        .select("id,display_name")
-        .in("id", userIds);
-      if (userErr) throw new Error(userErr.message);
-      idToName = (users ?? []).reduce((acc: Record<number, string>, u: any) => {
-        acc[u.id as number] = (u.display_name as string) ?? "";
-        return acc;
-      }, {});
-    }
-
-    const mapped: ScheduleItem[] = (rows ?? []).map((r: any) => ({
-      id: r.id as number,
-      title: (r.task_name as string) || "(無題)",
-      description: (r.description as string) || "",
-      startDate: r.planned_start ? String(r.planned_start).slice(0, 10) : "",
-      endDate: r.planned_end ? String(r.planned_end).slice(0, 10) : "",
-      status: mapStatusToJa(r.status as string) as any,
-      priority: mapPriorityToJa(r.priority as string) as any,
-      assignee: r.primary_assignee_id != null ? idToName[r.primary_assignee_id as number] ?? "" : "",
-      progress: Number(r.progress_percent ?? 0),
-      category: "",
-    }));
-
-    // ストアへ反映（既存UIはストアを参照しているため）
-    store.schedules.value = mapped;
+    await store.loadAll();
   } catch (e) {
     console.error("スケジュールの読み込みに失敗", e);
-    store.schedules.value = [] as ScheduleItem[];
   }
 };
 
@@ -131,9 +77,27 @@ const getPriorityColor = (priority) => {
 };
 
 // 新しいスケジュール追加
-const addNewSchedule = () => {
-  // 新しいスケジュール追加のロジック
-  console.log("新しいスケジュールを追加します");
+const addNewSchedule = async () => {
+  try {
+    // デフォルトの新しいスケジュールを作成
+    const newSchedule = {
+      title: "新しいスケジュール",
+      description: "",
+      startDate: "",
+      endDate: "",
+      status: "予定" as const,
+      priority: "中" as const,
+      assignee: "",
+      progress: 0,
+      category: "",
+    };
+    
+    const created = await store.create(newSchedule);
+    console.log("新しいスケジュールを作成しました:", created.id);
+  } catch (e) {
+    console.error("スケジュールの作成に失敗", e);
+    alert("スケジュールの作成に失敗しました");
+  }
 };
 
 // スケジュール編集
@@ -144,13 +108,11 @@ const editSchedule = (scheduleId) => {
   // 実際の遷移は App 側の「詳細を見る」ボタンやナビゲーションに合わせて行う
 };
 
-// スケジュール削除（DB側も削除）
+// スケジュール削除（ストア経由）
 const deleteSchedule = async (scheduleId: number) => {
   if (!confirm("このスケジュールを削除しますか？")) return;
   try {
-    const { error } = await supabase.from("tasks").delete().eq("id", scheduleId);
-    if (error) throw new Error(error.message);
-    schedules.value = schedules.value.filter((s) => s.id !== scheduleId);
+    await store.delete(scheduleId);
   } catch (e) {
     console.error("削除に失敗", e);
     alert("削除に失敗しました");

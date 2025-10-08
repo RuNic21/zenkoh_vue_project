@@ -19,4 +19,9 @@ export const taskMembersRepo = createCrudRepo<TaskMembers, TaskMembersInsert, Ta
 export const alertRulesRepo = createCrudRepo<AlertRules, AlertRulesInsert, AlertRulesUpdate>("alert_rules");
 export const notificationsRepo = createCrudRepo<Notifications, NotificationsInsert, NotificationsUpdate>("notifications");
 
+// 便利な関数群
+export async function listUsers(): Promise<Users[]> {
+  return await usersRepo.select("*");
+}
+
 

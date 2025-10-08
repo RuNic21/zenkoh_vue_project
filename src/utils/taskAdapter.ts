@@ -5,6 +5,7 @@
 import type { Task, TaskWithProject, TaskUpdate } from "../types/task";
 import type { ScheduleItem, ScheduleStatus, SchedulePriority } from "../types/schedule";
 import type { Users } from "../types/db/users";
+import { formatIsoToDate, formatDateToIso } from "./dateUtils";
 
 // DBのステータス値を日本語UIステータスに変換
 export function mapStatusToJa(dbStatus: string | null | undefined): ScheduleStatus {
@@ -63,8 +64,7 @@ export function taskToScheduleItem(
   
   // 日付形式変換（ISO → YYYY-MM-DD）
   const formatDate = (isoDate: string | null | undefined): string => {
-    if (!isoDate) return "";
-    return String(isoDate).slice(0, 10);
+    return formatIsoToDate(isoDate);
   };
 
   return {
@@ -89,8 +89,7 @@ export function taskToScheduleItem(
 export function scheduleItemToTaskUpdate(item: ScheduleItem): TaskUpdate {
   // 日付形式変換（YYYY-MM-DD → ISO）
   const formatToIso = (dateStr: string): string | null => {
-    if (!dateStr) return null;
-    return `${dateStr}T00:00:00.000Z`; // 簡易的なISO変換
+    return formatDateToIso(dateStr);
   };
 
   return {
@@ -112,8 +111,7 @@ export function scheduleItemToTaskInsert(
   projectId: number
 ): import("../types/task").TaskInsert {
   const formatToIso = (dateStr: string): string | null => {
-    if (!dateStr) return null;
-    return `${dateStr}T00:00:00.000Z`;
+    return formatDateToIso(dateStr);
   };
 
   return {

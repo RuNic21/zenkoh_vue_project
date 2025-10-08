@@ -2,7 +2,7 @@
 // スケジュール一覧ページ: プロジェクトのスケジュールを一覧表示・管理
 import { ref, computed, onMounted } from "vue";
 import { useScheduleStore } from "../store/schedule";
-import { getStatusBadgeClass, getProgressBarClass } from "../utils/uiHelpers";
+import { getStatusBadgeClass, getProgressBarClass, getPriorityColorClass } from "../utils/uiHelpers";
 import type { ScheduleItem } from "../types/schedule";
 
 // 共有ストア（DB値に置き換えて利用）
@@ -46,35 +46,8 @@ const filteredSchedules = computed(() => {
   return filtered;
 });
 
-// ステータス別の色を取得
-const getStatusColor = (status) => {
-  switch (status) {
-    case "進行中":
-      return "bg-gradient-primary";
-    case "完了":
-      return "bg-gradient-success";
-    case "予定":
-      return "bg-gradient-info";
-    case "遅延":
-      return "bg-gradient-warning";
-    default:
-      return "bg-gradient-secondary";
-  }
-};
-
-// 優先度別の色を取得
-const getPriorityColor = (priority) => {
-  switch (priority) {
-    case "高":
-      return "text-danger";
-    case "中":
-      return "text-warning";
-    case "低":
-      return "text-success";
-    default:
-      return "text-secondary";
-  }
-};
+// ステータス別の色を取得（uiHelpersからインポート済み）
+// 優先度別の色を取得（uiHelpersからインポート済み）
 
 // 新しいスケジュール追加
 const addNewSchedule = async () => {
@@ -93,15 +66,20 @@ const addNewSchedule = async () => {
     };
     
     const created = await store.create(newSchedule);
-    console.log("新しいスケジュールを作成しました:", created.id);
+    if (created) {
+      console.log("新しいスケジュールを作成しました:", created.id);
+    } else {
+      throw new Error("スケジュールの作成に失敗しました");
+    }
   } catch (e) {
     console.error("スケジュールの作成に失敗", e);
-    alert("スケジュールの作成に失敗しました");
+    const errorMessage = e instanceof Error ? e.message : "スケジュールの作成に失敗しました";
+    alert(errorMessage);
   }
 };
 
 // スケジュール編集
-const editSchedule = (scheduleId) => {
+const editSchedule = (scheduleId: number) => {
   // 一覧から選択して詳細へ遷移できるように選択IDをセット
   store.selectSchedule(scheduleId);
   // ルート未使用のため、親（App）に任せず一覧内では詳細ボタンでナビゲートする想定
@@ -113,14 +91,16 @@ const deleteSchedule = async (scheduleId: number) => {
   if (!confirm("このスケジュールを削除しますか？")) return;
   try {
     await store.delete(scheduleId);
+    console.log("スケジュールを削除しました:", scheduleId);
   } catch (e) {
     console.error("削除に失敗", e);
-    alert("削除に失敗しました");
+    const errorMessage = e instanceof Error ? e.message : "削除に失敗しました";
+    alert(errorMessage);
   }
 };
 
 // 詳細表示（選択して App 側のウォッチで詳細へ遷移）
-const viewDetails = (scheduleId) => {
+const viewDetails = (scheduleId: number) => {
   store.selectSchedule(scheduleId);
 };
 
@@ -249,7 +229,7 @@ onMounted(() => {
               </span>
               <span 
                 class="text-sm font-weight-bold"
-                :class="getPriorityColor(schedule.priority)"
+                :class="getPriorityColorClass(schedule.priority)"
               >
                 優先度: {{ schedule.priority }}
               </span>

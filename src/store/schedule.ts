@@ -6,9 +6,11 @@ import { ref, computed } from "vue";
 import type { ScheduleItem } from "../types/schedule";
 import { listTasksWithProject, createTask, updateTask, deleteTask } from "../services/taskService";
 import { listUsers } from "../services/dbServices";
+import { listProjects } from "../services/projectService";
 import { tasksToScheduleItems, scheduleItemToTaskInsert, scheduleItemToTaskUpdate } from "../utils/taskAdapter";
 import type { TaskWithProject } from "../types/task";
 import type { Users } from "../types/db/users";
+import type { Project } from "../types/project";
 
 // スケジュールデータ（DB から取得）
 const schedules = ref<ScheduleItem[]>([]);
@@ -109,11 +111,21 @@ export const useScheduleStore = () => ({
   // 新しいスケジュールを作成
   async create(item: Omit<ScheduleItem, "id">) {
     try {
-      // デフォルトプロジェクト ID（必要に応じて動的に設定）
-      const defaultProjectId = 2; // サンプルデータのプロジェクト ID
+      // 利用可能なプロジェクト一覧を取得
+      const projects = await listProjects();
+      
+      if (projects.length === 0) {
+        throw new Error("利用可能なプロジェクトがありません。先にプロジェクトを作成してください。");
+      }
+      
+      // 最初のプロジェクトをデフォルトとして使用（またはアーカイブされていない最初のプロジェクト）
+      const activeProjects = projects.filter(p => !p.is_archived);
+      const defaultProject = activeProjects.length > 0 ? activeProjects[0] : projects[0];
+      
+      console.log("デフォルトプロジェクトを選択:", defaultProject.name, "(ID:", defaultProject.id, ")");
       
       // ScheduleItem を TaskInsert に変換
-      const taskInsert = scheduleItemToTaskInsert(item, defaultProjectId);
+      const taskInsert = scheduleItemToTaskInsert(item, defaultProject.id);
       
       // DB に作成
       const createdTask = await createTask(taskInsert);

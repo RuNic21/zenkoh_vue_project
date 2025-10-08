@@ -2,7 +2,7 @@
 // スケジュール詳細ページ: 個別スケジュールの詳細表示・編集
 import { ref, computed, onMounted, watch } from "vue";
 import { useScheduleStore } from "../store/schedule";
-import { supabase } from "../services/supabaseClient";
+import { getStatusBadgeClass, getPriorityColorClass } from "../utils/uiHelpers";
 
 // 共有ストアから選択中スケジュールを参照（欠損プロパティを安全に補完）
 const store = useScheduleStore();
@@ -46,35 +46,8 @@ watch(scheduleDetail, (val) => {
 // 新しいコメントの入力
 const newComment = ref("");
 
-// ステータス別の色を取得
-const getStatusColor = (status) => {
-  switch (status) {
-    case "進行中":
-      return "bg-gradient-primary";
-    case "完了":
-      return "bg-gradient-success";
-    case "予定":
-      return "bg-gradient-info";
-    case "遅延":
-      return "bg-gradient-warning";
-    default:
-      return "bg-gradient-secondary";
-  }
-};
-
-// 優先度別の色を取得
-const getPriorityColor = (priority) => {
-  switch (priority) {
-    case "高":
-      return "text-danger";
-    case "中":
-      return "text-warning";
-    case "低":
-      return "text-success";
-    default:
-      return "text-secondary";
-  }
-};
+// ステータス別の色を取得（uiHelpersからインポート済み）
+// 優先度別の色を取得（uiHelpersからインポート済み）
 
 // 編集モードの切り替え
 const toggleEditMode = () => {
@@ -84,31 +57,16 @@ const toggleEditMode = () => {
   }
 };
 
-// 保存処理
+// 保存処理（ストア経由）
 const saveChanges = async () => {
   try {
-    // DB 更新（tasks）
-    const id = scheduleDetail.value.id as number;
-    const payload: Record<string, unknown> = {
-      task_name: editForm.value.title,
-      description: editForm.value.description,
-      planned_start: editForm.value.startDate || null,
-      planned_end: editForm.value.endDate || null,
-      progress_percent: editForm.value.progress,
-    };
-    const { error } = await supabase
-      .from("tasks")
-      .update(payload)
-      .eq("id", id);
-    if (error) throw new Error(error.message);
-
-    // ストアも更新
-    store.updateSchedule({ ...editForm.value });
+    await store.save({ ...editForm.value });
     isEditMode.value = false;
     console.log("スケジュールが保存されました");
   } catch (e) {
     console.error("保存に失敗", e);
-    alert("保存に失敗しました");
+    const errorMessage = e instanceof Error ? e.message : "保存に失敗しました";
+    alert(errorMessage);
   }
 };
 
@@ -134,8 +92,9 @@ const addComment = () => {
 };
 
 // ファイル添付
-const handleFileUpload = (event) => {
-  const files = event.target.files;
+const handleFileUpload = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const files = target.files;
   for (let file of files) {
     const attachment = {
       name: file.name,
@@ -346,7 +305,7 @@ onMounted(() => {
               <span class="text-sm">ステータス</span>
               <span 
                 class="badge"
-                :class="getStatusColor(scheduleDetail.status)"
+                :class="getStatusBadgeClass(scheduleDetail.status)"
               >
                 {{ scheduleDetail.status }}
               </span>
@@ -355,7 +314,7 @@ onMounted(() => {
               <span class="text-sm">優先度</span>
               <span 
                 class="text-sm font-weight-bold"
-                :class="getPriorityColor(scheduleDetail.priority)"
+                :class="getPriorityColorClass(scheduleDetail.priority)"
               >
                 {{ scheduleDetail.priority }}
               </span>

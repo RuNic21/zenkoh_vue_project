@@ -1,0 +1,274 @@
+# Zenkoh Project Scheduler - データベーススキーマドキュメント
+
+## 📋 概要
+
+Zenkoh Project Scheduler は Supabase を基盤とした現代的プロジェクト管理システムです。このドキュメントはデータベーススキーマ構造と各テーブルの役割を説明します。
+
+## 🎯 最新の更新（2025年1月）
+
+- **サービス層完全統合**: 6個のコアファイルに集約完了
+- **自動型生成**: SupabaseスキーマからTypeScript型を自動生成
+- **完全なDB統合**: 実際のSupabaseデータで動作確認完了
+- **開発ワークフロー**: 環境テスト、シードデータ、CRUDテストスクリプト完備
+- **型安全性確保**: TypeScriptによる完全な型チェック
+
+## 🏗️ 全体アーキテクチャ
+
+```mermaid
+erDiagram
+    PROJECTS ||--o{ TASKS : "has"
+    PROJECTS ||--o{ BOARDS : "has"
+    PROJECTS ||--o{ ALERT_RULES : "has"
+    PROJECTS ||--o{ NOTIFICATIONS : "has"
+    PROJECTS }o--|| USERS : "owned_by"
+    
+    BOARDS ||--o{ BOARD_COLUMNS : "has"
+    TASKS }o--|| BOARD_COLUMNS : "current_column"
+    TASKS }o--|| USERS : "assigned_to"
+    TASKS ||--o{ TASK_MEMBERS : "has"
+    TASK_MEMBERS }o--|| USERS : "member"
+    
+    ALERT_RULES ||--o{ NOTIFICATIONS : "triggers"
+    TASKS ||--o{ NOTIFICATIONS : "related_to"
+```
+
+## 📊 テーブル詳細
+
+### 1. 主要テーブル
+
+#### 🎯 PROJECTS (プロジェクト)
+```sql
+CREATE TABLE projects (
+  id BIGINT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  start_date DATE,
+  end_date DATE,
+  owner_user_id BIGINT REFERENCES users(id),
+  is_archived BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+```
+
+**役割**: プロジェクトの基本情報を管理
+- **主要フィールド**: `name`, `description`, `start_date`, `end_date`, `owner_user_id`
+- **関係**: users (所有者), tasks (下位タスク), boards (カンバンボード)
+
+#### 📝 TASKS (タスク)
+```sql
+CREATE TABLE tasks (
+  id BIGINT PRIMARY KEY,
+  project_id BIGINT NOT NULL REFERENCES projects(id),
+  task_name TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL,
+  priority TEXT NOT NULL,
+  progress_percent INTEGER NOT NULL DEFAULT 0,
+  planned_start TIMESTAMPTZ,
+  planned_end TIMESTAMPTZ,
+  actual_start TIMESTAMPTZ,
+  actual_end TIMESTAMPTZ,
+  primary_assignee_id BIGINT REFERENCES users(id),
+  parent_task_id BIGINT REFERENCES tasks(id),
+  wbs_code TEXT,
+  sort_order INTEGER,
+  current_column_id BIGINT REFERENCES board_columns(id),
+  is_archived BOOLEAN NOT NULL DEFAULT false,
+  created_by BIGINT REFERENCES users(id),
+  updated_by BIGINT REFERENCES users(id),
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+```
+
+**役割**: プロジェクトの個別作業項目を管理
+- **主要フィールド**: `task_name`, `description`, `status`, `priority`, `progress_percent`
+- **状態値**: `NOT_STARTED`, `IN_PROGRESS`, `DONE`, `DELAYED`, `HOLD`
+- **優先度**: `HIGH`, `MEDIUM`, `LOW`
+- **関係**: projects (上位プロジェクト), users (担当者), board_columns (現在位置)
+
+#### 👥 USERS (ユーザー)
+```sql
+CREATE TABLE users (
+  id BIGINT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  display_name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+```
+
+**役割**: システムユーザー情報管理
+- **主要フィールド**: `email`, `display_name`, `password_hash`, `is_active`
+
+### 2. カンバンボードシステム
+
+#### 📋 BOARDS (ボード)
+```sql
+CREATE TABLE boards (
+  id BIGINT PRIMARY KEY,
+  project_id BIGINT NOT NULL REFERENCES projects(id),
+  name TEXT NOT NULL,
+  is_default BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+```
+
+**役割**: プロジェクト別カンバンボード管理
+- **主要フィールド**: `name`, `is_default`
+- **関係**: projects (上位プロジェクト), board_columns (カラム)
+
+#### 📊 BOARD_COLUMNS (ボードカラム)
+```sql
+CREATE TABLE board_columns (
+  id BIGINT PRIMARY KEY,
+  board_id BIGINT NOT NULL REFERENCES boards(id),
+  name TEXT NOT NULL,
+  sort_order INTEGER NOT NULL,
+  wip_limit INTEGER,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+```
+
+**役割**: カンバンボードのカラム（例: To Do, In Progress, Done）管理
+- **主要フィールド**: `name`, `sort_order`, `wip_limit`
+- **関係**: boards (上位ボード), tasks (現在位置のタスク)
+
+### 3. 協業およびメンバーシップ
+
+#### 🤝 TASK_MEMBERS (タスクメンバー)
+```sql
+CREATE TABLE task_members (
+  task_id BIGINT NOT NULL REFERENCES tasks(id),
+  user_id BIGINT NOT NULL REFERENCES users(id),
+  role TEXT NOT NULL,
+  PRIMARY KEY (task_id, user_id)
+);
+```
+
+**役割**: タスクの多重担当者および役割管理
+- **主要フィールド**: `role` (例: "assignee", "reviewer", "observer")
+- **関係**: tasks (タスク), users (メンバー)
+
+### 4. 通知システム
+
+#### 🔔 ALERT_RULES (アラートルール)
+```sql
+CREATE TABLE alert_rules (
+  id BIGINT PRIMARY KEY,
+  project_id BIGINT NOT NULL REFERENCES projects(id),
+  name TEXT NOT NULL,
+  rule_type TEXT NOT NULL,
+  params_json JSONB,
+  is_enabled BOOLEAN NOT NULL DEFAULT true,
+  notify_email TEXT,
+  created_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL
+);
+```
+
+**役割**: プロジェクト別通知ルール定義
+- **主要フィールド**: `name`, `rule_type`, `params_json`, `is_enabled`
+- **ルールタイプ**: "deadline_approaching", "task_overdue", "progress_milestone" など
+
+#### 📧 NOTIFICATIONS (通知)
+```sql
+CREATE TABLE notifications (
+  id BIGINT PRIMARY KEY,
+  project_id BIGINT NOT NULL REFERENCES projects(id),
+  task_id BIGINT REFERENCES tasks(id),
+  alert_rule_id BIGINT REFERENCES alert_rules(id),
+  to_email TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  body_text TEXT NOT NULL,
+  status TEXT NOT NULL,
+  send_after TIMESTAMPTZ NOT NULL,
+  sent_at TIMESTAMPTZ,
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL
+);
+```
+
+**役割**: 実際の通知送信履歴および状態管理
+- **主要フィールド**: `to_email`, `subject`, `body_text`, `status`, `send_after`
+- **状態**: "pending", "sent", "failed"
+
+## 🔄 データフロー
+
+### 1. プロジェクト作成 → タスク作成
+```
+PROJECTS (作成) → TASKS (下位タスク) → BOARD_COLUMNS (カンバン位置)
+```
+
+### 2. タスク進行 → 通知送信
+```
+TASKS (状態変更) → ALERT_RULES (ルール確認) → NOTIFICATIONS (通知送信)
+```
+
+### 3. 協業ワークフロー
+```
+TASKS (primary_assignee) + TASK_MEMBERS (追加メンバー) → 協業進行
+```
+
+## 🛠️ 開発者ガイド
+
+### 型定義ファイル位置
+- **自動生成**: `src/types/db/*.ts` (Supabaseスキーマから自動生成)
+- **手動定義**: `src/types/task.ts`, `src/types/project.ts` (ビジネスロジック用)
+
+### サービスレイヤー（6個のコアファイル）
+- **基本接続**: `src/services/supabaseClient.ts` (Supabaseクライアントおよび基本クエリ)
+- **汎用CRUD**: `src/services/crud.ts` (型安全なCRUDファクトリ)
+- **自動生成サービス**: `src/services/dbServices.ts` (スキーマベースCRUDサービス)
+- **タスクサービス**: `src/services/taskService.ts` (タスク専用ビジネスロジック)
+- **プロジェクトサービス**: `src/services/projectService.ts` (プロジェクト専用ビジネスロジック)
+- **関係サービス**: `src/services/relationService.ts` (JOINクエリおよび関係型データ)
+
+### データ変換
+- **アダプター**: `src/utils/taskAdapter.ts` (DB ↔ UI変換)
+- **UI型**: `src/types/schedule.ts` (画面表示用)
+- **ストア**: `src/store/schedule.ts` (Vueコンポーネント用状態管理)
+
+## 📝 サンプルデータ
+
+### プロジェクト例
+```csv
+id,name,description,start_date,end_date,owner_user_id,is_archived
+2,サプライチェーン可視化 1,サプライチェーンの可視化プロジェクト,2024-01-01,2024-06-30,1,false
+```
+
+### タスク例
+```csv
+id,project_id,task_name,description,status,priority,progress_percent,planned_start,planned_end
+45,2,シードタスク 1,初期タスクの説明,IN_PROGRESS,HIGH,100,2024-01-01,2024-01-15
+```
+
+## 🔧 メンテナンス
+
+### スキーマ変更時
+1. Supabaseでスキーマ修正
+2. `npm run types:gen` 実行して型再生成
+3. 必要に応じて `src/utils/taskAdapter.ts` 修正
+4. テスト実行: `npm run test:crud:all`
+
+### データマイグレーション
+- **シードデータ**: `npm run seed:all`
+- **CSVエクスポート**: `npm run export:csv`
+- **データ検証**: `npm run debug:count`
+
+### 開発ワークフロー
+- **環境テスト**: `npm run test:env`
+- **全体CRUDテスト**: `npm run test:crud:all`
+- **個別テスト**: `npm run test:projects`, `npm run test:tasks`
+- **型生成**: `npm run types:gen` (DBから), `npm run types:fromcsv` (CSVから)
+
+## 📚 関連ドキュメント
+
+- [フロントエンドアーキテクチャ](./frontend-architecture.md)
+- [APIドキュメント](./api-documentation.md)
+- [デプロイガイド](./deployment-guide.md)

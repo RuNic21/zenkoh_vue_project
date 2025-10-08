@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 // メインレイアウトコンポーネント: プロジェクト管理スケジューラーの基本レイアウト
 import { ref, computed, watch } from "vue";
 
@@ -58,14 +58,14 @@ const navigationItems = ref([
 ]);
 
 // 現在のページに基づいてアクティブなメニューを更新
-const updateActiveMenu = (pageId) => {
+const updateActiveMenu = (pageId: string) => {
   navigationItems.value.forEach(item => {
     item.isActive = item.id === pageId;
   });
 };
 
 // ナビゲーション処理
-const handleNavigation = (pageId) => {
+const handleNavigation = (pageId: string) => {
   updateActiveMenu(pageId);
   emit('navigate', pageId);
 };

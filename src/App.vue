@@ -15,13 +15,13 @@ const currentPage = ref("dashboard");
 const store = useScheduleStore();
 
 // ページ切り替えメソッド
-const navigateToPage = (pageName) => {
+const navigateToPage = (pageName: string) => {
   currentPage.value = pageName;
 };
 
 // ダッシュボードの「詳細を見る」クリック時の処理
 // 目的: プロジェクト名から該当スケジュールを推測して選択→詳細へ
-const handleViewProjectDetail = (project) => {
+const handleViewProjectDetail = (project: ProjectProgressRow) => {
   try {
     const list = store.schedules.value || [];
     const target = list.find((s) => typeof s.title === "string" && s.title.startsWith(project.name));

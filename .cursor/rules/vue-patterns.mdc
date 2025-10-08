@@ -1,0 +1,415 @@
+---
+globs: *.vue,*.ts,*.js,*.html,*.css,*.scss
+description: Vue 3 Composition API パターン（ファイルタイプ別適用）
+---
+
+# Vue 3 Composition API パターン
+
+## 🎯 基本パターン
+
+### 1. コンポーネント構造
+```vue
+<script setup lang="ts">
+// このコンポーネントの目的を簡潔に説明
+import { ref, computed, onMounted } from "vue";
+
+// Props定義（用途を日本語コメントで説明）
+const props = defineProps<{
+  // 受け取るデータの用途を説明
+  propName: string;
+  optionalProp?: number;
+}>();
+
+// Emits定義
+const emit = defineEmits<{
+  // イベント名と引数の型を定義
+  update: [value: string];
+  delete: [id: number];
+}>();
+
+// リアクティブデータ
+const state = ref("");
+const derived = computed(() => state.value);
+
+// メソッド
+const handleEvent = () => {
+  // イベント処理の意図を説明
+  emit("update", state.value);
+};
+
+// ライフサイクル
+onMounted(() => {
+  console.log("コンポーネントマウント完了");
+});
+</script>
+
+<template>
+  <!-- ルート要素の役割を説明 -->
+  <div class="component-name">
+    <!-- セクション説明 -->
+    <header></header>
+    <main></main>
+  </div>
+</template>
+
+<style scoped>
+/* 必要な範囲のみスタイルを適用 */
+</style>
+```
+
+### 2. Store使用パターン
+```typescript
+// Store の使用例
+import { useScheduleStore } from "@/store/schedule";
+
+const store = useScheduleStore();
+
+// データ読み込み
+await store.loadAll();
+
+// データ操作
+await store.save(updatedItem);
+await store.create(newItem);
+await store.delete(itemId);
+
+// リアクティブデータ参照
+const schedules = computed(() => store.schedules.value);
+const selectedSchedule = computed(() => store.selectedSchedule.value);
+```
+
+### 3. サービス層使用パターン
+```typescript
+// サービス層の使用例
+import { listTasks, createTask } from "@/services/taskService";
+import { taskToScheduleItem } from "@/utils/taskAdapter";
+
+// データ取得
+const tasks = await listTasks();
+const scheduleItems = tasksToScheduleItems(tasks);
+
+// データ作成
+const newTask = await createTask({
+  project_id: 1,
+  task_name: "新しいタスク",
+  status: "NOT_STARTED"
+});
+```
+
+## 🔄 データフロー パターン
+
+### 1. 一覧 → 詳細遷移
+```typescript
+// 一覧コンポーネント
+const handleItemClick = (item: ScheduleItem) => {
+  store.selectSchedule(item.id);
+  // App.vue の watch で自動的に詳細ページへ遷移
+};
+
+// App.vue
+watch(() => store.selectedScheduleId.value, (id) => {
+  if (id != null) {
+    currentPage.value = "schedule-detail";
+  }
+});
+```
+
+### 2. フォーム送信パターン
+```typescript
+const formData = ref({
+  title: "",
+  description: "",
+  startDate: "",
+  endDate: ""
+});
+
+const isSubmitting = ref(false);
+
+const handleSubmit = async () => {
+  if (isSubmitting.value) return;
+  
+  isSubmitting.value = true;
+  try {
+    await store.create(formData.value);
+    // 成功処理
+    formData.value = { title: "", description: "", startDate: "", endDate: "" };
+  } catch (error) {
+    console.error("作成に失敗:", error);
+    alert("作成に失敗しました");
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+```
+
+### 3. エラーハンドリングパターン
+```typescript
+const handleAsyncOperation = async () => {
+  try {
+    const result = await someAsyncFunction();
+    if (!result) {
+      throw new Error("操作が失敗しました");
+    }
+    // 成功処理
+  } catch (error) {
+    console.error("エラー詳細:", error);
+    // ユーザーフレンドリーなメッセージ
+    alert("操作に失敗しました。しばらく時間をおいて再試行してください。");
+  }
+};
+```
+
+## 🎨 Material Dashboard UI パターン
+
+### 1. 基本レイアウト構造
+```vue
+<template>
+  <div class="g-sidenav-show bg-gray-100">
+    <!-- サイドバー -->
+    <aside class="sidenav navbar navbar-vertical navbar-expand-xs border-radius-lg fixed-start ms-2 bg-white my-2">
+      <!-- サイドバーコンテンツ -->
+    </aside>
+    
+    <!-- メインコンテンツ -->
+    <main class="main-content position-relative max-height-vh-100 h-100 border-radius-lg">
+      <!-- ナビゲーションバー -->
+      <nav class="navbar navbar-main navbar-expand-lg px-0 mx-3 shadow-none border-radius-xl">
+        <!-- ナビゲーションコンテンツ -->
+      </nav>
+      
+      <!-- コンテンツエリア -->
+      <div class="container-fluid py-4">
+        <!-- ページコンテンツ -->
+      </div>
+    </main>
+  </div>
+</template>
+```
+
+### 2. カードコンポーネント
+```vue
+<template>
+  <div class="card">
+    <div class="card-header pb-0">
+      <div class="row">
+        <div class="col-lg-6 col-8">
+          <h6>カードタイトル</h6>
+          <p class="text-sm mb-0">
+            <i class="fa fa-chart-line text-info" aria-hidden="true"></i>
+            <span class="font-weight-bold ms-1">サブタイトル</span>
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="card-body px-0 pt-0 pb-2">
+      <!-- カードコンテンツ -->
+    </div>
+  </div>
+</template>
+```
+
+### 3. 統計カード
+```vue
+<template>
+  <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+    <div class="card">
+      <div class="card-header p-2 ps-3">
+        <div class="d-flex justify-content-between">
+          <div>
+            <p class="text-sm mb-0 text-capitalize">ラベル</p>
+            <h4 class="mb-0">{{ value }}</h4>
+          </div>
+          <div class="icon icon-md icon-shape bg-gradient-primary shadow-dark shadow text-center border-radius-lg">
+            <i class="material-symbols-rounded opacity-10">icon_name</i>
+          </div>
+        </div>
+      </div>
+      <hr class="dark horizontal my-0">
+      <div class="card-footer p-2 ps-3">
+        <p class="mb-0 text-sm">
+          <span class="text-success font-weight-bolder">+{{ change }}</span> 変更内容
+        </p>
+      </div>
+    </div>
+  </div>
+</template>
+```
+
+### 4. ボタンとバッジ
+```vue
+<template>
+  <!-- ボタン -->
+  <button class="btn btn-sm bg-gradient-primary mb-0">アクション</button>
+  <button class="btn btn-sm bg-gradient-secondary mb-0">キャンセル</button>
+  <button class="btn btn-sm bg-gradient-success mb-0">保存</button>
+  <button class="btn btn-sm bg-gradient-warning mb-0">注意</button>
+  <button class="btn btn-sm bg-gradient-danger mb-0">削除</button>
+
+  <!-- バッジ -->
+  <span class="badge bg-gradient-success">完了</span>
+  <span class="badge bg-gradient-warning">進行中</span>
+  <span class="badge bg-gradient-danger">遅延</span>
+  <span class="badge bg-gradient-info">予定</span>
+</template>
+```
+
+### 5. レスポンシブグリッド
+```vue
+<template>
+  <!-- 4カラム統計カード -->
+  <div class="row mb-4">
+    <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+      <!-- カード内容 -->
+    </div>
+  </div>
+
+  <!-- 2カラムレイアウト -->
+  <div class="row">
+    <div class="col-lg-8 col-md-6">
+      <!-- メインコンテンツ -->
+    </div>
+    <div class="col-lg-4 col-md-6">
+      <!-- サイドバー -->
+    </div>
+  </div>
+</template>
+```
+
+## 🔧 ユーティリティ使用パターン
+
+### 1. UI ヘルパー使用
+```typescript
+import { getStatusBadgeClass, getProgressBarClass } from "@/utils/uiHelpers";
+
+// テンプレート内で使用
+<span :class="getStatusBadgeClass(item.status)">{{ item.status }}</span>
+<div :class="getProgressBarClass(item.progress)" :style="{ width: item.progress + '%' }"></div>
+```
+
+### 2. アダプター使用
+```typescript
+import { taskToScheduleItem, scheduleItemToTaskUpdate } from "@/utils/taskAdapter";
+
+// DB → UI 変換
+const scheduleItems = tasks.map(task => taskToScheduleItem(task, users));
+
+// UI → DB 変換
+const taskUpdate = scheduleItemToTaskUpdate(scheduleItem);
+```
+
+## 📱 状態管理パターン
+
+### 1. ローカル状態
+```typescript
+// フォーム状態
+const formData = ref({
+  title: "",
+  description: ""
+});
+
+// ローディング状態
+const isLoading = ref(false);
+
+// エラー状態
+const errorMessage = ref("");
+```
+
+### 2. グローバル状態（Store）
+```typescript
+// Store から状態取得
+const schedules = computed(() => store.schedules.value);
+const selectedSchedule = computed(() => store.selectedSchedule.value);
+
+// Store 操作
+const selectSchedule = (id: number) => {
+  store.selectSchedule(id);
+};
+```
+
+## 🎯 TypeScript パターン
+
+### 1. 基本型定義
+```typescript
+// ビジネスロジック用型
+export interface ScheduleItem {
+  id: number;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  status: ScheduleStatus;
+  priority: SchedulePriority;
+  assignee: string;
+  progress: number;
+  category: string;
+  tags: string[];
+  notes: string;
+  attachments: string[];
+  comments: Comment[];
+}
+
+// 列挙型
+export type ScheduleStatus = "予定" | "進行中" | "完了" | "遅延" | "保留";
+export type SchedulePriority = "高" | "中" | "低";
+
+// オプショナル型
+export interface TaskInsert {
+  project_id: number;
+  task_name: string;
+  description?: string;
+  status?: string;
+  priority?: string;
+  progress_percent?: number;
+}
+```
+
+### 2. 関数型定義
+```typescript
+// 基本関数
+export function createTask(payload: TaskInsert): Promise<Task | null>;
+
+// 非同期関数
+export async function updateTask(
+  id: number, 
+  payload: TaskUpdate
+): Promise<Task | null>;
+
+// エラーハンドリング型
+export type Result<T, E = Error> = 
+  | { success: true; data: T }
+  | { success: false; error: E };
+```
+
+### 3. 型ガード
+```typescript
+// 基本型ガード
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+function isTask(value: unknown): value is Task {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    "task_name" in value &&
+    "status" in value
+  );
+}
+```
+
+## 🚨 注意事項
+
+### 1. パフォーマンス
+- `v-for` には必ず `:key` を設定
+- 大きなリストには仮想スクロールを検討
+- 不要なリアクティブデータは避ける
+
+### 2. アクセシビリティ
+- セマンティックな HTML 要素を使用
+- `aria-label` や `aria-describedby` を適切に設定
+- キーボードナビゲーションをサポート
+
+### 3. 型安全性
+- TypeScript の型を活用
+- `any` 型の使用を避ける
+- プロパティの型定義を明確にする

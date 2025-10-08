@@ -2,15 +2,24 @@
 
 各ルールの役割と参照先をまとめています。新規ルールの追加・更新時は本インデックスも更新してください。
 
-## 基本ガイド
-- coding-style.mdc — 日本語コメント方針、UI テキスト日本語、セミコロン/ダブルクォート、既存インデント遵守
-- javascript-typescript.mdc — JS/TS 基本スタイル、エラー処理、import/export
-- vue-components.mdc — <script setup> 推奨、props/emit コメント、テンプレート意図明記、scoped
-- project-guidelines-ja.mdc — プロジェクト構成、Material Dashboard 統合、UI 文言基準
-- japanese-ui-guidelines.mdc — ボタン/メッセージ/フォーム/テーブル/状態/空/ツールチップ/日付の標準文言
+## 🔄 常時適用ルール（alwaysApply: true）
+**すべてのリクエストで自動的に参照される基本ルール**
 
-## データ/アーキテクチャ（重要）
-- project-data-architecture.mdc — 型定義・UI ヘルパー・リポジトリ・ストア・画面連携・Supabase 置換方針
+- **coding-style.mdc** — 日本語コメント方針、UI テキスト日本語、セミコロン/ダブルクォート、既存インデント遵守
+- **project-structure.mdc** — プロジェクト構造・ディレクトリ配置・ファイル命名規則・主要ファイル役割
+
+## 🎯 ファイルタイプ別適用ルール（globs指定）
+**特定のファイルタイプで自動的に参照されるルール**
+
+- **javascript-typescript.mdc** (`*.js,*.ts,*.tsx`) — JS/TS 基本スタイル、エラー処理、import/export
+- **japanese-ui-guidelines.mdc** (`*.vue,*.js,*.html`) — ボタン/メッセージ/フォーム/テーブル/状態/空/ツールチップ/日付の標準文言
+- **vue-patterns.mdc** (`*.vue,*.ts,*.js,*.html,*.css,*.scss`) — Vue 3 Composition API パターン・TypeScript パターン・Material Dashboard UI パターン・データフロー・状態管理
+
+## 📚 選択的参照ルール（description指定）
+**ユーザーが明示的に参照する必要がある専門ルール**
+
+- **database-integration.mdc** — データベース統合ルール・Supabase連携・型変換・エラー処理・開発ツール
+- **development-workflow.mdc** — 開発ワークフロー・デバッグ手順・トラブルシューティング・デプロイ準備
 
 ## 運用ルール
 - 既存ルール改訂時は互換維持と移行手順を記載
@@ -18,4 +27,8 @@
 - 型/ヘルパーは重複定義せず既存へ集約
 
 ## 変更履歴（要約）
-- 2025-09: project-data-architecture.mdc 追加（Supabase 連携準備）
+- 2025-01: ルール統合・最適化（typescript-patterns, material-dashboard-integration を vue-patterns に統合）
+- 2025-01: ルール整理・重複削除（vue-components, project-guidelines-ja, project-data-architecture を削除）
+- 2025-01: database-integration.mdc 追加（DB統合完了・実際連携ルール）
+- 2025-01: 不要ファイル削除（scheduleService.ts, supabaseClient.js）
+- 2025-01: サービス層整理完了（6個のコアファイルに集約）

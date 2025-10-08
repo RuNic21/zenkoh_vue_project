@@ -20,4 +20,13 @@ export const getProgressBarClass = (progress: number): string => {
   return "progress-bar bg-gradient-danger";
 };
 
+// 優先度に応じたテキスト色を返す
+export const getPriorityColorClass = (priority: string): string => {
+  if (!priority) return "text-secondary";
+  if (priority === "高") return "text-danger";
+  if (priority === "中") return "text-warning";
+  if (priority === "低") return "text-success";
+  return "text-secondary";
+};
+
 

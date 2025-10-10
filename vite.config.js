@@ -21,9 +21,21 @@ export default defineConfig({
     // CSSソースマップ生成（開発時のデバッグ用）
     devSourcemap: true
   },
+  // ソースマップエラーを無視する設定
+  optimizeDeps: {
+    exclude: ['@vite/client', '@vite/env']
+  },
+  server: {
+    // ソースマップエラーを無視する設定
+    fs: {
+      strict: false
+    }
+  },
   build: {
     // ビルド時のCSS最適化
     cssCodeSplit: true,
+    // ソースマップ生成を無効化（本番環境）
+    sourcemap: false,
     rollupOptions: {
       output: {
         // CSSファイル分割によるキャッシュ最適化

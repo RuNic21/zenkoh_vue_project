@@ -8,6 +8,8 @@ import type { ScheduleItem } from "../types/schedule";
 // 共有ストア（DB値に置き換えて利用）
 const store = useScheduleStore();
 const schedules = store.schedules;
+const isLoading = store.isLoading;
+const errorMessage = store.errorMessage;
 
 // マッピング関数は taskAdapter.ts に移動済み
 
@@ -73,8 +75,8 @@ const addNewSchedule = async () => {
     }
   } catch (e) {
     console.error("スケジュールの作成に失敗", e);
-    const errorMessage = e instanceof Error ? e.message : "スケジュールの作成に失敗しました";
-    alert(errorMessage);
+    const message = e instanceof Error ? e.message : "スケジュールの作成に失敗しました";
+    errorMessage.value = message;
   }
 };
 
@@ -94,8 +96,8 @@ const deleteSchedule = async (scheduleId: number) => {
     console.log("スケジュールを削除しました:", scheduleId);
   } catch (e) {
     console.error("削除に失敗", e);
-    const errorMessage = e instanceof Error ? e.message : "削除に失敗しました";
-    alert(errorMessage);
+    const message = e instanceof Error ? e.message : "削除に失敗しました";
+    errorMessage.value = message;
   }
 };
 
@@ -114,6 +116,13 @@ onMounted(() => {
 <template>
   <!-- スケジュール一覧ページ -->
   <div class="schedule-list-page">
+    <!-- ローディング/エラー表示 -->
+    <div v-if="isLoading" class="alert alert-secondary" role="alert">
+      読み込み中です...
+    </div>
+    <div v-if="!isLoading && errorMessage" class="alert alert-danger" role="alert">
+      {{ errorMessage }}
+    </div>
     <!-- ページヘッダー -->
     <div class="row mb-4">
       <div class="col-12">

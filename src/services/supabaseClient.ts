@@ -12,9 +12,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 		"Supabase の環境変数が未設定です。.env.local に VITE_SUPABASE_URL と VITE_SUPABASE_ANON_KEY を設定してください"
 	);
 	// 開発環境でのみアラートを表示
-	if (import.meta.env.DEV) {
-		alert("Supabase の環境変数が設定されていません。.env.local ファイルを確認してください。");
-	}
+    // alert は使用せず、開発者はコンソール/README を参照
 }
 
 export const supabase: SupabaseClient = createClient(supabaseUrl ?? "", supabaseAnonKey ?? "", {

@@ -7,7 +7,7 @@ import MainLayout from "./layouts/MainLayout.vue";
 import ScheduleList from "./pages/ScheduleList.vue";
 import ScheduleDetail from "./pages/ScheduleDetail.vue";
 // Supabase クライアント（ダッシュボード一覧をDBから取得するために使用）
-import { supabase } from "./services/supabaseClient";
+import { fetchProjectProgress, type ProjectProgressRow } from "./services/dashboardService";
 
 // 現在のページを管理するリアクティブデータ
 const currentPage = ref("dashboard");
@@ -53,71 +53,46 @@ const currentComponent = computed(() => {
 // 仕様: 進捗 = 同一プロジェクトの tasks.progress_percent の平均（小数点四捨五入）
 //       担当者 = projects.owner_user_id に紐づく users.display_name（無ければ "-"）
 //       期限 = projects.end_date（無ければ "-"）
-interface ProjectProgressRow {
-  id: number;
-  name: string;
-  owner: string;
-  progress: number;
-  status: string;
-  dueDate: string;
-}
 const projectProgressList = ref<ProjectProgressRow[]>([]);
+// ダッシュボード用ローディング/エラー
+const isDashboardLoading = ref(false);
+const dashboardErrorMessage = ref("");
+
+// ダッシュボード統計（プロジェクト進捗一覧から算出）
+const inProgressCount = computed(() =>
+  projectProgressList.value.filter((p) => p.status === "進行中").length
+);
+const completedCount = computed(() =>
+  projectProgressList.value.filter((p) => p.status === "完了").length
+);
+const completionRate = computed(() => {
+  const total = projectProgressList.value.length;
+  if (total === 0) return 0;
+  return Math.round((completedCount.value / total) * 100);
+});
+const overdueCount = computed(() => {
+  const today = new Date();
+  return projectProgressList.value.filter((p) => {
+    if (!p.dueDate || p.dueDate === "-") return false;
+    // 期限を Date に変換（ISO 文字列想定）
+    const due = new Date(p.dueDate as string);
+    if (isNaN(due.getTime())) return false;
+    return due < today && p.status !== "完了";
+  }).length;
+});
 
 // DB からダッシュボード用データを読み込む
 const loadDashboardFromDb = async (): Promise<void> => {
   try {
-    // 1) プロジェクト一覧を取得（最新10件）
-    const { data: projects, error: projErr } = await supabase
-      .from("projects")
-      .select("id,name,owner_user_id,end_date")
-      .order("id", { ascending: false })
-      .limit(10);
-    if (projErr) throw new Error(projErr.message);
-    const projectIds = (projects ?? []).map((p) => p.id);
-
-    // 2) 対象プロジェクトのタスク進捗をまとめて取得
-    const { data: tasks, error: taskErr } = await supabase
-      .from("tasks")
-      .select("project_id,progress_percent")
-      .in("project_id", projectIds.length > 0 ? projectIds : [-1]);
-    if (taskErr) throw new Error(taskErr.message);
-
-    // 3) owner ユーザー名を一括取得
-    const ownerIds = Array.from(
-      new Set((projects ?? []).map((p) => p.owner_user_id).filter((v) => v != null))
-    ) as number[];
-    let ownersMap: Record<number, string> = {};
-    if (ownerIds.length > 0) {
-      const { data: owners, error: userErr } = await supabase
-        .from("users")
-        .select("id,display_name")
-        .in("id", ownerIds);
-      if (userErr) throw new Error(userErr.message);
-      ownersMap = (owners ?? []).reduce((acc, u) => {
-        acc[u.id as number] = (u.display_name as string) ?? "-";
-        return acc;
-      }, {} as Record<number, string>);
-    }
-
-    // 4) 集計して表示用配列を構築
-    const progressByProject = new Map<number, { sum: number; count: number }>();
-    for (const t of tasks ?? []) {
-      const key = t.project_id as number;
-      const cur = progressByProject.get(key) ?? { sum: 0, count: 0 };
-      progressByProject.set(key, { sum: cur.sum + (t.progress_percent as number), count: cur.count + 1 });
-    }
-
-    projectProgressList.value = (projects ?? []).map((p) => {
-      const agg = progressByProject.get(p.id) ?? { sum: 0, count: 0 };
-      const avg = agg.count > 0 ? Math.round(agg.sum / agg.count) : 0;
-      const status = avg >= 100 ? "完了" : "進行中";
-      const owner = p.owner_user_id != null ? ownersMap[p.owner_user_id as number] ?? "-" : "-";
-      const due = p.end_date ? String(p.end_date) : "-";
-      return { id: p.id, name: p.name as string, owner, progress: avg, status, dueDate: due };
-    });
+    isDashboardLoading.value = true;
+    dashboardErrorMessage.value = "";
+    projectProgressList.value = await fetchProjectProgress(10);
   } catch (e) {
     console.error("ダッシュボードの読み込みに失敗", e);
     projectProgressList.value = [];
+    dashboardErrorMessage.value = "ダッシュボードの読み込みに失敗しました。しばらくしてから再試行してください。";
+  } finally {
+    isDashboardLoading.value = false;
   }
 };
 
@@ -218,6 +193,13 @@ watch(() => store.selectedScheduleId.value, (id) => {
         <div class="container-fluid py-4">
           <!-- ダッシュボードページ -->
           <div v-if="currentPage === 'dashboard'">
+            <!-- ローディング/エラー表示 -->
+            <div v-if="isDashboardLoading" class="alert alert-secondary" role="alert">
+              読み込み中です...
+            </div>
+            <div v-if="!isDashboardLoading && dashboardErrorMessage" class="alert alert-danger" role="alert">
+              {{ dashboardErrorMessage }}
+            </div>
             <!-- ページヘッダー -->
             <div class="row mb-4">
               <div class="col-12">
@@ -238,7 +220,7 @@ watch(() => store.selectedScheduleId.value, (id) => {
                     <div class="d-flex justify-content-between">
                       <div>
                         <p class="text-sm mb-0 text-capitalize">進行中プロジェクト</p>
-                        <h4 class="mb-0">12</h4>
+                        <h4 class="mb-0">{{ inProgressCount }}</h4>
                       </div>
                       <div class="icon icon-md icon-shape bg-gradient-primary shadow-dark shadow text-center border-radius-lg">
                         <i class="material-symbols-rounded opacity-10">work</i>
@@ -248,7 +230,7 @@ watch(() => store.selectedScheduleId.value, (id) => {
                   <hr class="dark horizontal my-0">
                   <div class="card-footer p-2 ps-3">
                     <p class="mb-0 text-sm">
-                      <span class="text-success font-weight-bolder">+2</span> 今週追加
+                      <span class="text-success font-weight-bolder">&nbsp;</span>
                     </p>
                   </div>
                 </div>
@@ -259,8 +241,8 @@ watch(() => store.selectedScheduleId.value, (id) => {
                   <div class="card-header p-2 ps-3">
                     <div class="d-flex justify-content-between">
                       <div>
-                        <p class="text-sm mb-0 text-capitalize">今週のタスク</p>
-                        <h4 class="mb-0">28</h4>
+                        <p class="text-sm mb-0 text-capitalize">完了プロジェクト</p>
+                        <h4 class="mb-0">{{ completedCount }}</h4>
                       </div>
                       <div class="icon icon-md icon-shape bg-gradient-success shadow-dark shadow text-center border-radius-lg">
                         <i class="material-symbols-rounded opacity-10">task</i>
@@ -270,7 +252,7 @@ watch(() => store.selectedScheduleId.value, (id) => {
                   <hr class="dark horizontal my-0">
                   <div class="card-footer p-2 ps-3">
                     <p class="mb-0 text-sm">
-                      <span class="text-success font-weight-bolder">+5</span> 昨日から
+                      <span class="text-success font-weight-bolder">&nbsp;</span>
                     </p>
                   </div>
                 </div>
@@ -282,7 +264,7 @@ watch(() => store.selectedScheduleId.value, (id) => {
                     <div class="d-flex justify-content-between">
                       <div>
                         <p class="text-sm mb-0 text-capitalize">完了率</p>
-                        <h4 class="mb-0">85%</h4>
+                        <h4 class="mb-0">{{ completionRate }}%</h4>
                       </div>
                       <div class="icon icon-md icon-shape bg-gradient-info shadow-dark shadow text-center border-radius-lg">
                         <i class="material-symbols-rounded opacity-10">trending_up</i>
@@ -292,7 +274,7 @@ watch(() => store.selectedScheduleId.value, (id) => {
                   <hr class="dark horizontal my-0">
                   <div class="card-footer p-2 ps-3">
                     <p class="mb-0 text-sm">
-                      <span class="text-success font-weight-bolder">+3%</span> 先週から
+                      <span class="text-success font-weight-bolder">&nbsp;</span>
                     </p>
                   </div>
                 </div>
@@ -304,7 +286,7 @@ watch(() => store.selectedScheduleId.value, (id) => {
                     <div class="d-flex justify-content-between">
                       <div>
                         <p class="text-sm mb-0 text-capitalize">期限切れ</p>
-                        <h4 class="mb-0">3</h4>
+                        <h4 class="mb-0">{{ overdueCount }}</h4>
                       </div>
                       <div class="icon icon-md icon-shape bg-gradient-warning shadow-dark shadow text-center border-radius-lg">
                         <i class="material-symbols-rounded opacity-10">warning</i>

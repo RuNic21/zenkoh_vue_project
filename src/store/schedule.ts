@@ -15,6 +15,12 @@ import type { Project } from "../types/project";
 // スケジュールデータ（DB から取得）
 const schedules = ref<ScheduleItem[]>([]);
 
+// ローディング状態（API 呼び出し中の可視化に使用）
+const isLoading = ref(false);
+
+// エラー状態（ユーザーに分かりやすい日本語メッセージを表示）
+const errorMessage = ref("");
+
 // 選択中スケジュールID（一覧→詳細の連携に使用）
 const selectedScheduleId = ref<number | null>(null);
 
@@ -59,6 +65,8 @@ const removeSchedule = (id: number) => {
 // ストアの公開 API
 export const useScheduleStore = () => ({
   schedules,
+  isLoading,
+  errorMessage,
   selectedScheduleId,
   selectedSchedule,
   selectSchedule,
@@ -69,6 +77,8 @@ export const useScheduleStore = () => ({
   // DB から全スケジュールを読み込み
   async loadAll() {
     try {
+      isLoading.value = true;
+      errorMessage.value = "";
       // タスクとプロジェクト情報を JOIN して取得
       const tasks = await listTasksWithProject();
       
@@ -83,12 +93,17 @@ export const useScheduleStore = () => ({
     } catch (error) {
       console.error("スケジュールデータの読み込みに失敗:", error);
       schedules.value = [];
+      errorMessage.value = "スケジュールの読み込みに失敗しました。しばらくしてから再試行してください。";
+    } finally {
+      isLoading.value = false;
     }
   },
   
   // スケジュールを保存（更新）
   async save(item: ScheduleItem) {
     try {
+      isLoading.value = true;
+      errorMessage.value = "";
       // ScheduleItem を TaskUpdate に変換
       const taskUpdate = scheduleItemToTaskUpdate(item);
       
@@ -104,13 +119,18 @@ export const useScheduleStore = () => ({
       }
     } catch (error) {
       console.error("スケジュールの保存に失敗:", error);
+      errorMessage.value = "スケジュールの保存に失敗しました。入力内容を確認して再試行してください。";
       throw error;
+    } finally {
+      isLoading.value = false;
     }
   },
   
   // 新しいスケジュールを作成
   async create(item: Omit<ScheduleItem, "id">) {
     try {
+      isLoading.value = true;
+      errorMessage.value = "";
       // 利用可能なプロジェクト一覧を取得
       const projects = await listProjects();
       
@@ -143,13 +163,18 @@ export const useScheduleStore = () => ({
       }
     } catch (error) {
       console.error("スケジュールの作成に失敗:", error);
+      errorMessage.value = "スケジュールの作成に失敗しました。しばらくしてから再試行してください。";
       throw error;
+    } finally {
+      isLoading.value = false;
     }
   },
   
   // スケジュールを削除
   async delete(id: number) {
     try {
+      isLoading.value = true;
+      errorMessage.value = "";
       // DB から削除
       const success = await deleteTask(id);
       
@@ -162,7 +187,10 @@ export const useScheduleStore = () => ({
       }
     } catch (error) {
       console.error("スケジュールの削除に失敗:", error);
+      errorMessage.value = "スケジュールの削除に失敗しました。しばらくしてから再試行してください。";
       throw error;
+    } finally {
+      isLoading.value = false;
     }
   },
 });

@@ -2,28 +2,31 @@
 // スケジュール詳細ページ: 個別スケジュールの詳細表示・編集
 import { ref, computed, onMounted, watch } from "vue";
 import { useScheduleStore } from "../store/schedule";
+import type { ScheduleItem, ScheduleStatus, SchedulePriority, ScheduleAttachment, ScheduleComment } from "../types/schedule";
 import { getStatusBadgeClass, getPriorityColorClass } from "../utils/uiHelpers";
 
 // 共有ストアから選択中スケジュールを参照（欠損プロパティを安全に補完）
 const store = useScheduleStore();
-const scheduleDetail = computed<any>(() => {
+const isLoading = store.isLoading;
+const errorMessage = store.errorMessage;
+const scheduleDetail = computed<ScheduleItem>(() => {
   const base = {
     id: 0,
     title: "スケジュール未選択",
     description: "左の一覧からスケジュールを選択してください",
     startDate: "",
     endDate: "",
-    status: "予定",
-    priority: "中",
+    status: "予定" as ScheduleStatus,
+    priority: "中" as SchedulePriority,
     assignee: "",
     progress: 0,
     category: "",
-    tags: [],
+    tags: [] as string[],
     notes: "",
-    attachments: [],
-    comments: [],
+    attachments: [] as ScheduleAttachment[],
+    comments: [] as ScheduleComment[],
   };
-  const src: any = store.selectedSchedule || {};
+  const src = (store.selectedSchedule.value as ScheduleItem | null) || ({} as Partial<ScheduleItem>);
   return { ...base, ...src, 
     // 配列/文字列系は欠損時に既定値を強制
     tags: Array.isArray(src.tags) ? src.tags : base.tags,
@@ -36,7 +39,7 @@ const scheduleDetail = computed<any>(() => {
 
 // 編集モードの管理
 const isEditMode = ref(false);
-const editForm = ref({ ...scheduleDetail.value });
+const editForm = ref<ScheduleItem>({ ...scheduleDetail.value });
 
 // 選択スケジュールが変わったら編集フォームを同期
 watch(scheduleDetail, (val) => {
@@ -65,8 +68,8 @@ const saveChanges = async () => {
     console.log("スケジュールが保存されました");
   } catch (e) {
     console.error("保存に失敗", e);
-    const errorMessage = e instanceof Error ? e.message : "保存に失敗しました";
-    alert(errorMessage);
+    const message = e instanceof Error ? e.message : "保存に失敗しました";
+    errorMessage.value = message;
   }
 };
 
@@ -79,14 +82,15 @@ const cancelEdit = () => {
 // コメント追加
 const addComment = () => {
   if (newComment.value.trim()) {
-    const comment = {
+    const comment: ScheduleComment = {
       id: Date.now(),
       author: "現在のユーザー",
       content: newComment.value,
       timestamp: new Date().toLocaleString('ja-JP'),
       avatar: "U"
     };
-    scheduleDetail.value.comments.push(comment);
+    // comments は computed で必ず配列に正規化されるため non-null で扱う
+    scheduleDetail.value.comments!.push(comment);
     newComment.value = "";
   }
 };
@@ -95,11 +99,12 @@ const addComment = () => {
 const handleFileUpload = (event: Event) => {
   const target = event.target as HTMLInputElement;
   const files = target.files;
-  for (let file of files) {
-    const attachment = {
+  if (!files) return;
+  for (const file of files) {
+    const attachment: ScheduleAttachment = {
       name: file.name,
       size: (file.size / 1024 / 1024).toFixed(1) + "MB",
-      type: file.name.split('.').pop()
+      type: file.name.split('.').pop() || ""
     };
     // 編集フォームに追加し、保存時にストアへ反映
     if (!Array.isArray(editForm.value.attachments)) {
@@ -118,6 +123,13 @@ onMounted(() => {
 <template>
   <!-- スケジュール詳細ページ -->
   <div class="schedule-detail-page">
+    <!-- ローディング/エラー表示 -->
+    <div v-if="isLoading" class="alert alert-secondary" role="alert">
+      読み込み中です...
+    </div>
+    <div v-if="!isLoading && errorMessage" class="alert alert-danger" role="alert">
+      {{ errorMessage }}
+    </div>
     <!-- ページヘッダー -->
     <div class="row mb-4">
       <div class="col-12">
@@ -379,9 +391,9 @@ onMounted(() => {
             <h6 class="mb-0">添付ファイル</h6>
           </div>
           <div class="card-body">
-            <div v-if="scheduleDetail.attachments.length > 0">
+            <div v-if="(scheduleDetail.attachments?.length || 0) > 0">
               <div 
-                v-for="file in scheduleDetail.attachments" 
+                v-for="file in (scheduleDetail.attachments || [])" 
                 :key="file.name"
                 class="d-flex align-items-center mb-2"
               >

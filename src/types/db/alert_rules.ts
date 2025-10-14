@@ -6,7 +6,7 @@ export interface AlertRules {
   is_enabled: boolean;
   created_at: string;
   updated_at: string;
-  rule_type: string;
+  rule_type: "DUE_SOON" | "OVERDUE" | "NO_PROGRESS" | "CUSTOM";
   notify_email?: string | null;
   name: string;
 }
@@ -18,7 +18,7 @@ export interface AlertRulesInsert {
   is_enabled?: boolean;
   created_at?: string;
   updated_at?: string;
-  rule_type: string;
+  rule_type: "DUE_SOON" | "OVERDUE" | "NO_PROGRESS" | "CUSTOM";
   notify_email?: string | null;
   name: string;
 }
@@ -30,7 +30,7 @@ export interface AlertRulesUpdate {
   is_enabled?: boolean;
   created_at?: string;
   updated_at?: string;
-  rule_type?: string;
+  rule_type?: "DUE_SOON" | "OVERDUE" | "NO_PROGRESS" | "CUSTOM";
   notify_email?: string | null;
   name?: string;
 }

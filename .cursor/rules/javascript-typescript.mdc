@@ -1,8 +1,7 @@
 ---
-globs: *.js,*.ts,*.tsx
 description: JavaScript/TypeScript ガイド（ファイルタイプ別適用）
+alwaysApply: false
 ---
-
 # JavaScript/TypeScript ガイド（日本語）
 
 ## 基本スタイル
@@ -20,16 +19,119 @@ export default App;
 ## 関数と変数
 - アロー関数を優先
 - 変数名は camelCase。boolean は is/has/can で開始
+- 非同期関数は async/await を使用
+- 関数名は動詞で開始（get, set, create, update, delete, list, fetch）
+
+## 型定義
+```typescript
+// インターフェース定義
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  isActive: boolean;
+}
+
+// 型エイリアス
+type Status = "pending" | "active" | "completed" | "cancelled";
+
+// ジェネリック型
+interface ApiResponse<T> {
+  data: T;
+  success: boolean;
+  message: string;
+}
+```
 
 ## エラー処理
 ```javascript
+// 基本エラー処理
 try {
   const result = await riskyOperation();
 } catch (error) {
   console.error("処理失敗:", error);
   showErrorMessage("エラーが発生しました");
 }
+
+// サービス層エラー処理
+export async function createTask(payload: TaskInsert): Promise<Task | null> {
+  try {
+    const { data, error } = await supabase
+      .from("tasks")
+      .insert([payload])
+      .select("*")
+      .single();
+    
+    if (error) {
+      console.error("タスク作成に失敗:", error.message);
+      return null;
+    }
+    return data as Task;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("予期せぬエラー:", msg);
+    return null;
+  }
+}
+
+// 型ガード
+function isError(error: unknown): error is Error {
+  return error instanceof Error;
+}
 ```
 
 ## コメント
 - 関数/複雑ロジックに日本語コメントを付与
+- 関数の目的と引数・戻り値を明記
+- 複雑なロジックには処理の流れを説明
+
+## 非同期処理
+```typescript
+// Promise チェーン
+const fetchData = async (): Promise<Data[]> => {
+  try {
+    const response = await fetch("/api/data");
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("データ取得に失敗:", error);
+    throw error;
+  }
+};
+
+// 並列処理
+const fetchMultipleData = async () => {
+  const [users, projects, tasks] = await Promise.all([
+    fetchUsers(),
+    fetchProjects(),
+    fetchTasks()
+  ]);
+  return { users, projects, tasks };
+};
+```
+
+## ユーティリティ関数
+```typescript
+// 日付処理
+export const formatDate = (date: string | Date): string => {
+  return new Date(date).toLocaleDateString("ja-JP");
+};
+
+// バリデーション
+export const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+// デバウンス
+export const debounce = <T extends (...args: any[]) => any>(
+  func: T,
+  delay: number
+): T => {
+  let timeoutId: NodeJS.Timeout;
+  return ((...args: any[]) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  }) as T;
+};
+```

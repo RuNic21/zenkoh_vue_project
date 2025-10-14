@@ -4,10 +4,11 @@
 // ステータスに応じたバッジクラスを返す
 export const getStatusBadgeClass = (status: string): string => {
   if (!status) return "badge bg-secondary";
-  if (status === "完了") return "badge bg-gradient-success";
-  if (status === "進行中") return "badge bg-gradient-info";
-  if (status === "遅延") return "badge bg-gradient-danger";
-  if (status === "保留") return "badge bg-gradient-warning";
+  if (status === "DONE") return "badge bg-gradient-success";
+  if (status === "IN_PROGRESS") return "badge bg-gradient-info";
+  if (status === "BLOCKED") return "badge bg-gradient-danger";
+  if (status === "CANCELLED") return "badge bg-gradient-warning";
+  if (status === "NOT_STARTED") return "badge bg-gradient-secondary";
   return "badge bg-secondary";
 };
 
@@ -23,9 +24,10 @@ export const getProgressBarClass = (progress: number): string => {
 // 優先度に応じたテキスト色を返す
 export const getPriorityColorClass = (priority: string): string => {
   if (!priority) return "text-secondary";
-  if (priority === "高") return "text-danger";
-  if (priority === "中") return "text-warning";
-  if (priority === "低") return "text-success";
+  if (priority === "URGENT") return "text-danger";
+  if (priority === "HIGH") return "text-danger";
+  if (priority === "MEDIUM") return "text-warning";
+  if (priority === "LOW") return "text-success";
   return "text-secondary";
 };
 

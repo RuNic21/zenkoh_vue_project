@@ -23,14 +23,20 @@ zenkoh_vue_project/
 ```
 src/
 ├── main.js                 # Vue アプリエントリーポイント
-├── App.vue                 # ルートコンポーネント
+├── App.vue                 # ルートコンポーネント（ダッシュボード含む）
 ├── layouts/                # レイアウトコンポーネント
 │   └── MainLayout.vue      # メインレイアウト
-├── pages/                  # ページコンポーネント
+├── pages/                  # ページコンポーネント（5つのメインページ）
 │   ├── ScheduleList.vue    # スケジュール一覧
-│   └── ScheduleDetail.vue  # スケジュール詳細
+│   ├── ScheduleDetail.vue  # スケジュール詳細
+│   ├── ProjectManagement.vue # プロジェクト管理
+│   ├── TeamManagement.vue  # チーム管理
+│   └── ReportPage.vue      # レポート・分析
 ├── components/             # 再利用可能コンポーネント
-├── services/               # データベース・API サービス
+│   ├── Charts/             # チャートコンポーネント
+│   ├── OptimizedDataTable.vue # 最適化データテーブル
+│   └── PerformanceOptimizedTable.vue # パフォーマンス最適化テーブル
+├── services/               # データベース・API サービス（11個の専門サービス）
 ├── store/                  # 状態管理
 ├── types/                  # TypeScript 型定義
 ├── utils/                  # ユーティリティ関数
@@ -70,27 +76,39 @@ import { ref } from "vue";
 - [src/main.js](mdc:src/main.js): Vue アプリ初期化、Material Dashboard CSS 読み込み
 - [src/App.vue](mdc:src/App.vue): ルートコンポーネント、ページルーティング、ダッシュボード
 
-### サービス層（6個のコアファイル）
+### サービス層（11個の専門サービス）
 - [src/services/supabaseClient.ts](mdc:src/services/supabaseClient.ts): Supabase 接続クライアント
 - [src/services/crud.ts](mdc:src/services/crud.ts): 汎用 CRUD ファクトリ
 - [src/services/dbServices.ts](mdc:src/services/dbServices.ts): 自動生成 CRUD リポジトリ
 - [src/services/taskService.ts](mdc:src/services/taskService.ts): タスク専用サービス
 - [src/services/projectService.ts](mdc:src/services/projectService.ts): プロジェクト専用サービス
 - [src/services/relationService.ts](mdc:src/services/relationService.ts): 関係型データサービス
+- [src/services/dashboardService.ts](mdc:src/services/dashboardService.ts): ダッシュボード統計・分析
+- [src/services/activityService.ts](mdc:src/services/activityService.ts): 活動フィード・通知管理
+- [src/services/reportService.ts](mdc:src/services/reportService.ts): レポート生成・エクスポート
+- [src/services/teamService.ts](mdc:src/services/teamService.ts): チーム管理
+- [src/services/notificationService.ts](mdc:src/services/notificationService.ts): 通知システム
 
 ### 状態管理
 - [src/store/schedule.ts](mdc:src/store/schedule.ts): スケジュール状態管理、DB 連携
 
 ### 型定義
 - [src/types/db/](mdc:src/types/db/): Supabase スキーマ自動生成型（編集禁止）
+  - projects.ts, tasks.ts, users.ts, boards.ts, board_columns.ts
+  - task_members.ts, notifications.ts, alert_rules.ts
 - [src/types/schedule.ts](mdc:src/types/schedule.ts): UI 表示用型
 - [src/types/task.ts](mdc:src/types/task.ts): ビジネスロジック用型
 - [src/types/project.ts](mdc:src/types/project.ts): プロジェクト用型
+- [src/types/team.ts](mdc:src/types/team.ts): チーム管理用型
+- [src/types/report.ts](mdc:src/types/report.ts): レポート・分析用型
+- [src/types/notification.ts](mdc:src/types/notification.ts): 通知システム用型
 
 ### ユーティリティ
 - [src/utils/taskAdapter.ts](mdc:src/utils/taskAdapter.ts): DB ↔ UI 型変換
 - [src/utils/uiHelpers.ts](mdc:src/utils/uiHelpers.ts): UI ヘルパー関数
 - [src/utils/dateUtils.ts](mdc:src/utils/dateUtils.ts): 日付処理
+- [src/utils/errorHandler.ts](mdc:src/utils/errorHandler.ts): 統一エラー処理
+- [src/utils/performanceUtils.ts](mdc:src/utils/performanceUtils.ts): パフォーマンス最適化
 
 ## 🔧 開発スクリプト
 
@@ -128,8 +146,12 @@ npm run types:fromcsv         # CSVから型生成
 ### 開発ツール
 - **TypeScript**: 型安全性
 - **Sass**: CSS プリプロセッサ
-- **Chart.js**: グラフ表示
+- **Chart.js**: グラフ表示・データ可視化
+- **Vue Chart.js**: Vue用チャートライブラリ
 - **Font Awesome**: アイコン
+- **Flatpickr**: 日付ピッカー
+- **NoUISlider**: スライダーコンポーネント
+- **Perfect Scrollbar**: カスタムスクロールバー
 
 ## 🚨 重要な制約
 

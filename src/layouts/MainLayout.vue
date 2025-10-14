@@ -2,23 +2,34 @@
 // メインレイアウトコンポーネント: プロジェクト管理スケジューラーの基本レイアウト
 import { ref, computed, watch } from "vue";
 
+// NavigationItem インターフェース定義
+interface NavigationItem {
+  id: string;
+  name: string;
+  icon: string;
+  isActive: boolean;
+}
+
+// Props インターフェース定義
+interface Props {
+  currentPage: string;
+}
+
 // props定義: 親コンポーネントから受け取るデータ
-const props = defineProps({
-  currentPage: {
-    type: String,
-    required: true,
-    default: "dashboard"
-  }
+const props = withDefaults(defineProps<Props>(), {
+  currentPage: "dashboard"
 });
 
 // emit定義: 親コンポーネントにイベントを送信
-const emit = defineEmits(['navigate']);
+const emit = defineEmits<{
+  navigate: [pageId: string];
+}>();
 
 // サイドバーの開閉状態を管理
 const isSidebarOpen = ref(true);
 
 // ナビゲーションメニューアイテム
-const navigationItems = ref([
+const navigationItems = ref<NavigationItem[]>([
   {
     id: "dashboard",
     name: "ダッシュボード",
@@ -26,21 +37,15 @@ const navigationItems = ref([
     isActive: true
   },
   {
-    id: "schedule-list",
-    name: "スケジュール一覧",
-    icon: "schedule",
-    isActive: false
-  },
-  {
-    id: "projects",
+    id: "project-management",
     name: "プロジェクト管理",
     icon: "work",
     isActive: false
   },
   {
-    id: "tasks",
+    id: "schedule-list",
     name: "タスク管理",
-    icon: "task",
+    icon: "schedule",
     isActive: false
   },
   {
@@ -50,9 +55,9 @@ const navigationItems = ref([
     isActive: false
   },
   {
-    id: "reports",
+    id: "report",
     name: "レポート",
-    icon: "analytics",
+    icon: "assessment",
     isActive: false
   }
 ]);

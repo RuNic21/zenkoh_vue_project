@@ -8,7 +8,7 @@ export interface Notifications {
   send_after: string;
   sent_at?: string | null;
   body_text: string;
-  status: string;
+  status: "QUEUED" | "SENT" | "FAILED" | "CANCELLED";
   last_error?: string | null;
   to_email: string;
   subject: string;
@@ -23,7 +23,7 @@ export interface NotificationsInsert {
   send_after?: string;
   sent_at?: string | null;
   body_text: string;
-  status?: string;
+  status?: "QUEUED" | "SENT" | "FAILED" | "CANCELLED";
   last_error?: string | null;
   to_email: string;
   subject: string;
@@ -38,7 +38,7 @@ export interface NotificationsUpdate {
   send_after?: string;
   sent_at?: string | null;
   body_text?: string;
-  status?: string;
+  status?: "QUEUED" | "SENT" | "FAILED" | "CANCELLED";
   last_error?: string | null;
   to_email?: string;
   subject?: string;

@@ -1,9 +1,126 @@
 <script setup lang="ts">
-// スケジュール詳細ページ: 個別スケジュールの詳細表示・編集
 import { ref, computed, onMounted, watch } from "vue";
 import { useScheduleStore } from "../store/schedule";
 import type { ScheduleItem, ScheduleStatus, SchedulePriority, ScheduleAttachment, ScheduleComment } from "../types/schedule";
 import { getStatusBadgeClass, getPriorityColorClass } from "../utils/uiHelpers";
+import { listUsers } from "../services/dbServices";
+import type { Users } from "../types/db/users";
+
+// スケジュール詳細ページ: 個別スケジュールの詳細表示・編集
+
+// TODO: 現在のスキーマで即座に実装可能な機能
+// 1. 基本情報編集機能の完全実装
+//    - task_name, description フィールドの完全DB連携
+//    - progress_percent フィールドの実装（0-100の範囲制限）
+//    - status フィールドの実装（NOT_STARTED, IN_PROGRESS, BLOCKED, DONE, CANCELLED）
+//    - priority フィールドの実装（LOW, MEDIUM, HIGH, URGENT）
+//
+// 2. 担当者管理システムの完全実装
+//    - primary_assignee_id フィールドでusersテーブルと連携
+//    - changeAssignee()関数でDB保存ロジック実装
+//    - ユーザー名↔ユーザーID変換ロジック実装
+//    - 担当者変更時の権限チェック機能実装
+//
+// 3. スケジュール管理システムの完全実装
+//    - planned_start, planned_end フィールドの実装
+//    - actual_start, actual_end フィールドの実装
+//    - 計画vs実績の比較表示機能実装
+//    - 日付バリデーション機能実装
+//
+// 4. プロジェクト連携システムの実装
+//    - project_id フィールドでprojectsテーブルと連携
+//    - プロジェクト情報の表示（project.name, project.description）
+//    - プロジェクト別フィルタリング機能実装
+//
+// 5. 状態変更履歴システムの実装
+//    - created_at, updated_at, created_by, updated_by フィールド活用
+//    - 状態変更時の履歴記録機能実装
+//    - 変更者情報の表示機能実装
+//    - 履歴の時系列表示機能実装
+//
+// 6. クイックアクションシステムの改善
+//    - executeQuickAction()でactual_start/actual_end自動記録
+//    - 状態変更時の進捗率自動調整機能実装
+//    - アクション実行時の通知機能実装
+//    - カスタムアクション定義機能実装
+//
+// 7. WBSコード管理システムの実装
+//    - wbs_code フィールドの表示・編集機能実装
+//    - WBSコードのバリデーション機能実装
+//    - WBSコードによるソート機能実装
+//
+// 8. 親子タスク関係システムの実装
+//    - parent_task_id フィールドの活用
+//    - 子タスク一覧表示機能実装
+//    - 親タスクへのナビゲーション機能実装
+//    - タスク階層の視覚化機能実装
+
+// TODO: スキーマ拡張が必要な機能（将来実装）
+// 9. タグ管理システム - 現在メモリ上でのみ管理
+//    - tasksテーブルにtags TEXT[]カラム追加が必要
+//    - addTag()/removeTag()関数でDB保存ロジック実装が必要
+//    - taskAdapter.tsでtagsフィールドの変換ロジック実装が必要
+//    - タグの重複チェック機能実装が必要
+//    - タグ使用頻度統計機能実装が必要
+//
+// 10. コメントシステム - 現在メモリ上でのみ管理
+//    - tasksテーブルにcomments JSONBカラム追加が必要
+//    - addComment()関数でDB保存ロジック実装が必要
+//    - コメント削除/編集機能実装が必要
+//    - コメント作成者認証システム実装が必要
+//
+// 11. 添付ファイルシステム - 現在メモリ上でのみ管理
+//    - tasksテーブルにattachments JSONBカラム追加が必要
+//    - handleFileUpload()関数で実際のファイルアップロード実装が必要
+//    - ファイルダウンロード機能実装が必要
+//    - ファイル削除機能実装が必要
+//    - ファイルサイズ制限およびタイプ検証実装が必要
+//
+// 12. メモ/ノートシステム - 現在descriptionフィールドで代用可能
+//    - tasksテーブルにnotes TEXTカラム追加が必要
+//    - メモデータをDBからロード/保存するロジック実装が必要
+//    - メモ履歴機能実装が必要
+//
+// 13. チームメンバー管理システム - task_membersテーブル活用
+//    - task_membersテーブルとの連携実装が必要
+//    - チームメンバー追加/削除機能実装が必要
+//    - メンバー役割管理機能実装が必要
+//    - メンバー別権限管理機能実装が必要
+//
+// 14. 通知システム - notificationsテーブル活用
+//    - alert_rulesテーブルとの連携実装が必要
+//    - タスク状態変更時の通知機能実装が必要
+//    - 期限切れ通知機能実装が必要
+//    - カスタム通知ルール設定機能実装が必要
+//
+// 15. 活動ログシステム - activitiesテーブル活用
+//    - タスク操作のログ記録機能実装が必要
+//    - 活動履歴の表示機能実装が必要
+//    - ログフィルタリング機能実装が必要
+//    - ログエクスポート機能実装が必要
+
+// TODO: データベーススキーマ拡張案
+// 16. スキーマ拡張提案
+//    - tasksテーブルに以下のカラム追加を検討:
+//      * tags TEXT[] - タグ配列
+//      * comments JSONB - コメント配列
+//      * attachments JSONB - 添付ファイル情報
+//      * notes TEXT - メモ/ノート
+//      * status_history JSONB - 状態変更履歴
+//    - インデックス作成: tags, status_history用のGINインデックス
+//    - 制約追加: tags配列の最大長制限
+//
+// 17. サービス層拡張
+//    - taskService.tsに新フィールド処理ロジック追加が必要
+//    - JSONBフィールドのシリアライズ/デシリアライズ処理実装が必要
+//    - バッチ更新機能実装が必要
+//    - 履歴クエリ最適化実装が必要
+//
+// 18. アダプター層拡張
+//    - taskAdapter.tsに新フィールド変換ロジック実装が必要
+//    - ユーザー名↔ユーザーID変換関数実装が必要
+//    - JSONBフィールドの型安全な変換実装が必要
+//    - デフォルト値処理の統一実装が必要
 
 // 共有ストアから選択中スケジュールを参照（欠損プロパティを安全に補完）
 const store = useScheduleStore();
@@ -48,6 +165,44 @@ watch(scheduleDetail, (val) => {
 
 // 新しいコメントの入力
 const newComment = ref("");
+
+// タグ管理
+const newTag = ref("");
+const availableTags = ref<string[]>([]);
+
+// 状態変更履歴（DBから取得するように変更予定）
+const statusHistory = ref<Array<{ from: string; to: string; user: string; timestamp: string; reason: string }>>([]);
+
+// 利用可能なユーザー一覧（DBから取得）
+const availableUsers = ref<Array<{ id: number; name: string; avatar: string }>>([]);
+
+// ユーザーデータをロードする関数
+const loadUsers = async () => {
+  try {
+    const result = await listUsers() as any;
+    if (result.success && result.data) {
+      availableUsers.value = result.data.map((user: any) => ({
+        id: user.id,
+        name: user.display_name,
+        avatar: user.display_name.charAt(0).toUpperCase()
+      }));
+    } else {
+      console.error("ユーザーデータの読み込みに失敗:", result.error);
+      availableUsers.value = [];
+    }
+  } catch (error) {
+    console.error("ユーザーデータの読み込みに失敗:", error);
+    availableUsers.value = [];
+  }
+};
+
+// クイックアクション
+const quickActions = ref([
+  { label: "開始", status: "進行中", icon: "play_arrow", color: "success" },
+  { label: "完了", status: "完了", icon: "check", color: "primary" },
+  { label: "保留", status: "保留", icon: "pause", color: "warning" },
+  { label: "遅延", status: "遅延", icon: "schedule", color: "danger" }
+]);
 
 // ステータス別の色を取得（uiHelpersからインポート済み）
 // 優先度別の色を取得（uiHelpersからインポート済み）
@@ -114,9 +269,66 @@ const handleFileUpload = (event: Event) => {
   }
 };
 
+// タグ追加
+const addTag = (tag: string) => {
+  if (tag.trim() && !(editForm.value.tags || []).includes(tag.trim())) {
+    if (!editForm.value.tags) {
+      editForm.value.tags = [];
+    }
+    editForm.value.tags.push(tag.trim());
+    newTag.value = "";
+  }
+};
+
+// タグ削除
+const removeTag = (tagToRemove: string) => {
+  if (editForm.value.tags) {
+    editForm.value.tags = editForm.value.tags.filter(tag => tag !== tagToRemove);
+  }
+};
+
+// タグ自動補完
+const filteredTags = computed(() => {
+  if (!newTag.value) return availableTags.value;
+  return availableTags.value.filter(tag => 
+    tag.toLowerCase().includes(newTag.value.toLowerCase())
+  );
+});
+
+// 担当者変更
+const changeAssignee = (userId: number) => {
+  const user = availableUsers.value.find(u => u.id === userId);
+  if (user) {
+    editForm.value.assignee = user.name;
+  }
+};
+
+// クイックアクション実行
+const executeQuickAction = async (action: any) => {
+  try {
+    editForm.value.status = action.status;
+    await saveChanges();
+    
+    // 状態変更履歴に追加
+    statusHistory.value.unshift({
+      from: scheduleDetail.value.status,
+      to: action.status,
+      user: "現在のユーザー",
+      timestamp: new Date().toLocaleString('ja-JP'),
+      reason: `${action.label}アクション実行`
+    });
+    
+    console.log(`${action.label}アクションを実行しました`);
+  } catch (error) {
+    console.error("クイックアクションの実行に失敗:", error);
+  }
+};
+
 // コンポーネント初期化
-onMounted(() => {
+onMounted(async () => {
   console.log("スケジュール詳細ページが読み込まれました");
+  // ユーザーデータをロード
+  await loadUsers();
 });
 </script>
 
@@ -141,6 +353,20 @@ onMounted(() => {
             </p>
           </div>
           <div class="d-flex gap-2">
+            <!-- クイックアクションボタン -->
+            <div v-if="!isEditMode" class="d-flex gap-1 me-3">
+              <button 
+                v-for="action in quickActions" 
+                :key="action.status"
+                class="btn btn-sm"
+                :class="`btn-outline-${action.color}`"
+                @click="executeQuickAction(action)"
+                :title="`${action.label}に変更`"
+              >
+                <i class="material-symbols-rounded">{{ action.icon }}</i>
+              </button>
+            </div>
+            
             <button 
               v-if="!isEditMode"
               class="btn btn-outline-primary"
@@ -257,6 +483,43 @@ onMounted(() => {
           </div>
         </div>
 
+        <!-- 状態変更履歴 -->
+        <div class="card mb-4">
+          <div class="card-header pb-0">
+            <h6 class="mb-0">状態変更履歴</h6>
+          </div>
+          <div class="card-body">
+            <div class="timeline timeline-one-side">
+              <div 
+                v-for="(history, index) in statusHistory" 
+                :key="index"
+                class="timeline-block mb-3"
+              >
+                <span class="timeline-step">
+                  <div class="avatar avatar-sm bg-gradient-info">
+                    <i class="material-symbols-rounded text-white opacity-10">swap_horiz</i>
+                  </div>
+                </span>
+                <div class="timeline-content">
+                  <h6 class="text-dark text-sm font-weight-bold mb-0">
+                    {{ history.from }} → {{ history.to }}
+                  </h6>
+                  <p class="text-secondary font-weight-bold text-xs mt-1 mb-0">
+                    {{ history.user }} • {{ history.timestamp }}
+                  </p>
+                  <p class="text-sm mt-1 mb-0 text-muted">{{ history.reason }}</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 履歴が空の場合 -->
+            <div v-if="statusHistory.length === 0" class="text-center py-3">
+              <i class="material-symbols-rounded text-muted opacity-50" style="font-size: 48px;">history</i>
+              <p class="text-sm text-muted mt-2">状態変更履歴がありません</p>
+            </div>
+          </div>
+        </div>
+
         <!-- コメントセクション -->
         <div class="card">
           <div class="card-header pb-0">
@@ -333,7 +596,25 @@ onMounted(() => {
             </div>
             <div class="d-flex justify-content-between align-items-center">
               <span class="text-sm">担当者</span>
-              <span class="text-sm font-weight-bold">{{ scheduleDetail.assignee }}</span>
+              <div class="d-flex align-items-center">
+                <span class="text-sm font-weight-bold me-2">{{ scheduleDetail.assignee }}</span>
+                <select 
+                  v-if="isEditMode"
+                  class="form-select form-select-sm"
+                  style="width: auto; min-width: 120px;"
+                  @change="changeAssignee(Number(($event.target as HTMLSelectElement).value))"
+                >
+                  <option value="">担当者を選択</option>
+                  <option 
+                    v-for="user in availableUsers" 
+                    :key="user.id" 
+                    :value="user.id"
+                    :selected="user.name === scheduleDetail.assignee"
+                  >
+                    {{ user.name }}
+                  </option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -373,14 +654,64 @@ onMounted(() => {
             <h6 class="mb-0">タグ</h6>
           </div>
           <div class="card-body">
-            <div class="d-flex flex-wrap gap-2">
+            <!-- タグ表示 -->
+            <div class="d-flex flex-wrap gap-2 mb-3">
               <span 
                 v-for="tag in scheduleDetail.tags" 
                 :key="tag"
-                class="badge bg-gradient-info"
+                class="badge bg-gradient-info d-flex align-items-center"
               >
                 {{ tag }}
+                <button 
+                  v-if="isEditMode"
+                  class="btn-close btn-close-white ms-2"
+                  style="font-size: 0.6rem;"
+                  @click="removeTag(tag)"
+                  :title="`${tag}を削除`"
+                ></button>
               </span>
+            </div>
+            
+            <!-- タグ追加（編集モード時のみ） -->
+            <div v-if="isEditMode">
+              <div class="input-group input-group-sm">
+                <input 
+                  type="text" 
+                  class="form-control"
+                  v-model="newTag"
+                  placeholder="タグを入力..."
+                  @keyup.enter="addTag(newTag)"
+                  list="tag-suggestions"
+                >
+                <button 
+                  class="btn btn-outline-primary"
+                  @click="addTag(newTag)"
+                  :disabled="!newTag.trim()"
+                >
+                  <i class="material-symbols-rounded">add</i>
+                </button>
+              </div>
+              
+              <!-- タグ候補 -->
+              <datalist id="tag-suggestions">
+                <option v-for="tag in filteredTags" :key="tag" :value="tag"></option>
+              </datalist>
+              
+              <!-- 人気タグ -->
+              <div class="mt-2">
+                <small class="text-muted">人気タグ:</small>
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                  <button 
+                    v-for="tag in availableTags.slice(0, 4)" 
+                    :key="tag"
+                    class="btn btn-sm btn-outline-secondary"
+                    @click="addTag(tag)"
+                    :disabled="(scheduleDetail.tags || []).includes(tag)"
+                  >
+                    {{ tag }}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -477,6 +808,72 @@ onMounted(() => {
   padding: 0.375rem 0;
 }
 
+/* クイックアクションボタンのスタイリング */
+.btn-outline-success:hover {
+  background-color: #28a745;
+  border-color: #28a745;
+  color: white;
+}
+
+.btn-outline-primary:hover {
+  background-color: #007bff;
+  border-color: #007bff;
+  color: white;
+}
+
+.btn-outline-warning:hover {
+  background-color: #ffc107;
+  border-color: #ffc107;
+  color: #212529;
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+/* タグのスタイリング */
+.badge {
+  transition: all 0.2s ease-in-out;
+}
+
+.badge:hover {
+  transform: scale(1.05);
+}
+
+.btn-close {
+  opacity: 0.7;
+}
+
+.btn-close:hover {
+  opacity: 1;
+}
+
+/* 状態変更履歴のスタイリング */
+.timeline-step .avatar {
+  background: linear-gradient(45deg, #667eea, #764ba2);
+}
+
+/* 担当者選択のスタイリング */
+.form-select-sm {
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* 人気タグボタンのスタイリング */
+.btn-outline-secondary {
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.btn-outline-secondary:hover {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  color: white;
+}
+
 /* レスポンシブデザイン */
 @media (max-width: 768px) {
   .schedule-detail-page {
@@ -485,6 +882,25 @@ onMounted(() => {
   
   .card-body {
     padding: 1rem;
+  }
+  
+  /* クイックアクションボタンを縦並びに */
+  .d-flex.gap-1 {
+    flex-direction: column;
+    gap: 0.5rem !important;
+  }
+  
+  /* タグ入力エリアの調整 */
+  .input-group-sm {
+    flex-direction: column;
+  }
+  
+  .input-group-sm .form-control {
+    border-radius: 0.375rem 0.375rem 0 0;
+  }
+  
+  .input-group-sm .btn {
+    border-radius: 0 0 0.375rem 0.375rem;
   }
 }
 </style>

@@ -2,8 +2,10 @@
 // 目的: DB の Task 型を UI で表示するための変換型として使用
 // 実際のデータは Task 型で管理し、UI 表示時に ScheduleItem に変換
 
-export type ScheduleStatus = "予定" | "進行中" | "完了" | "遅延" | "保留";
-export type SchedulePriority = "高" | "中" | "低";
+// データベーススキーマのstatus値に合わせて定義
+export type ScheduleStatus = "NOT_STARTED" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELLED";
+// データベーススキーマのpriority値に合わせて定義  
+export type SchedulePriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
 export interface ScheduleAttachment {
   name: string;

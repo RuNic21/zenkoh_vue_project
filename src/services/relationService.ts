@@ -10,6 +10,7 @@ import type { BoardColumns } from "../types/db/board_columns";
 import type { Boards } from "../types/db/boards";
 import type { Notifications } from "../types/db/notifications";
 import type { AlertRules } from "../types/db/alert_rules";
+import { handleServiceCall, createSuccessResult, createErrorResult, translateSupabaseError, type ServiceResult } from "../utils/errorHandler";
 
 // 型: タスク + プロジェクト + メンバー(ユーザー)
 export type TaskWithProjectAndMembers = Tasks & {
@@ -60,28 +61,26 @@ function applyWhere(query: any, where?: WhereCondition[]) {
 export async function listTasksWithProjectAndMembers(
   filter?: SelectFilter,
   where?: WhereCondition[]
-): Promise<TaskWithProjectAndMembers[]> {
-  try {
-    let query = supabase
-      .from("tasks")
-      .select("*, project:projects(id,name), members:task_members(role,user:users(id,display_name,email))");
+): Promise<ServiceResult<TaskWithProjectAndMembers[]>> {
+  return handleServiceCall(
+    async () => {
+      let query = supabase
+        .from("tasks")
+        .select("*, project:projects(id,name), members:task_members(role,user:users(id,display_name,email))");
 
-    if (filter) {
-      for (const [k, v] of Object.entries(filter)) query = query.eq(k, v as never);
-    }
-    query = applyWhere(query, where);
+      if (filter) {
+        for (const [k, v] of Object.entries(filter)) query = query.eq(k, v as never);
+      }
+      query = applyWhere(query, where);
 
-    const { data, error } = await query;
-    if (error) {
-      console.error("タスク結合取得に失敗:", error.message);
-      return [];
-    }
-    return (data as TaskWithProjectAndMembers[]) ?? [];
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("タスク結合取得でエラー:", msg);
-    return [];
-  }
+      const { data, error } = await query;
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
+      return (data as TaskWithProjectAndMembers[]) ?? [];
+    },
+    "タスク結合取得に失敗しました"
+  );
 }
 
 // カラム + ボード(+プロジェクト)

@@ -1,8 +1,7 @@
 ---
-globs: *.vue,*.ts,*.js,*.html,*.css,*.scss
 description: Vue 3 Composition API パターン（ファイルタイプ別適用）
+alwaysApply: false
 ---
-
 # Vue 3 Composition API パターン
 
 ## 🎯 基本パターン
@@ -79,7 +78,7 @@ const selectedSchedule = computed(() => store.selectedSchedule.value);
 
 ### 3. サービス層使用パターン
 ```typescript
-// サービス層の使用例
+// 基本サービス使用例
 import { listTasks, createTask } from "@/services/taskService";
 import { taskToScheduleItem } from "@/utils/taskAdapter";
 
@@ -93,6 +92,25 @@ const newTask = await createTask({
   task_name: "新しいタスク",
   status: "NOT_STARTED"
 });
+
+// 専門サービス使用例
+import { fetchProjectProgress } from "@/services/dashboardService";
+import { listUsers, createUser } from "@/services/teamService";
+import { generateReport } from "@/services/reportService";
+import { listNotifications } from "@/services/notificationService";
+
+// ダッシュボード統計
+const stats = await fetchProjectProgress();
+
+// チーム管理
+const users = await listUsers();
+const newUser = await createUser(userData);
+
+// レポート生成
+const report = await generateReport(options);
+
+// 通知管理
+const notifications = await listNotifications();
 ```
 
 ## 🔄 データフロー パターン
@@ -115,6 +133,7 @@ watch(() => store.selectedScheduleId.value, (id) => {
 
 ### 2. フォーム送信パターン
 ```typescript
+// 基本フォーム
 const formData = ref({
   title: "",
   description: "",
@@ -137,6 +156,43 @@ const handleSubmit = async () => {
     alert("作成に失敗しました");
   } finally {
     isSubmitting.value = false;
+  }
+};
+
+// 複雑なフォーム（バリデーション付き）
+const userForm = ref({
+  name: "",
+  email: "",
+  role: "user",
+  isActive: true
+});
+
+const errors = ref<Record<string, string>>({});
+
+const validateForm = (): boolean => {
+  errors.value = {};
+  
+  if (!userForm.value.name) {
+    errors.value.name = "名前は必須です";
+  }
+  
+  if (!userForm.value.email) {
+    errors.value.email = "メールアドレスは必須です";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userForm.value.email)) {
+    errors.value.email = "有効なメールアドレスを入力してください";
+  }
+  
+  return Object.keys(errors.value).length === 0;
+};
+
+const handleUserSubmit = async () => {
+  if (!validateForm()) return;
+  
+  try {
+    await createUser(userForm.value);
+    // 成功処理
+  } catch (error) {
+    console.error("ユーザー作成に失敗:", error);
   }
 };
 ```
@@ -294,6 +350,44 @@ const scheduleItems = tasks.map(task => taskToScheduleItem(task, users));
 
 // UI → DB 変換
 const taskUpdate = scheduleItemToTaskUpdate(scheduleItem);
+```
+
+### 3. エラーハンドリング使用
+```typescript
+import { handleError, showErrorMessage } from "@/utils/errorHandler";
+
+const handleAsyncOperation = async () => {
+  try {
+    const result = await someAsyncFunction();
+    return result;
+  } catch (error) {
+    handleError(error, "操作に失敗しました");
+    return null;
+  }
+};
+```
+
+### 4. パフォーマンス最適化使用
+```typescript
+import { debounce, throttle } from "@/utils/performanceUtils";
+
+// 検索入力のデバウンス
+const searchQuery = ref("");
+const debouncedSearch = debounce(async (query: string) => {
+  if (query.length > 2) {
+    const results = await searchItems(query);
+    searchResults.value = results;
+  }
+}, 300);
+
+watch(searchQuery, (newQuery) => {
+  debouncedSearch(newQuery);
+});
+
+// スクロールイベントのスロットル
+const handleScroll = throttle(() => {
+  // スクロール処理
+}, 100);
 ```
 
 ## 📱 状態管理パターン

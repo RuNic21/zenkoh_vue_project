@@ -6,11 +6,13 @@ Zenkoh Project Scheduler は Supabase を基盤とした現代的プロジェク
 
 ## 🎯 最新の更新（2025年1月）
 
-- **サービス層完全統合**: 6個のコアファイルに集約完了
+- **サービス層拡張**: 11個の専門サービスに拡張完了
+- **ページ拡張**: 5つのメインページ（ダッシュボード、スケジュール一覧・詳細、プロジェクト管理、チーム管理、レポート）
 - **自動型生成**: SupabaseスキーマからTypeScript型を自動生成
 - **完全なDB統合**: 実際のSupabaseデータで動作確認完了
 - **開発ワークフロー**: 環境テスト、シードデータ、CRUDテストスクリプト完備
 - **型安全性確保**: TypeScriptによる完全な型チェック
+- **データ可視化**: Chart.js、vue-chartjsを活用した統計・分析機能
 
 ## 🏗️ 全体アーキテクチャ
 
@@ -269,6 +271,23 @@ id,project_id,task_name,description,status,priority,progress_percent,planned_sta
 
 ## 📚 関連ドキュメント
 
-- [フロントエンドアーキテクチャ](./frontend-architecture.md)
-- [APIドキュメント](./api-documentation.md)
-- [デプロイガイド](./deployment-guide.md)
+- [スケジュール管理設計書](./schedule-management-design.md)
+- [データベース統合ガイド](./database-integration-guide.md)
+- [README](../README.md)
+
+## 🎯 サービス層対応
+
+### 11個の専門サービス
+- **基本CRUD**: `crud.ts`, `dbServices.ts`
+- **専門機能**: `taskService.ts`, `projectService.ts`, `teamService.ts`
+- **分析機能**: `dashboardService.ts`, `reportService.ts`
+- **通知機能**: `notificationService.ts`, `activityService.ts`
+- **関係型データ**: `relationService.ts`
+
+### 5つのメインページ
+- **ダッシュボード**: プロジェクト進捗統計・可視化
+- **スケジュール一覧**: タスク一覧・フィルタリング
+- **スケジュール詳細**: タスク詳細・編集
+- **プロジェクト管理**: プロジェクトCRUD・カンバンボード
+- **チーム管理**: ユーザー管理・権限設定
+- **レポート・分析**: 統計・分析・レポート生成

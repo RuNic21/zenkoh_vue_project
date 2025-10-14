@@ -24,10 +24,10 @@ export interface Task {
   primary_assignee_id?: number | null;
 
   // ステータス（必須）
-  status: string;
+  status: "NOT_STARTED" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELLED";
 
   // 優先度（必須）
-  priority: string;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
   // 計画開始/終了（任意）
   planned_start?: string | null; // ISO
@@ -38,7 +38,7 @@ export interface Task {
   actual_end?: string | null;    // ISO
 
   // 進捗率（0-100, 必須）
-  progress_percent: number;
+  progress_percent: number; // 0-100の範囲
 
   // カンバン列ID（任意）
   current_column_id?: number | null;
@@ -65,8 +65,8 @@ export interface TaskInsert {
   description?: string | null;
   primary_assignee_id?: number | null;
   // DB 側デフォルトに任せるため任意
-  status?: string;
-  priority?: string;
+  status?: "NOT_STARTED" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELLED";
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   planned_start?: string | null;
   planned_end?: string | null;
   actual_start?: string | null;
@@ -86,8 +86,8 @@ export interface TaskUpdate {
   task_name?: string;
   description?: string | null;
   primary_assignee_id?: number | null;
-  status?: string;
-  priority?: string;
+  status?: "NOT_STARTED" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELLED";
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   planned_start?: string | null;
   planned_end?: string | null;
   actual_start?: string | null;

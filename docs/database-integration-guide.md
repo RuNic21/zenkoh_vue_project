@@ -41,6 +41,13 @@ npm run dev
 - **alert_rules**: アラートルール
 - **notifications**: 通知履歴
 
+### サービス層（11個の専門サービス）
+- **基本CRUD**: `crud.ts`, `dbServices.ts`
+- **専門機能**: `taskService.ts`, `projectService.ts`, `teamService.ts`
+- **分析機能**: `dashboardService.ts`, `reportService.ts`
+- **通知機能**: `notificationService.ts`, `activityService.ts`
+- **関係型データ**: `relationService.ts`
+
 ### データフロー
 ```
 プロジェクト作成 → タスク作成 → カンバンボード配置 → 進捗率更新 → 通知送信
@@ -51,9 +58,14 @@ npm run dev
 ### 1. 新機能追加時
 1. DBスキーマ確認 (`src/types/db/*.ts`)
 2. サービス関数作成 (`src/services/*.ts`)
+   - 基本CRUD: `crud.ts`, `dbServices.ts`
+   - 専門機能: `taskService.ts`, `projectService.ts`, `teamService.ts`
+   - 分析機能: `dashboardService.ts`, `reportService.ts`
+   - 通知機能: `notificationService.ts`, `activityService.ts`
 3. アダプター関数追加 (`src/utils/taskAdapter.ts`)
 4. Store関数実装 (`src/store/schedule.ts`)
 5. コンポーネントでStore使用
+6. ページコンポーネント作成 (`src/pages/*.vue`)
 
 ### 2. データベース変更時
 1. Supabaseでスキーマ修正
@@ -123,6 +135,31 @@ const created = await createTask(newTask);
 const store = useScheduleStore();
 await store.loadAll(); // DBから全スケジュールロード
 const schedules = store.schedules.value; // リアクティブデータ
+```
+
+### ダッシュボード統計取得
+```typescript
+import { fetchProjectProgress } from "@/services/dashboardService";
+const stats = await fetchProjectProgress();
+```
+
+### チーム管理
+```typescript
+import { listUsers, createUser } from "@/services/teamService";
+const users = await listUsers();
+const newUser = await createUser(userData);
+```
+
+### レポート生成
+```typescript
+import { generateReport } from "@/services/reportService";
+const report = await generateReport(options);
+```
+
+### 通知管理
+```typescript
+import { listNotifications } from "@/services/notificationService";
+const notifications = await listNotifications();
 ```
 
 ## 🔍 問題解決

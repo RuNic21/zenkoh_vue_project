@@ -26,6 +26,150 @@ description: コーディングスタイルガイド（日本語）
 
 ## ファイル構造の参照
 - [src/main.js](mdc:src/main.js): エントリーポイント
-- [src/App.vue](mdc:src/App.vue): ルートコンポーネント
+- [src/App.vue](mdc:src/App.vue): ルートコンポーネント（ダッシュボード含む）
+- [src/layouts/MainLayout.vue](mdc:src/layouts/MainLayout.vue): メインレイアウト
+- [src/pages/](mdc:src/pages/): ページコンポーネント（5つのメインページ）
 - [src/components/](mdc:src/components/): 再利用コンポーネント
+- [src/services/](mdc:src/services/): データベース・API サービス（11個の専門サービス）
+- [src/store/](mdc:src/store/): 状態管理
+- [src/types/](mdc:src/types/): TypeScript 型定義
+- [src/utils/](mdc:src/utils/): ユーティリティ関数
 - [src/assets/](mdc:src/assets/): 画像/CSS/JS 等のアセット
+
+## 新機能開発ガイドライン
+
+### 1. ページコンポーネント作成
+```vue
+<script setup lang="ts">
+// ページの目的を簡潔に説明
+// 例: プロジェクト管理ページ: プロジェクトの一覧表示・作成・編集・削除機能
+
+import { ref, computed, onMounted } from "vue";
+import { useScheduleStore } from "@/store/schedule";
+import { fetchProjectProgress } from "@/services/dashboardService";
+
+// 必要な型をインポート
+import type { Project, User, Task } from "@/types";
+
+// リアクティブデータ
+const projects = ref<Project[]>([]);
+const isLoading = ref(false);
+
+// メソッド
+const loadProjects = async () => {
+  // データ読み込み処理
+};
+
+// ライフサイクル
+onMounted(() => {
+  loadProjects();
+});
+</script>
+
+<template>
+  <!-- ページの役割を説明 -->
+  <div class="page-container">
+    <!-- ヘッダーセクション -->
+    <div class="page-header">
+      <h3>ページタイトル</h3>
+      <p>ページの説明</p>
+    </div>
+    
+    <!-- メインコンテンツ -->
+    <div class="page-content">
+      <!-- コンテンツ -->
+    </div>
+  </div>
+</template>
+
+<style scoped>
+/* 必要な範囲のみスタイルを適用 */
+</style>
+```
+
+### 2. サービス関数作成
+```typescript
+// src/services/[serviceName]Service.ts
+import { supabase } from "./supabaseClient";
+import type { [TypeName] } from "@/types/[typeName]";
+
+/**
+ * [機能名]を取得する
+ * @param params 取得パラメータ
+ * @returns [戻り値の説明]
+ */
+export async function list[Items](
+  params?: [ParamsType]
+): Promise<[ItemType][] | null> {
+  try {
+    const { data, error } = await supabase
+      .from("[table_name]")
+      .select("*")
+      .eq("condition", params?.value);
+    
+    if (error) {
+      console.error("[機能名]取得に失敗:", error.message);
+      return null;
+    }
+    
+    return data as [ItemType][];
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("予期せぬエラー:", msg);
+    return null;
+  }
+}
+```
+
+### 3. 型定義作成
+```typescript
+// src/types/[typeName].ts
+export interface [TypeName] {
+  id: number;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type [TypeName]Status = "active" | "inactive" | "pending";
+export type [TypeName]Priority = "low" | "medium" | "high" | "urgent";
+
+export interface [TypeName]Create {
+  name: string;
+  description?: string;
+}
+
+export interface [TypeName]Update {
+  id: number;
+  name?: string;
+  description?: string;
+}
+```
+
+### 4. ユーティリティ関数作成
+```typescript
+// src/utils/[utilityName].ts
+/**
+ * [機能の説明]
+ * @param param パラメータの説明
+ * @returns 戻り値の説明
+ */
+export function [functionName](param: [ParamType]): [ReturnType] {
+  // 実装
+}
+
+/**
+ * [機能の説明]（非同期版）
+ */
+export async function [asyncFunctionName](
+  param: [ParamType]
+): Promise<[ReturnType]> {
+  try {
+    // 実装
+  } catch (error) {
+    console.error("[機能名]でエラー:", error);
+    throw error;
+  }
+}
+```

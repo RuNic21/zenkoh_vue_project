@@ -16,11 +16,11 @@ export interface Tasks {
   actual_end?: string | null;
   progress_percent: number;
   current_column_id?: number | null;
-  priority: string;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   wbs_code?: string | null;
   task_name: string;
   description?: string | null;
-  status: string;
+  status: "NOT_STARTED" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELLED";
 }
 
 export interface TasksInsert {
@@ -40,11 +40,11 @@ export interface TasksInsert {
   actual_end?: string | null;
   progress_percent?: number;
   current_column_id?: number | null;
-  priority?: string;
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   wbs_code?: string | null;
   task_name: string;
   description?: string | null;
-  status?: string;
+  status?: "NOT_STARTED" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELLED";
 }
 
 export interface TasksUpdate {
@@ -64,9 +64,9 @@ export interface TasksUpdate {
   actual_end?: string | null;
   progress_percent?: number;
   current_column_id?: number | null;
-  priority?: string;
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
   wbs_code?: string | null;
   task_name?: string;
   description?: string | null;
-  status?: string;
+  status?: "NOT_STARTED" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELLED";
 }

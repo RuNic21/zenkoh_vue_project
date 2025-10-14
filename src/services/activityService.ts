@@ -28,6 +28,7 @@
 //    - 通知既読/未読状態管理実装が必要
 
 import { supabase } from "./supabaseClient";
+import { listUsers } from "./dbServices";
 
 // 活動ログの型定義
 export interface ActivityLog {
@@ -161,7 +162,7 @@ export async function createActivityNotification(
   taskId: number | null,
   subject: string,
   bodyText: string,
-  toEmail: string = 'admin@example.com'
+  toEmail: string = 'system@zenkoh.com'
 ): Promise<boolean> {
   try {
     const { error } = await supabase
@@ -189,33 +190,46 @@ export async function createActivityNotification(
 
 // プロジェクト作成時の活動ログ生成
 export async function logProjectCreated(projectId: number, projectName: string, ownerName: string): Promise<void> {
+  // 実際のユーザー情報を取得してから通知を作成
+  const users = await listUsers();
+  const adminUser = users.find(user => user.display_name === ownerName) || users[0];
+  const toEmail = adminUser ? adminUser.email : 'system@zenkoh.com';
+  
   await createActivityNotification(
     projectId,
     null,
     `新しいプロジェクト作成: ${projectName}`,
     `新しいプロジェクト "${projectName}"が作成されました。\n担当者: ${ownerName}`,
-    'admin@example.com'
+    toEmail
   );
 }
 
 // タスク作成時の活動ログ生成
 export async function logTaskCreated(projectId: number, taskId: number, projectName: string, taskName: string): Promise<void> {
+  // 実際のユーザー情報を取得してから通知を作成
+  const users = await listUsers();
+  const toEmail = users.length > 0 ? users[0].email : 'system@zenkoh.com';
+  
   await createActivityNotification(
     projectId,
     taskId,
     `新しいタスク作成: ${taskName}`,
     `プロジェクト "${projectName}"に新しいタスク "${taskName}"が追加されました。`,
-    'admin@example.com'
+    toEmail
   );
 }
 
 // タスク 完了時の活動ログ生成
 export async function logTaskCompleted(projectId: number, taskId: number, projectName: string, taskName: string): Promise<void> {
+  // 実際のユーザー情報を取得してから通知を作成
+  const users = await listUsers();
+  const toEmail = users.length > 0 ? users[0].email : 'system@zenkoh.com';
+  
   await createActivityNotification(
     projectId,
     taskId,
     `タスク完了: ${taskName}`,
     `プロジェクト "${projectName}"の"${taskName}"タスクが完了しました。`,
-    'admin@example.com'
+    toEmail
   );
 }

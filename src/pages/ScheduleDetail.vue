@@ -88,6 +88,8 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useScheduleStore } from "../store/schedule";
 import type { ScheduleItem, ScheduleStatus, SchedulePriority, ScheduleAttachment, ScheduleComment } from "../types/schedule";
 import { getStatusBadgeClass, getPriorityColorClass } from "../utils/uiHelpers";
+import { listUsers } from "../services/dbServices";
+import type { Users } from "../types/db/users";
 
 // 共有ストアから選択中スケジュールを参照（欠損プロパティを安全に補完）
 const store = useScheduleStore();
@@ -137,19 +139,26 @@ const newComment = ref("");
 const newTag = ref("");
 const availableTags = ref(["緊急", "重要", "バグ修正", "新機能", "改善", "テスト", "ドキュメント", "レビュー"]);
 
-// 状態変更履歴
-const statusHistory = ref([
-  { from: "予定", to: "進行中", user: "田中太郎", timestamp: "2024-01-15 10:30", reason: "作業開始" },
-  { from: "進行中", to: "完了", user: "佐藤花子", timestamp: "2024-01-16 15:45", reason: "作業完了" }
-]);
+// 状態変更履歴（DBから取得するように変更予定）
+const statusHistory = ref<Array<{ from: string; to: string; user: string; timestamp: string; reason: string }>>([]);
 
-// 利用可能なユーザー一覧
-const availableUsers = ref([
-  { id: 1, name: "田中太郎", avatar: "T" },
-  { id: 2, name: "佐藤花子", avatar: "S" },
-  { id: 3, name: "鈴木一郎", avatar: "S" },
-  { id: 4, name: "高橋美咲", avatar: "T" }
-]);
+// 利用可能なユーザー一覧（DBから取得）
+const availableUsers = ref<Array<{ id: number; name: string; avatar: string }>>([]);
+
+// ユーザーデータをロードする関数
+const loadUsers = async () => {
+  try {
+    const users = await listUsers();
+    availableUsers.value = users.map(user => ({
+      id: user.id,
+      name: user.display_name,
+      avatar: user.display_name.charAt(0).toUpperCase()
+    }));
+  } catch (error) {
+    console.error("ユーザーデータの読み込みに失敗:", error);
+    availableUsers.value = [];
+  }
+};
 
 // クイックアクション
 const quickActions = ref([
@@ -280,8 +289,10 @@ const executeQuickAction = async (action: any) => {
 };
 
 // コンポーネント初期化
-onMounted(() => {
+onMounted(async () => {
   console.log("スケジュール詳細ページが読み込まれました");
+  // ユーザーデータをロード
+  await loadUsers();
 });
 </script>
 

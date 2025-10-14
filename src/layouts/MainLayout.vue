@@ -26,21 +26,15 @@ const navigationItems = ref([
     isActive: true
   },
   {
-    id: "schedule-list",
-    name: "スケジュール一覧",
-    icon: "schedule",
-    isActive: false
-  },
-  {
-    id: "projects",
+    id: "project-management",
     name: "プロジェクト管理",
     icon: "work",
     isActive: false
   },
   {
-    id: "tasks",
+    id: "schedule-list",
     name: "タスク管理",
-    icon: "task",
+    icon: "schedule",
     isActive: false
   },
   {

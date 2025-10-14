@@ -1,82 +1,398 @@
-import { supabase } from "./supabaseClient";
+// ダッシュボード用サービス（プロジェクト分析・統計情報）
+// 目的: プロジェクトの統計情報、タスク分析、進捗率計算を提供
+//
+// TODO: 今後の機能拡張予定
+// 1. チャートデータ生成関数
+//    - getProjectProgressChartData(): プロジェクト進行率チャート用データ
+//    - getTaskStatusChartData(): タスク状態分布パイチャート用データ
+//    - getMonthlyProjectTrendData(): 月別プロジェクト推移データ
+//    - getAssigneeWorkloadData(): 担当者別作業量データ
+//
+// 2. タイムラインデータ生成関数
+//    - getProjectTimelineData(): ガントチャート用タイムラインデータ
+//    - getMilestoneData(): マイルストーンデータ
+//    - getProjectDependencyData(): プロジェクト依存関係データ
+//
+// 3. カンバンボードデータ生成関数
+//    - getKanbanBoardData(): カンバンボード用データ
+//    - getColumnStatistics(): カラム別統計情報
+//    - getWIPLimits(): WIP制限情報
+//
+// 4. 高度な分析関数
+//    - getProjectHealthScore(): プロジェクト健全性スコア
+//    - getRiskAnalysis(): リスク分析データ
+//    - getPerformanceMetrics(): パフォーマンス指標
+//
+// 5. エクスポート用データ生成
+//    - getExportData(): CSV/PDFエクスポート用データ
+//    - getReportData(): レポート生成用データ
 
-// ダッシュボード用のプロジェクト進捗行の型
-export interface ProjectProgressRow {
-  // プロジェクトID
-  id: number;
-  // プロジェクト名
-  name: string;
-  // オーナー名（users.display_name）
-  owner: string;
-  // 進捗率（tasks.progress_percent の平均）
-  progress: number;
-  // 状態（進捗から算出）
-  status: string;
-  // 期限（projects.end_date を文字列化）
-  dueDate: string;
+import { supabase } from "./supabaseClient";
+import type { Project } from "../types/project";
+import type { Task } from "../types/task";
+
+// プロジェクト統計情報の型定義
+export interface ProjectStats {
+  totalProjects: number;           // 総プロジェクト数
+  activeProjects: number;          // アクティブプロジェクト数
+  archivedProjects: number;        // アーカイブプロジェクト数
+  overdueProjects: number;         // 期限切れプロジェクト数
+  totalTasks: number;              // 総タスク数
+  completedTasks: number;          // 完了タスク数
+  inProgressTasks: number;         // 進行中タスク数
+  blockedTasks: number;            // ブロックタスク数
+  averageProgress: number;         // 平均進捗率
 }
 
-// ダッシュボード用集計サービス
-// 目的: UI レイヤーから DB アクセスロジックを分離し、テスト容易性と責務分離を確保する
-export async function fetchProjectProgress(limit: number = 10): Promise<ProjectProgressRow[]> {
+// プロジェクト詳細統計の型定義
+export interface ProjectDetailStats {
+  projectId: number;
+  projectName: string;
+  totalTasks: number;
+  completedTasks: number;
+  inProgressTasks: number;
+  blockedTasks: number;
+  notStartedTasks: number;
+  averageProgress: number;
+  overdueTasks: number;
+  highPriorityTasks: number;
+  assigneeCount: number;
+}
+
+// プロジェクト統計情報を取得
+export async function getProjectStats(): Promise<ProjectStats> {
   try {
-    // 1) プロジェクト一覧を取得
-    const { data: projects, error: projErr } = await supabase
+    // プロジェクト統計
+    const { data: projects, error: projectsError } = await supabase
       .from("projects")
-      .select("id,name,owner_user_id,end_date")
-      .order("id", { ascending: false })
-      .limit(limit);
-    if (projErr) throw new Error(projErr.message);
+      .select("id, is_archived, end_date");
 
-    const projectIds = (projects ?? []).map((p) => p.id);
-
-    // 2) 対象プロジェクトのタスク進捗をまとめて取得
-    const { data: tasks, error: taskErr } = await supabase
-      .from("tasks")
-      .select("project_id,progress_percent")
-      .in("project_id", projectIds.length > 0 ? projectIds : [-1]);
-    if (taskErr) throw new Error(taskErr.message);
-
-    // 3) owner ユーザー名を一括取得
-    const ownerIds = Array.from(
-      new Set((projects ?? []).map((p) => p.owner_user_id).filter((v) => v != null))
-    ) as number[];
-    let ownersMap: Record<number, string> = {};
-    if (ownerIds.length > 0) {
-      const { data: owners, error: userErr } = await supabase
-        .from("users")
-        .select("id,display_name")
-        .in("id", ownerIds);
-      if (userErr) throw new Error(userErr.message);
-      ownersMap = (owners ?? []).reduce((acc, u) => {
-        acc[u.id as number] = (u.display_name as string) ?? "-";
-        return acc;
-      }, {} as Record<number, string>);
+    if (projectsError) {
+      console.error("プロジェクト統計取得エラー:", projectsError);
+      throw new Error("プロジェクト統計の取得に失敗しました");
     }
 
-    // 4) 集計して表示用配列を構築
-    const progressByProject = new Map<number, { sum: number; count: number }>();
-    for (const t of tasks ?? []) {
-      const key = t.project_id as number;
-      const cur = progressByProject.get(key) ?? { sum: 0, count: 0 };
-      progressByProject.set(key, {
-        sum: cur.sum + (t.progress_percent as number),
-        count: cur.count + 1,
+    const today = new Date();
+    const totalProjects = projects?.length || 0;
+    const activeProjects = projects?.filter(p => !p.is_archived).length || 0;
+    const archivedProjects = projects?.filter(p => p.is_archived).length || 0;
+    const overdueProjects = projects?.filter(p => 
+      !p.is_archived && p.end_date && new Date(p.end_date) < today
+    ).length || 0;
+
+    // タスク統計
+    const { data: tasks, error: tasksError } = await supabase
+      .from("tasks")
+      .select("status, progress_percent, is_archived");
+
+    if (tasksError) {
+      console.error("タスク統計取得エラー:", tasksError);
+      throw new Error("タスク統計の取得に失敗しました");
+    }
+
+    const activeTasks = tasks?.filter(t => !t.is_archived) || [];
+    const totalTasks = activeTasks.length;
+    const completedTasks = activeTasks.filter(t => t.status === "DONE").length;
+    const inProgressTasks = activeTasks.filter(t => t.status === "IN_PROGRESS").length;
+    const blockedTasks = activeTasks.filter(t => t.status === "BLOCKED").length;
+    
+    const averageProgress = totalTasks > 0 
+      ? Math.round(activeTasks.reduce((sum, t) => sum + t.progress_percent, 0) / totalTasks)
+      : 0;
+
+    return {
+      totalProjects,
+      activeProjects,
+      archivedProjects,
+      overdueProjects,
+      totalTasks,
+      completedTasks,
+      inProgressTasks,
+      blockedTasks,
+      averageProgress
+    };
+  } catch (error) {
+    console.error("プロジェクト統計取得でエラー:", error);
+    // エラー時はデフォルト値を返す
+    return {
+      totalProjects: 0,
+      activeProjects: 0,
+      archivedProjects: 0,
+      overdueProjects: 0,
+      totalTasks: 0,
+      completedTasks: 0,
+      inProgressTasks: 0,
+      blockedTasks: 0,
+      averageProgress: 0
+    };
+  }
+}
+
+// プロジェクト別詳細統計を取得
+export async function getProjectDetailStats(): Promise<ProjectDetailStats[]> {
+  try {
+    // プロジェクト一覧を取得
+    const { data: projects, error: projectsError } = await supabase
+      .from("projects")
+      .select("id, name")
+      .order("name");
+
+    if (projectsError) {
+      console.error("プロジェクト一覧取得エラー:", projectsError);
+      throw new Error("プロジェクト一覧の取得に失敗しました");
+    }
+
+    if (!projects || projects.length === 0) {
+      return [];
+    }
+
+    const projectStats: ProjectDetailStats[] = [];
+
+    for (const project of projects) {
+      // 各プロジェクトのタスク統計を取得
+      const { data: tasks, error: tasksError } = await supabase
+        .from("tasks")
+        .select("status, progress_percent, priority, planned_end, primary_assignee_id, is_archived")
+        .eq("project_id", project.id)
+        .eq("is_archived", false);
+
+      if (tasksError) {
+        console.error(`プロジェクト ${project.id} のタスク取得エラー:`, tasksError);
+        continue;
+      }
+
+      const activeTasks = tasks || [];
+      const totalTasks = activeTasks.length;
+      const completedTasks = activeTasks.filter(t => t.status === "DONE").length;
+      const inProgressTasks = activeTasks.filter(t => t.status === "IN_PROGRESS").length;
+      const blockedTasks = activeTasks.filter(t => t.status === "BLOCKED").length;
+      const notStartedTasks = activeTasks.filter(t => t.status === "NOT_STARTED").length;
+      
+      const averageProgress = totalTasks > 0 
+        ? Math.round(activeTasks.reduce((sum, t) => sum + t.progress_percent, 0) / totalTasks)
+        : 0;
+
+      // 期限切れタスク数
+      const today = new Date();
+      const overdueTasks = activeTasks.filter(t => 
+        t.planned_end && new Date(t.planned_end) < today && t.status !== "DONE"
+      ).length;
+
+      // 高優先度タスク数
+      const highPriorityTasks = activeTasks.filter(t => 
+        t.priority === "HIGH" || t.priority === "URGENT"
+      ).length;
+
+      // 担当者数（重複を除く）
+      const assigneeIds = new Set(
+        activeTasks
+          .map(t => t.primary_assignee_id)
+          .filter(id => id !== null)
+      );
+      const assigneeCount = assigneeIds.size;
+
+      projectStats.push({
+        projectId: project.id,
+        projectName: project.name,
+        totalTasks,
+        completedTasks,
+        inProgressTasks,
+        blockedTasks,
+        notStartedTasks,
+        averageProgress,
+        overdueTasks,
+        highPriorityTasks,
+        assigneeCount
       });
     }
 
-    return (projects ?? []).map((p) => {
-      const agg = progressByProject.get(p.id) ?? { sum: 0, count: 0 };
-      const avg = agg.count > 0 ? Math.round(agg.sum / agg.count) : 0;
-      const status = avg >= 100 ? "完了" : "進行中";
-      const owner = p.owner_user_id != null ? ownersMap[p.owner_user_id as number] ?? "-" : "-";
-      const due = p.end_date ? String(p.end_date) : "-";
-      return { id: p.id, name: p.name as string, owner, progress: avg, status, dueDate: due };
-    });
-  } catch (e) {
-    console.error("ダッシュボード集計に失敗:", e);
+    return projectStats;
+  } catch (error) {
+    console.error("プロジェクト詳細統計取得でエラー:", error);
     return [];
   }
 }
 
+// プロジェクトのタスク一覧を取得
+export async function getProjectTasks(projectId: number): Promise<Task[]> {
+  try {
+    const { data: tasks, error } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("project_id", projectId)
+      .eq("is_archived", false)
+      .order("created_at", { ascending: false });
 
+    if (error) {
+      console.error(`プロジェクト ${projectId} のタスク取得エラー:`, error);
+      return [];
+    }
+
+    return tasks || [];
+  } catch (error) {
+    console.error("プロジェクトタスク取得でエラー:", error);
+    return [];
+  }
+}
+
+// タスク状態の日本語表示名を取得
+export function getTaskStatusLabel(status: string): string {
+  switch (status) {
+    case "NOT_STARTED":
+      return "未開始";
+    case "IN_PROGRESS":
+      return "進行中";
+    case "BLOCKED":
+      return "ブロック";
+    case "DONE":
+      return "完了";
+    case "CANCELLED":
+      return "キャンセル";
+    default:
+      return status;
+  }
+}
+
+// タスク優先度の日本語表示名を取得
+export function getTaskPriorityLabel(priority: string): string {
+  switch (priority) {
+    case "LOW":
+      return "低";
+    case "MEDIUM":
+      return "中";
+    case "HIGH":
+      return "高";
+    case "URGENT":
+      return "緊急";
+    default:
+      return priority;
+  }
+}
+
+// タスク状態のバッジクラスを取得
+export function getTaskStatusBadgeClass(status: string): string {
+  switch (status) {
+    case "NOT_STARTED":
+      return "badge bg-gradient-secondary";
+    case "IN_PROGRESS":
+      return "badge bg-gradient-info";
+    case "BLOCKED":
+      return "badge bg-gradient-warning";
+    case "DONE":
+      return "badge bg-gradient-success";
+    case "CANCELLED":
+      return "badge bg-gradient-danger";
+    default:
+      return "badge bg-gradient-light";
+  }
+}
+
+// タスク優先度のバッジクラスを取得
+export function getTaskPriorityBadgeClass(priority: string): string {
+  switch (priority) {
+    case "LOW":
+      return "badge bg-gradient-secondary";
+    case "MEDIUM":
+      return "badge bg-gradient-info";
+    case "HIGH":
+      return "badge bg-gradient-warning";
+    case "URGENT":
+      return "badge bg-gradient-danger";
+    default:
+      return "badge bg-gradient-light";
+  }
+}
+
+// プロジェクト進捗情報の型定義（App.vue用）
+export interface ProjectProgressRow {
+  id: number;
+  name: string;
+  description: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  owner_user_id: number | null;
+  is_archived: boolean;
+  created_at: string;
+  updated_at: string;
+  total_tasks: number;
+  completed_tasks: number;
+  in_progress_tasks: number;
+  blocked_tasks: number;
+  average_progress: number;
+  overdue_tasks: number;
+}
+
+// プロジェクト進捗情報を取得（App.vue用）
+export async function fetchProjectProgress(): Promise<ProjectProgressRow[]> {
+  try {
+    // プロジェクト一覧を取得
+    const { data: projects, error: projectsError } = await supabase
+      .from("projects")
+      .select("id, name, description, start_date, end_date, owner_user_id, is_archived, created_at, updated_at")
+      .order("name");
+
+    if (projectsError) {
+      console.error("プロジェクト一覧取得エラー:", projectsError);
+      throw new Error("プロジェクト一覧の取得に失敗しました");
+    }
+
+    if (!projects || projects.length === 0) {
+      return [];
+    }
+
+    const projectProgressRows: ProjectProgressRow[] = [];
+
+    for (const project of projects) {
+      // 各プロジェクトのタスク統計を取得
+      const { data: tasks, error: tasksError } = await supabase
+        .from("tasks")
+        .select("status, progress_percent, planned_end, is_archived")
+        .eq("project_id", project.id)
+        .eq("is_archived", false);
+
+      if (tasksError) {
+        console.error(`プロジェクト ${project.id} のタスク取得エラー:`, tasksError);
+        continue;
+      }
+
+      const activeTasks = tasks || [];
+      const totalTasks = activeTasks.length;
+      const completedTasks = activeTasks.filter(t => t.status === "DONE").length;
+      const inProgressTasks = activeTasks.filter(t => t.status === "IN_PROGRESS").length;
+      const blockedTasks = activeTasks.filter(t => t.status === "BLOCKED").length;
+      
+      const averageProgress = totalTasks > 0 
+        ? Math.round(activeTasks.reduce((sum, t) => sum + t.progress_percent, 0) / totalTasks)
+        : 0;
+
+      // 期限切れタスク数
+      const today = new Date();
+      const overdueTasks = activeTasks.filter(t => 
+        t.planned_end && new Date(t.planned_end) < today && t.status !== "DONE"
+      ).length;
+
+      projectProgressRows.push({
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        start_date: project.start_date,
+        end_date: project.end_date,
+        owner_user_id: project.owner_user_id,
+        is_archived: project.is_archived,
+        created_at: project.created_at,
+        updated_at: project.updated_at,
+        total_tasks: totalTasks,
+        completed_tasks: completedTasks,
+        in_progress_tasks: inProgressTasks,
+        blocked_tasks: blockedTasks,
+        average_progress: averageProgress,
+        overdue_tasks: overdueTasks
+      });
+    }
+
+    return projectProgressRows;
+  } catch (error) {
+    console.error("プロジェクト進捗取得でエラー:", error);
+    return [];
+  }
+}

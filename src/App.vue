@@ -6,6 +6,7 @@ import { getStatusBadgeClass, getProgressBarClass } from "./utils/uiHelpers";
 import MainLayout from "./layouts/MainLayout.vue";
 import ScheduleList from "./pages/ScheduleList.vue";
 import ScheduleDetail from "./pages/ScheduleDetail.vue";
+import ProjectManagement from "./pages/ProjectManagement.vue";
 // Supabase クライアント（ダッシュボード一覧をDBから取得するために使用）
 import { fetchProjectProgress, type ProjectProgressRow } from "./services/dashboardService";
 
@@ -49,6 +50,8 @@ const currentComponent = computed(() => {
       return ScheduleList;
     case "schedule-detail":
       return ScheduleDetail;
+    case "project-management":
+      return ProjectManagement;
     default:
       return null;
   }
@@ -292,46 +295,7 @@ const loadRecentActivities = async (): Promise<ActivityLog[]> => {
     const { fetchRecentActivities } = await import('./services/activityService');
     const activities = await fetchRecentActivities(10);
     
-    // 活動データがない場合は Mock データを表示 (開発/テスト用)
-    if (activities.length === 0) {
-      console.log('活動データがないためMockデータを表示します。');
-      return [
-      {
-        id: 1,
-        type: 'task_completed',
-        description: 'プロジェクトAの"UIデザイン"タスクが完了しました',
-        user: '田中開発',
-        timestamp: new Date(Date.now() - 5 * 60 * 1000), // 5분 전
-        projectId: 1,
-        taskId: 101
-      },
-      {
-        id: 2,
-        type: 'deadline_approaching',
-        description: 'プロジェクトBの締切まで3日です',
-        user: 'システム',
-        timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30분 전
-        projectId: 2
-      },
-      {
-        id: 3,
-        type: 'user_assigned',
-        description: 'プロジェクトCに佐藤チームリーダーが担当者として割り当てられました',
-        user: '管理者',
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2시간 전
-        projectId: 3
-      },
-      {
-        id: 4,
-        type: 'project_created',
-        description: '新しいプロジェクト"ウェブサイトリニューアル"が作成されました',
-        user: '鈴木企画',
-        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4시간 전
-        projectId: 4
-      }
-    ];
-    }
-    
+    // DBから取得したデータのみを返す（Mockデータは削除）
     return activities;
   } catch (error) {
     console.error("活動データの読み込みに失敗:", error);
@@ -473,7 +437,11 @@ watch(() => store.selectedScheduleId.value, (id, oldId) => {
                   <a class="opacity-5 text-dark" href="javascript:;">ページ</a>
                 </li>
                 <li class="breadcrumb-item text-sm text-dark active" aria-current="page">
-                  {{ currentPage === 'dashboard' ? 'ダッシュボード' : 'スケジュール管理' }}
+                  {{ 
+                    currentPage === 'dashboard' ? 'ダッシュボード' : 
+                    currentPage === 'project-management' ? 'プロジェクト管理' : 
+                    'スケジュール管理' 
+                  }}
                 </li>
               </ol>
             </nav>

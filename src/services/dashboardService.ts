@@ -320,16 +320,30 @@ export interface ProjectProgressRow {
   blocked_tasks: number;
   average_progress: number;
   overdue_tasks: number;
+  // App.vueで使用する追加プロパティ
+  owner: string;
+  status: "完了" | "進行中" | "遅延" | "未開始";
+  progress: number;
+  dueDate: string | null;
 }
 
 // プロジェクト進捗情報を取得（App.vue用）
-export async function fetchProjectProgress(): Promise<ProjectProgressRow[]> {
+export async function fetchProjectProgress(limit?: number): Promise<ProjectProgressRow[]> {
   try {
-    // プロジェクト一覧を取得
-    const { data: projects, error: projectsError } = await supabase
+    // プロジェクト一覧を取得（ユーザー情報も含む）
+    let query = supabase
       .from("projects")
-      .select("id, name, description, start_date, end_date, owner_user_id, is_archived, created_at, updated_at")
+      .select(`
+        id, name, description, start_date, end_date, owner_user_id, is_archived, created_at, updated_at,
+        users!projects_owner_user_id_fkey(display_name)
+      `)
       .order("name");
+    
+    if (limit) {
+      query = query.limit(limit);
+    }
+    
+    const { data: projects, error: projectsError } = await query;
 
     if (projectsError) {
       console.error("プロジェクト一覧取得エラー:", projectsError);
@@ -371,6 +385,18 @@ export async function fetchProjectProgress(): Promise<ProjectProgressRow[]> {
         t.planned_end && new Date(t.planned_end) < today && t.status !== "DONE"
       ).length;
 
+      // プロジェクトの状態を判定
+      let status: "完了" | "進行中" | "遅延" | "未開始";
+      if (completedTasks === totalTasks && totalTasks > 0) {
+        status = "完了";
+      } else if (overdueTasks > 0) {
+        status = "遅延";
+      } else if (inProgressTasks > 0 || completedTasks > 0) {
+        status = "進行中";
+      } else {
+        status = "未開始";
+      }
+
       projectProgressRows.push({
         id: project.id,
         name: project.name,
@@ -386,7 +412,12 @@ export async function fetchProjectProgress(): Promise<ProjectProgressRow[]> {
         in_progress_tasks: inProgressTasks,
         blocked_tasks: blockedTasks,
         average_progress: averageProgress,
-        overdue_tasks: overdueTasks
+        overdue_tasks: overdueTasks,
+        // App.vueで使用する追加プロパティ
+        owner: (project as any).users?.display_name || "-",
+        status: status,
+        progress: averageProgress,
+        dueDate: project.end_date
       });
     }
 

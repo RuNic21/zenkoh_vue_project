@@ -44,9 +44,9 @@ const navigationItems = ref([
     isActive: false
   },
   {
-    id: "reports",
+    id: "report",
     name: "レポート",
-    icon: "analytics",
+    icon: "assessment",
     isActive: false
   }
 ]);

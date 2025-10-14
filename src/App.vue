@@ -8,6 +8,7 @@ import ScheduleList from "./pages/ScheduleList.vue";
 import ScheduleDetail from "./pages/ScheduleDetail.vue";
 import ProjectManagement from "./pages/ProjectManagement.vue";
 import TeamManagement from "./pages/TeamManagement.vue";
+import ReportPage from "./pages/ReportPage.vue";
 // Supabase クライアント（ダッシュボード一覧をDBから取得するために使用）
 import { fetchProjectProgress, type ProjectProgressRow } from "./services/dashboardService";
 
@@ -55,6 +56,8 @@ const currentComponent = computed(() => {
       return ProjectManagement;
     case "team":
       return TeamManagement;
+    case "report":
+      return ReportPage;
     default:
       return null;
   }
@@ -262,9 +265,8 @@ const handleInviteTeamMember = () => {
 };
 
 const handleGenerateReport = () => {
-  console.log("리포트 생성");
-  // TODO: レポート生成機能を実装する
-  alert("レポート生成機能を実装中です。");
+  console.log("レポートページへ遷移");
+  currentPage.value = "report";
 };
 
 // フィルタ初期化
@@ -444,6 +446,7 @@ watch(() => store.selectedScheduleId.value, (id, oldId) => {
                     currentPage === 'dashboard' ? 'ダッシュボード' : 
                     currentPage === 'project-management' ? 'プロジェクト管理' : 
                     currentPage === 'team' ? 'チーム管理' :
+                    currentPage === 'report' ? 'レポート' :
                     'スケジュール管理' 
                   }}
                 </li>

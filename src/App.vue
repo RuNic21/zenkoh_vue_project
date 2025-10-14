@@ -12,6 +12,45 @@ import ReportPage from "./pages/ReportPage.vue";
 // Supabase クライアント（ダッシュボード一覧をDBから取得するために使用）
 import { fetchProjectProgress, type ProjectProgressRow } from "./services/dashboardService";
 
+// ========================================
+// Phase 1: 基本分析機能の実装 TODO
+// ========================================
+
+// TODO: 1. プロジェクト進捗率ドーナツチャート実装
+// - tasks.progress_percent を基にした進捗率可視化
+// - Chart.js を使用してドーナツチャート作成
+// - プロジェクト別・全体進捗率の表示
+// - リアルタイム更新機能
+
+// TODO: 2. 締切アラートウィジェット実装
+// - planned_end, end_date を基にした締切監視
+// - 3日以内の締切プロジェクトをハイライト表示
+// - 期限切れプロジェクトの警告表示
+// - クリックで詳細ページへ遷移
+
+// TODO: 3. 優先度別分布チャート実装
+// - tasks.priority (LOW/MEDIUM/HIGH/URGENT) の分布可視化
+// - 円グラフまたは棒グラフで優先度分布表示
+// - フィルタリング機能との連携
+// - 優先度別の進捗率比較
+
+// TODO: 4. Chart.js ライブラリ統合
+// - Chart.js のインストールと設定
+// - チャートコンポーネントの作成
+// - レスポンシブデザイン対応
+// - テーマカラーとの統一
+
+// TODO: 5. チャート用データサービス関数実装
+// - 進捗率データ取得関数
+// - 締切データ取得関数
+// - 優先度分布データ取得関数
+// - データキャッシュ機能
+// - エラーハンドリング
+
+// ========================================
+// メインアプリケーションコンポーネント
+// ========================================
+
 // 現在のページを管理するリアクティブデータ
 const currentPage = ref("dashboard");
 // 共有ストアを初期化
@@ -183,7 +222,7 @@ const handleCreateProject = async () => {
       return;
     }
 
-    // 실제 DB에 프로젝트 생성
+    // 実際にデータベースへプロジェクトを作成
     const { createProject } = await import("./services/projectService");
     const result = await createProject({
       name: projectName.trim(),

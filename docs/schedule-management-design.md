@@ -8,7 +8,7 @@ Zenkoh Project Schedulerは、Vue 3 + Supabaseを基盤とした現代的プロ�
 
 **管理者中心運用**: ユーザー管理は管理者が直接修正
 
-## 🎯 主要画面構成
+## 🎯 主要画面構成（5つのメインページ）
 
 ### 1. ダッシュボード画面 (Dashboard)
 
@@ -37,6 +37,7 @@ Zenkoh Project Schedulerは、Vue 3 + Supabaseを基盤とした現代的プロ�
 - **サービス**: `src/services/dashboardService.ts` (プロジェクト進捗率集計)
 - **タイプ**: `src/types/schedule.ts` (UI表示用タイプ)
 - **ユーティリティ**: `src/utils/uiHelpers.ts` (状態別色クラス)
+- **チャート**: `src/components/Charts/ReportChart.vue` (データ可視化)
 
 ### 2. プロジェクト管理画面 (Project Management)
 
@@ -46,6 +47,8 @@ Zenkoh Project Schedulerは、Vue 3 + Supabaseを基盤とした現代的プロ�
 - **プロジェクト別タスク管理**: 各プロジェクトに属するタスクを管理者中心で管理
 - **進捗率追跡**: プロジェクト内タスクの平均進捗率計算
 - **ユーザー割り当て管理**: プロジェクト所有者及びタスク担当者指定
+- **カンバンボード管理**: boards, board_columnsテーブルを活用したWIP制限・ボトルネック分析
+- **プロジェクト統計・分析**: Chart.jsを活用した進捗率可視化・優先度分布分析
 
 #### 活用されるDBテーブル及びカラム
 - **projectsテーブル**:
@@ -61,13 +64,14 @@ Zenkoh Project Schedulerは、Vue 3 + Supabaseを基盤とした現代的プロ�
   - `progress_percent`: 作業進捗率
 
 #### 活用されるファイル
-- **サービス**: `src/services/projectService.ts` (プロジェクトCRUD)
-- **タイプ**: `src/types/project.ts` (プロジェクトタイプ定義)
-- **DBタイプ**: `src/types/db/projects.ts` (自動生成されたDBタイプ)
-- **コンポーネント**: `src/pages/ProjectList.vue` (予定)
+- **コンポーネント**: `src/pages/ProjectManagement.vue`
+- **サービス**: `src/services/projectService.ts`, `src/services/taskService.ts`, `src/services/dashboardService.ts`
+- **タイプ**: `src/types/project.ts`, `src/types/task.ts`
+- **ユーティリティ**: `src/utils/taskAdapter.ts` (DB ↔ UI 型変換), `src/utils/performanceUtils.ts` (パフォーマンス最適化)
+- **チャート**: `src/components/Charts/ReportChart.vue` (プロジェクト統計可視化)
 
 
-### 3. タスク管理画面 (Task Management)
+### 3. スケジュール一覧画面 (Schedule List)
 
 #### 主要機能
 - **タスク一覧照会**: 全てのタスクの詳細情報表示
@@ -105,6 +109,67 @@ Zenkoh Project Schedulerは、Vue 3 + Supabaseを基盤とした現代的プロ�
 - **アダプター**: `src/utils/taskAdapter.ts` (DB ↔ UIタイプ変換)
 - **ストア**: `src/store/schedule.ts` (状態管理)
 
+### 4. スケジュール詳細画面 (Schedule Detail)
+
+#### 主要機能
+- **タスク詳細表示**: 選択されたタスクの詳細情報表示
+- **タスク編集**: タスクの基本情報・進捗率・状態変更
+- **コメント・メモ管理**: タスクに関するコメント・メモの追加・編集
+- **添付ファイル管理**: タスクに関連するファイルのアップロード・ダウンロード
+- **履歴追跡**: タスクの変更履歴・アクティビティログ表示
+
+#### 活用されるファイル
+- **コンポーネント**: `src/pages/ScheduleDetail.vue`
+- **サービス**: `src/services/taskService.ts`, `src/services/activityService.ts`
+- **タイプ**: `src/types/task.ts`, `src/types/schedule.ts`
+- **ユーティリティ**: `src/utils/taskAdapter.ts`, `src/utils/dateUtils.ts`
+
+### 5. チーム管理画面 (Team Management)
+
+#### 主要機能
+- **ユーザー管理**: ユーザーの作成・編集・削除・権限設定
+- **チームメンバー管理**: プロジェクト別チームメンバーの追加・削除・役割変更
+- **権限管理**: ユーザー別・プロジェクト別権限設定
+- **活動履歴**: ユーザーの活動履歴・ログイン状況追跡
+- **プロフィール管理**: ユーザープロフィール・アバター管理
+
+#### 活用されるDBテーブル及びカラム
+- **usersテーブル**:
+  - `id`: ユーザーID
+  - `display_name`: 表示名
+  - `email`: メールアドレス
+  - `role`: ユーザー役割
+  - `is_active`: アクティブ状態
+- **task_membersテーブル**:
+  - `task_id`: タスクID
+  - `user_id`: ユーザーID
+  - `role`: メンバー役割 (OWNER, CONTRIBUTOR, REVIEWER)
+
+#### 活用されるファイル
+- **コンポーネント**: `src/pages/TeamManagement.vue`
+- **サービス**: `src/services/teamService.ts`, `src/services/notificationService.ts`
+- **タイプ**: `src/types/team.ts`, `src/types/notification.ts`
+- **ユーティリティ**: `src/utils/errorHandler.ts`
+
+### 6. レポート・分析画面 (Report Page)
+
+#### 主要機能
+- **プロジェクト統計**: プロジェクト別進捗率・完了率・遅延率分析
+- **タスク分析**: タスク状態別分布・優先度別分析・担当者別作業量分析
+- **ユーザー分析**: ユーザー別生産性・作業量・スキル分析
+- **時系列分析**: 月別・週別のプロジェクト・タスク推移分析
+- **レポート生成**: PDF・Excel・CSV形式でのレポート出力
+
+#### 活用されるDBテーブル及びカラム
+- **全テーブル**: 統計・分析用データ取得
+- **集計クエリ**: 複雑なJOIN・GROUP BY・集計関数を活用
+
+#### 活用されるファイル
+- **コンポーネント**: `src/pages/ReportPage.vue`
+- **サービス**: `src/services/reportService.ts`, `src/services/dashboardService.ts`
+- **タイプ**: `src/types/report.ts`
+- **チャート**: `src/components/Charts/ReportChart.vue`
+- **ユーティリティ**: `src/utils/performanceUtils.ts`
 
 ## 🔗 プロジェクトとタスク画面の関連性
 
@@ -237,11 +302,14 @@ src/
 ├── layouts/
 │   └── MainLayout.vue         # 共通レイアウト (サイドバー、ナビゲーション)
 └── pages/
-    ├── ScheduleList.vue       # タスク一覧画面
-    └── ScheduleDetail.vue     # タスク詳細画面
+    ├── ScheduleList.vue       # スケジュール一覧画面
+    ├── ScheduleDetail.vue     # スケジュール詳細画面
+    ├── ProjectManagement.vue  # プロジェクト管理画面
+    ├── TeamManagement.vue     # チーム管理画面
+    └── ReportPage.vue         # レポート・分析画面
 ```
 
-### 2. サービス階層 (6個核心ファイル)
+### 2. サービス階層 (11個の専門サービス)
 ```
 src/services/
 ├── supabaseClient.ts          # Supabase接続クライアント
@@ -250,7 +318,11 @@ src/services/
 ├── taskService.ts             # タスク専用サービス
 ├── projectService.ts          # プロジェクト専用サービス
 ├── relationService.ts         # 関係型データサービス
-└── dashboardService.ts        # ダッシュボード集計サービス
+├── dashboardService.ts        # ダッシュボード統計・分析
+├── activityService.ts         # 活動フィード・通知管理
+├── reportService.ts           # レポート生成・エクスポート
+├── teamService.ts             # チーム管理
+└── notificationService.ts     # 通知システム
 ```
 
 ### 3. タイプ定義
@@ -259,10 +331,18 @@ src/types/
 ├── db/                        # 自動生成されたDBタイプ (修正禁止)
 │   ├── projects.ts
 │   ├── tasks.ts
-│   └── users.ts
+│   ├── users.ts
+│   ├── boards.ts
+│   ├── board_columns.ts
+│   ├── task_members.ts
+│   ├── notifications.ts
+│   └── alert_rules.ts
 ├── schedule.ts                # UI表示用タイプ
 ├── task.ts                    # ビジネスロジック用タスクタイプ
-└── project.ts                 # プロジェクトタイプ
+├── project.ts                 # プロジェクトタイプ
+├── team.ts                    # チーム管理用タイプ
+├── report.ts                  # レポート・分析用タイプ
+└── notification.ts            # 通知システム用タイプ
 ```
 
 ### 4. ユーティリティ
@@ -270,7 +350,9 @@ src/types/
 src/utils/
 ├── taskAdapter.ts             # DB ↔ UIタイプ変換
 ├── uiHelpers.ts               # UIヘルパー関数 (色、クラス)
-└── dateUtils.ts               # 日付処理ユーティリティ
+├── dateUtils.ts               # 日付処理ユーティリティ
+├── errorHandler.ts            # 統一エラー処理
+└── performanceUtils.ts        # パフォーマンス最適化
 ```
 
 ### 5. 状態管理

@@ -25,8 +25,11 @@ Database Layer (Supabase)
 
 ### 2. 型システム構造
 - **DB型**: `src/types/db/*.ts` (自動生成、編集禁止)
+  - projects.ts, tasks.ts, users.ts, boards.ts, board_columns.ts
+  - task_members.ts, notifications.ts, alert_rules.ts
 - **ビジネス型**: `src/types/task.ts`, `src/types/project.ts` (手動定義)
 - **UI型**: `src/types/schedule.ts` (画面表示用)
+- **専門型**: `src/types/team.ts`, `src/types/report.ts`, `src/types/notification.ts`
 
 ## 🔧 開発ルール
 
@@ -124,6 +127,9 @@ const saveChanges = async () => {
 - **USERS** → **TASK_MEMBERS** (1:N)
 - **PROJECTS** → **BOARDS** (1:N)
 - **BOARDS** → **BOARD_COLUMNS** (1:N)
+- **USERS** → **NOTIFICATIONS** (1:N)
+- **ALERT_RULES** → **NOTIFICATIONS** (1:N)
+- **TASKS** → **TASKS** (自己参照: parent_task_id)
 
 ### 2. 必須フィールドルール
 ```typescript
@@ -207,12 +213,12 @@ console.log(store.selectedSchedule.value);
 
 ### 1. 新しいサービス関数作成
 ```typescript
-// src/services/taskService.ts
-export async function newTaskFunction(params: SomeType): Promise<ResultType | null> {
+// src/services/[serviceName]Service.ts
+export async function newServiceFunction(params: SomeType): Promise<ResultType | null> {
   try {
     // Supabaseクエリ
     const { data, error } = await supabase
-      .from("tasks")
+      .from("table_name")
       .select("*")
       .eq("some_field", params.value);
     
@@ -230,7 +236,26 @@ export async function newTaskFunction(params: SomeType): Promise<ResultType | nu
 }
 ```
 
-### 2. 新しいアダプター関数作成
+### 2. 専門サービス使用例
+```typescript
+// ダッシュボード統計取得
+import { fetchProjectProgress } from "@/services/dashboardService";
+const stats = await fetchProjectProgress();
+
+// チーム管理
+import { listUsers, createUser } from "@/services/teamService";
+const users = await listUsers();
+
+// レポート生成
+import { generateReport } from "@/services/reportService";
+const report = await generateReport(options);
+
+// 通知管理
+import { listNotifications } from "@/services/notificationService";
+const notifications = await listNotifications();
+```
+
+### 3. 新しいアダプター関数作成
 ```typescript
 // src/utils/taskAdapter.ts
 export function newAdapterFunction(dbItem: DbType): UiType {
@@ -245,7 +270,7 @@ export function newAdapterFunction(dbItem: DbType): UiType {
 }
 ```
 
-### 3. Store関数追加
+### 4. Store関数追加
 ```typescript
 // src/store/schedule.ts
 export const useScheduleStore = () => ({

@@ -45,15 +45,24 @@ npm run types:gen
 
 # 2. サービス関数作成
 # src/services/ に新しいサービス関数を追加
+# - 基本CRUD: crud.ts, dbServices.ts
+# - 専門機能: taskService.ts, projectService.ts, teamService.ts
+# - 分析機能: dashboardService.ts, reportService.ts
+# - 通知機能: notificationService.ts, activityService.ts
 
 # 3. アダプター関数追加
-# src/utils/taskAdapter.ts に変換関数を追加
+# src/utils/ に変換関数を追加
+# - taskAdapter.ts: DB ↔ UI 型変換
+# - errorHandler.ts: 統一エラー処理
+# - performanceUtils.ts: パフォーマンス最適化
 
 # 4. Store関数実装
 # src/store/schedule.ts に新しい操作を追加
 
 # 5. コンポーネント実装
 # src/pages/ または src/components/ に新しいコンポーネントを作成
+# - ページ: ScheduleList, ScheduleDetail, ProjectManagement, TeamManagement, ReportPage
+# - コンポーネント: Charts/, OptimizedDataTable, PerformanceOptimizedTable
 
 # 6. テスト実行
 npm run test:crud:all
@@ -68,11 +77,36 @@ npm run types:gen
 # 3. アダプター関数更新
 # src/utils/taskAdapter.ts を修正
 
-# 4. テスト実行
+# 4. 関連サービス更新
+# - 新しいテーブル: 対応するサービス関数を追加
+# - 既存テーブル変更: 関連サービス関数を更新
+
+# 5. テスト実行
 npm run test:crud:all
 
-# 5. シードデータ再生成（必要に応じて）
+# 6. シードデータ再生成（必要に応じて）
 npm run seed:all
+```
+
+### 3. 新機能ページ開発
+```bash
+# 1. ページコンポーネント作成
+# src/pages/ に新しいページを作成
+
+# 2. ルーティング設定
+# App.vue に新しいページのルーティングを追加
+
+# 3. ナビゲーション更新
+# MainLayout.vue に新しいページへのリンクを追加
+
+# 4. サービス連携
+# 必要なサービス関数をインポート・使用
+
+# 5. 型定義
+# src/types/ に必要な型を定義
+
+# 6. テスト・デバッグ
+npm run dev
 ```
 
 ## 🐛 デバッグ手順
@@ -118,6 +152,11 @@ console.log(store.selectedSchedule.value);
 
 // 選択されたスケジュールID確認
 console.log(store.selectedScheduleId.value);
+
+// サービス層デバッグ
+console.log("プロジェクト統計:", await fetchProjectProgress());
+console.log("ユーザー一覧:", await listUsers());
+console.log("通知一覧:", await listNotifications());
 
 // エラー確認
 console.error("エラーメッセージ");

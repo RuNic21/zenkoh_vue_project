@@ -1,8 +1,7 @@
 ---
-globs: *.vue,*.ts,*.js,*.html,*.css,*.scss
 description: Vue 3 Composition API パターン（ファイルタイプ別適用）
+alwaysApply: false
 ---
-
 # Vue 3 Composition API パターン
 
 ## 🎯 基本パターン

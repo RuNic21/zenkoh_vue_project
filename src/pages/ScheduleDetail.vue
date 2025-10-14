@@ -137,7 +137,7 @@ const newComment = ref("");
 
 // タグ管理
 const newTag = ref("");
-const availableTags = ref(["緊急", "重要", "バグ修正", "新機能", "改善", "テスト", "ドキュメント", "レビュー"]);
+const availableTags = ref<string[]>([]);
 
 // 状態変更履歴（DBから取得するように変更予定）
 const statusHistory = ref<Array<{ from: string; to: string; user: string; timestamp: string; reason: string }>>([]);

@@ -1,8 +1,7 @@
 ---
-globs: *.vue,*.js,*.html
 description: 日本語UIテキストおよびユーザーエクスペリエンスガイドライン（ファイルタイプ別適用）
+alwaysApply: false
 ---
-
 # 日本語UIテキストガイドライン
 
 ## 基本原則

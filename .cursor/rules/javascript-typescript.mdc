@@ -1,8 +1,7 @@
 ---
-globs: *.js,*.ts,*.tsx
 description: JavaScript/TypeScript ガイド（ファイルタイプ別適用）
+alwaysApply: false
 ---
-
 # JavaScript/TypeScript ガイド（日本語）
 
 ## 基本スタイル

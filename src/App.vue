@@ -7,6 +7,7 @@ import MainLayout from "./layouts/MainLayout.vue";
 import ScheduleList from "./pages/ScheduleList.vue";
 import ScheduleDetail from "./pages/ScheduleDetail.vue";
 import ProjectManagement from "./pages/ProjectManagement.vue";
+import TeamManagement from "./pages/TeamManagement.vue";
 // Supabase クライアント（ダッシュボード一覧をDBから取得するために使用）
 import { fetchProjectProgress, type ProjectProgressRow } from "./services/dashboardService";
 
@@ -52,6 +53,8 @@ const currentComponent = computed(() => {
       return ScheduleDetail;
     case "project-management":
       return ProjectManagement;
+    case "team":
+      return TeamManagement;
     default:
       return null;
   }
@@ -181,7 +184,7 @@ const handleCreateProject = async () => {
     const newProject = await createProject({
       name: projectName.trim(),
       description: "",
-      owner_user_id: 1, // TODO: 現在のユーザーIDに設定
+      owner_user_id: null, // 現在のユーザーIDは認証システム実装後に設定
       start_date: new Date().toISOString().split('T')[0],
       end_date: null,
       is_archived: false
@@ -190,7 +193,7 @@ const handleCreateProject = async () => {
     if (newProject) {
       // 活動ログ生成
       const { logProjectCreated } = await import("./services/activityService");
-      await logProjectCreated(newProject.id, projectName, "管理者");
+      await logProjectCreated(newProject.id, projectName, "システム");
       
       alert(`プロジェクト "${projectName}"が正常に作成されました！`);
       // ダッシュボードデータの更新
@@ -388,7 +391,7 @@ const loadDashboardFromDb = async (): Promise<void> => {
 // アプリケーション初期化
 onMounted(async () => {
   console.log("プロジェクト管理スケジューラーが起動しました");
-  // 初回ロードでモックデータをロード（将来 Supabase に置換）
+  // スケジュールデータを DB から読み込み
   store.loadAll().catch((e) => console.error("初期データの読み込みに失敗", e));
   // ダッシュボードを DB から取得
   await loadDashboardFromDb();
@@ -440,6 +443,7 @@ watch(() => store.selectedScheduleId.value, (id, oldId) => {
                   {{ 
                     currentPage === 'dashboard' ? 'ダッシュボード' : 
                     currentPage === 'project-management' ? 'プロジェクト管理' : 
+                    currentPage === 'team' ? 'チーム管理' :
                     'スケジュール管理' 
                   }}
                 </li>

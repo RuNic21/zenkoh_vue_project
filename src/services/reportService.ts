@@ -14,39 +14,40 @@ import type {
   ChartData,
   ChartDataset
 } from "../types/report";
+import { handleServiceCall, createSuccessResult, createErrorResult, translateSupabaseError, type ServiceResult } from "../utils/errorHandler";
 
 // プロジェクト進捗レポート生成
 export async function generateProjectProgressReport(
   options: ReportOptions = {}
-): Promise<ProjectProgressReport[]> {
-  try {
-    // プロジェクト一覧を取得（JOINでユーザー情報も含む）
-    let query = supabase
-      .from("projects")
-      .select(`
-        id,
-        name,
-        start_date,
-        end_date,
-        owner_user_id,
-        users!projects_owner_user_id_fkey(display_name)
-      `);
+): Promise<ServiceResult<ProjectProgressReport[]>> {
+  return handleServiceCall(
+    async () => {
+      // プロジェクト一覧を取得（JOINでユーザー情報も含む）
+      let query = supabase
+        .from("projects")
+        .select(`
+          id,
+          name,
+          start_date,
+          end_date,
+          owner_user_id,
+          users!projects_owner_user_id_fkey(display_name)
+        `);
 
-    // フィルタリング
-    if (options.projectIds && options.projectIds.length > 0) {
-      query = query.in("id", options.projectIds);
-    }
+      // フィルタリング
+      if (options.projectIds && options.projectIds.length > 0) {
+        query = query.in("id", options.projectIds);
+      }
 
-    if (!options.includeArchived) {
-      query = query.eq("is_archived", false);
-    }
+      if (!options.includeArchived) {
+        query = query.eq("is_archived", false);
+      }
 
-    const { data: projects, error: projectsError } = await query;
+      const { data: projects, error: projectsError } = await query;
 
-    if (projectsError) {
-      console.error("プロジェクト取得エラー:", projectsError);
-      return [];
-    }
+      if (projectsError) {
+        throw new Error(translateSupabaseError(projectsError));
+      }
 
     if (!projects || projects.length === 0) {
       return [];
@@ -102,7 +103,7 @@ export async function generateProjectProgressReport(
       projectReports.push({
         projectId: project.id,
         projectName: project.name,
-        ownerName: project.users?.display_name || "-",
+        ownerName: (project.users as any)?.display_name || "-",
         startDate: project.start_date,
         endDate: project.end_date,
         totalTasks,
@@ -115,49 +116,38 @@ export async function generateProjectProgressReport(
       });
     }
 
-    return projectReports;
-  } catch (error) {
-    console.error("プロジェクト進捗レポート生成エラー:", error);
-    return [];
-  }
+      return projectReports;
+    },
+    "プロジェクト進捗レポート生成に失敗しました"
+  );
 }
 
 // タスク統計レポート生成
 export async function generateTaskStatisticsReport(
   options: ReportOptions = {}
-): Promise<TaskStatisticsReport> {
-  try {
-    let query = supabase.from("tasks").select("id, status, progress_percent, planned_end");
+): Promise<ServiceResult<TaskStatisticsReport>> {
+  return handleServiceCall(
+    async () => {
+      let query = supabase.from("tasks").select("id, status, progress_percent, planned_end");
 
-    // フィルタリング
-    if (options.projectIds && options.projectIds.length > 0) {
-      query = query.in("project_id", options.projectIds);
-    }
+      // フィルタリング
+      if (options.projectIds && options.projectIds.length > 0) {
+        query = query.in("project_id", options.projectIds);
+      }
 
-    if (options.userIds && options.userIds.length > 0) {
-      query = query.in("primary_assignee_id", options.userIds);
-    }
+      if (options.userIds && options.userIds.length > 0) {
+        query = query.in("primary_assignee_id", options.userIds);
+      }
 
-    if (!options.includeArchived) {
-      query = query.eq("is_archived", false);
-    }
+      if (!options.includeArchived) {
+        query = query.eq("is_archived", false);
+      }
 
-    const { data: tasks, error } = await query;
+      const { data: tasks, error } = await query;
 
-    if (error) {
-      console.error("タスク統計取得エラー:", error);
-      return {
-        totalTasks: 0,
-        completedTasks: 0,
-        inProgressTasks: 0,
-        notStartedTasks: 0,
-        blockedTasks: 0,
-        cancelledTasks: 0,
-        overdueTasks: 0,
-        completionRate: 0,
-        averageProgress: 0
-      };
-    }
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
 
     const taskList = tasks || [];
     const totalTasks = taskList.length;
@@ -176,52 +166,41 @@ export async function generateTaskStatisticsReport(
       ? Math.round(taskList.reduce((sum, t) => sum + t.progress_percent, 0) / totalTasks)
       : 0;
 
-    return {
-      totalTasks,
-      completedTasks,
-      inProgressTasks,
-      notStartedTasks,
-      blockedTasks,
-      cancelledTasks,
-      overdueTasks,
-      completionRate,
-      averageProgress
-    };
-  } catch (error) {
-    console.error("タスク統計レポート生成エラー:", error);
-    return {
-      totalTasks: 0,
-      completedTasks: 0,
-      inProgressTasks: 0,
-      notStartedTasks: 0,
-      blockedTasks: 0,
-      cancelledTasks: 0,
-      overdueTasks: 0,
-      completionRate: 0,
-      averageProgress: 0
-    };
-  }
+      return {
+        totalTasks,
+        completedTasks,
+        inProgressTasks,
+        notStartedTasks,
+        blockedTasks,
+        cancelledTasks,
+        overdueTasks,
+        completionRate,
+        averageProgress
+      };
+    },
+    "タスク統計レポート生成に失敗しました"
+  );
 }
 
 // ユーザー別作業量レポート生成
 export async function generateUserWorkloadReport(
   options: ReportOptions = {}
-): Promise<UserWorkloadReport[]> {
-  try {
-    // ユーザー一覧を取得
-    const { data: users, error: usersError } = await supabase
-      .from("users")
-      .select("id, display_name")
-      .eq("is_active", true);
+): Promise<ServiceResult<UserWorkloadReport[]>> {
+  return handleServiceCall(
+    async () => {
+      // ユーザー一覧を取得
+      const { data: users, error: usersError } = await supabase
+        .from("users")
+        .select("id, display_name")
+        .eq("is_active", true);
 
-    if (usersError) {
-      console.error("ユーザー取得エラー:", usersError);
-      return [];
-    }
+      if (usersError) {
+        throw new Error(translateSupabaseError(usersError));
+      }
 
-    if (!users || users.length === 0) {
-      return [];
-    }
+      if (!users || users.length === 0) {
+        return [];
+      }
 
     const userReports: UserWorkloadReport[] = [];
 
@@ -280,42 +259,41 @@ export async function generateUserWorkloadReport(
       });
     }
 
-    return userReports;
-  } catch (error) {
-    console.error("ユーザー作業量レポート生成エラー:", error);
-    return [];
-  }
+      return userReports;
+    },
+    "ユーザー作業量レポート生成に失敗しました"
+  );
 }
 
 // 期限別レポート生成
 export async function generateDeadlineReport(
   options: ReportOptions = {}
-): Promise<DeadlineReport[]> {
-  try {
-    let query = supabase
-      .from("tasks")
-      .select("id, status, planned_end")
-      .not("planned_end", "is", null);
+): Promise<ServiceResult<DeadlineReport[]>> {
+  return handleServiceCall(
+    async () => {
+      let query = supabase
+        .from("tasks")
+        .select("id, status, planned_end")
+        .not("planned_end", "is", null);
 
-    // フィルタリング
-    if (options.projectIds && options.projectIds.length > 0) {
-      query = query.in("project_id", options.projectIds);
-    }
+      // フィルタリング
+      if (options.projectIds && options.projectIds.length > 0) {
+        query = query.in("project_id", options.projectIds);
+      }
 
-    if (options.userIds && options.userIds.length > 0) {
-      query = query.in("primary_assignee_id", options.userIds);
-    }
+      if (options.userIds && options.userIds.length > 0) {
+        query = query.in("primary_assignee_id", options.userIds);
+      }
 
-    if (!options.includeArchived) {
-      query = query.eq("is_archived", false);
-    }
+      if (!options.includeArchived) {
+        query = query.eq("is_archived", false);
+      }
 
-    const { data: tasks, error } = await query;
+      const { data: tasks, error } = await query;
 
-    if (error) {
-      console.error("期限別レポート取得エラー:", error);
-      return [];
-    }
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
 
     const taskList = tasks || [];
     const now = new Date();
@@ -356,39 +334,38 @@ export async function generateDeadlineReport(
       });
     }
 
-    return deadlineReports;
-  } catch (error) {
-    console.error("期限別レポート生成エラー:", error);
-    return [];
-  }
+      return deadlineReports;
+    },
+    "期限別レポート生成に失敗しました"
+  );
 }
 
 // 優先度別レポート生成
 export async function generatePriorityReport(
   options: ReportOptions = {}
-): Promise<PriorityReport[]> {
-  try {
-    let query = supabase.from("tasks").select("id, status, priority, progress_percent");
+): Promise<ServiceResult<PriorityReport[]>> {
+  return handleServiceCall(
+    async () => {
+      let query = supabase.from("tasks").select("id, status, priority, progress_percent");
 
-    // フィルタリング
-    if (options.projectIds && options.projectIds.length > 0) {
-      query = query.in("project_id", options.projectIds);
-    }
+      // フィルタリング
+      if (options.projectIds && options.projectIds.length > 0) {
+        query = query.in("project_id", options.projectIds);
+      }
 
-    if (options.userIds && options.userIds.length > 0) {
-      query = query.in("primary_assignee_id", options.userIds);
-    }
+      if (options.userIds && options.userIds.length > 0) {
+        query = query.in("primary_assignee_id", options.userIds);
+      }
 
-    if (!options.includeArchived) {
-      query = query.eq("is_archived", false);
-    }
+      if (!options.includeArchived) {
+        query = query.eq("is_archived", false);
+      }
 
-    const { data: tasks, error } = await query;
+      const { data: tasks, error } = await query;
 
-    if (error) {
-      console.error("優先度別レポート取得エラー:", error);
-      return [];
-    }
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
 
     const taskList = tasks || [];
     const priorities: ("LOW" | "MEDIUM" | "HIGH" | "URGENT")[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
@@ -413,11 +390,10 @@ export async function generatePriorityReport(
       });
     }
 
-    return priorityReports;
-  } catch (error) {
-    console.error("優先度別レポート生成エラー:", error);
-    return [];
-  }
+      return priorityReports;
+    },
+    "優先度別レポート生成に失敗しました"
+  );
 }
 
 // 統合レポート生成
@@ -426,11 +402,11 @@ export async function generateReport(options: ReportOptions = {}): Promise<Repor
     console.log("レポート生成を開始します...", options);
 
     const [
-      projectProgress,
-      taskStatistics,
-      userWorkload,
-      deadlineReport,
-      priorityReport
+      projectProgressResult,
+      taskStatisticsResult,
+      userWorkloadResult,
+      deadlineReportResult,
+      priorityReportResult
     ] = await Promise.all([
       generateProjectProgressReport(options),
       generateTaskStatisticsReport(options),
@@ -438,6 +414,23 @@ export async function generateReport(options: ReportOptions = {}): Promise<Repor
       generateDeadlineReport(options),
       generatePriorityReport(options)
     ]);
+
+    // ServiceResultからデータを抽出
+    const projectProgress = projectProgressResult.success && projectProgressResult.data ? projectProgressResult.data : [];
+    const taskStatistics = taskStatisticsResult.success && taskStatisticsResult.data ? taskStatisticsResult.data : {
+      totalTasks: 0,
+      completedTasks: 0,
+      inProgressTasks: 0,
+      notStartedTasks: 0,
+      blockedTasks: 0,
+      cancelledTasks: 0,
+      overdueTasks: 0,
+      completionRate: 0,
+      averageProgress: 0
+    };
+    const userWorkload = userWorkloadResult.success && userWorkloadResult.data ? userWorkloadResult.data : [];
+    const deadlineReport = deadlineReportResult.success && deadlineReportResult.data ? deadlineReportResult.data : [];
+    const priorityReport = priorityReportResult.success && priorityReportResult.data ? priorityReportResult.data : [];
 
     const reportData: ReportData = {
       projectProgress,

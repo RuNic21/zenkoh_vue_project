@@ -24,6 +24,20 @@ export function formatIsoToDate(isoString: string | null | undefined): string {
 export function formatDateToIso(dateString: string): string | null {
   if (!dateString) return null;
   try {
+    // YYYY-MM-DD形式の検証
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(dateString)) {
+      console.warn("無効な日付形式:", dateString);
+      return null;
+    }
+    
+    // 日付の妥当性チェック
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      console.warn("無効な日付:", dateString);
+      return null;
+    }
+    
     return `${dateString}T00:00:00.000Z`;
   } catch (error) {
     console.error("日付変換エラー:", error);

@@ -14,6 +14,7 @@ import type {
   AlertRuleType
 } from "../types/notification";
 import { supabase, selectRows, type SelectFilter, type WhereCondition } from "./supabaseClient";
+import { handleServiceCall, createSuccessResult, createErrorResult, translateSupabaseError, type ServiceResult } from "../utils/errorHandler";
 
 // テーブル名
 const NOTIFICATIONS_TABLE = "notifications";
@@ -25,78 +26,74 @@ const ALERT_RULES_TABLE = "alert_rules";
 export async function listNotifications(
   filter?: NotificationFilter,
   limit?: number
-): Promise<Notification[]> {
-  try {
-    let query = supabase
-      .from(NOTIFICATIONS_TABLE)
-      .select("*")
-      .order("created_at", { ascending: false });
+): Promise<ServiceResult<Notification[]>> {
+  return handleServiceCall(
+    async () => {
+      let query = supabase
+        .from(NOTIFICATIONS_TABLE)
+        .select("*")
+        .order("created_at", { ascending: false });
 
-    // フィルター適用
-    if (filter) {
-      if (filter.status) {
-        query = query.eq("status", filter.status);
+      // フィルター適用
+      if (filter) {
+        if (filter.status) {
+          query = query.eq("status", filter.status);
+        }
+        if (filter.project_id) {
+          query = query.eq("project_id", filter.project_id);
+        }
+        if (filter.task_id) {
+          query = query.eq("task_id", filter.task_id);
+        }
+        if (filter.email) {
+          query = query.ilike("to_email", `%${filter.email}%`);
+        }
+        if (filter.date_from) {
+          query = query.gte("created_at", filter.date_from);
+        }
+        if (filter.date_to) {
+          query = query.lte("created_at", filter.date_to);
+        }
       }
-      if (filter.project_id) {
-        query = query.eq("project_id", filter.project_id);
-      }
-      if (filter.task_id) {
-        query = query.eq("task_id", filter.task_id);
-      }
-      if (filter.email) {
-        query = query.ilike("to_email", `%${filter.email}%`);
-      }
-      if (filter.date_from) {
-        query = query.gte("created_at", filter.date_from);
-      }
-      if (filter.date_to) {
-        query = query.lte("created_at", filter.date_to);
-      }
-    }
 
-    // 件数制限
-    if (limit) {
-      query = query.limit(limit);
-    }
+      // 件数制限
+      if (limit) {
+        query = query.limit(limit);
+      }
 
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error("通知一覧取得に失敗:", error.message);
-      return [];
-    }
-    
-    return (data as Notification[]) ?? [];
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("通知一覧取得でエラー:", msg);
-    return [];
-  }
+      const { data, error } = await query;
+      
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
+      
+      return (data as Notification[]) ?? [];
+    },
+    "通知一覧取得に失敗しました"
+  );
 }
 
 // 通知作成
-export async function createNotification(payload: NotificationInsert): Promise<Notification | null> {
-  try {
-    const { data, error } = await supabase
-      .from(NOTIFICATIONS_TABLE)
-      .insert([{
-        status: "QUEUED",
-        send_after: new Date().toISOString(),
-        ...payload
-      }])
-      .select("*")
-      .single();
-    
-    if (error) {
-      console.error("通知作成に失敗:", error.message);
-      return null;
-    }
-    return data as Notification;
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("通知作成時に予期せぬエラー:", msg);
-    return null;
-  }
+export async function createNotification(payload: NotificationInsert): Promise<ServiceResult<Notification | null>> {
+  return handleServiceCall(
+    async () => {
+      const { data, error } = await supabase
+        .from(NOTIFICATIONS_TABLE)
+        .insert([{
+          status: "QUEUED",
+          send_after: new Date().toISOString(),
+          ...payload
+        }])
+        .select("*")
+        .single();
+      
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
+      return data as Notification;
+    },
+    "通知作成に失敗しました"
+  );
 }
 
 // 通知更新
@@ -378,13 +375,15 @@ export async function createNotificationFromTemplate(
     body = body.replace(new RegExp(placeholder, 'g'), value);
   }
 
-  return await createNotification({
+  const result = await createNotification({
     project_id: projectId,
     task_id: taskId,
     to_email: toEmail,
     subject,
     body_text: body
   });
+  
+  return result.success && result.data ? result.data : null;
 }
 
 export type { SelectFilter, WhereCondition };

@@ -84,7 +84,8 @@ const updateSchedule = (updated: ScheduleItem) => {
 const addSchedule = (item: Partial<ScheduleItem>) => {
   // 最低限のバリデーション
   if (!item || !item.title) return;
-  const newId = Math.max(0, ...schedules.value.map((s) => s.id)) + 1;
+  const maxId = schedules.value.length > 0 ? Math.max(...schedules.value.map((s) => s.id)) : 0;
+  const newId = maxId + 1;
   schedules.value.push({ id: newId, progress: 0, status: "予定", priority: "中", ...item } as ScheduleItem);
 };
 
@@ -111,13 +112,17 @@ export const useScheduleStore = () => ({
       isLoading.value = true;
       errorMessage.value = "";
       // タスクとプロジェクト情報を JOIN して取得
-      const tasks = await listTasksWithProject();
+      const tasksResult = await listTasksWithProject();
+      if (!tasksResult.success || !tasksResult.data) {
+        throw new Error(tasksResult.error || "タスクの取得に失敗しました");
+      }
       
       // ユーザー情報も取得（担当者名表示用）
-      const users = await listUsers();
+      const usersResult = await listUsers();
+      const users = usersResult.success && usersResult.data ? usersResult.data : [];
       
       // Task を ScheduleItem に変換
-      const scheduleItems = tasksToScheduleItems(tasks, users);
+      const scheduleItems = tasksToScheduleItems(tasksResult.data, users);
       
       schedules.value = scheduleItems;
       console.log("スケジュールデータを DB から読み込みました:", scheduleItems.length, "件");
@@ -139,14 +144,14 @@ export const useScheduleStore = () => ({
       const taskUpdate = scheduleItemToTaskUpdate(item);
       
       // DB を更新
-      const updatedTask = await updateTask(item.id, taskUpdate);
+      const result = await updateTask(item.id, taskUpdate);
       
-      if (updatedTask) {
+      if (result.success && result.data) {
         // ストアも更新
         updateSchedule(item);
         console.log("スケジュールを保存しました:", item.id);
       } else {
-        throw new Error("タスクの更新に失敗しました");
+        throw new Error(result.error || "タスクの更新に失敗しました");
       }
     } catch (error) {
       console.error("スケジュールの保存に失敗:", error);
@@ -163,7 +168,11 @@ export const useScheduleStore = () => ({
       isLoading.value = true;
       errorMessage.value = "";
       // 利用可能なプロジェクト一覧を取得
-      const projects = await listProjects();
+      const projectsResult = await listProjects();
+      if (!projectsResult.success || !projectsResult.data) {
+        throw new Error(projectsResult.error || "プロジェクトの取得に失敗しました");
+      }
+      const projects = projectsResult.data;
       
       if (projects.length === 0) {
         throw new Error("利用可能なプロジェクトがありません。先にプロジェクトを作成してください。");
@@ -179,18 +188,24 @@ export const useScheduleStore = () => ({
       const taskInsert = scheduleItemToTaskInsert(item, defaultProject.id);
       
       // DB に作成
-      const createdTask = await createTask(taskInsert);
+      const result = await createTask(taskInsert);
       
-      if (createdTask) {
+      if (result.success && result.data) {
         // 作成されたタスクを ScheduleItem に変換してストアに追加
-        const users = await listUsers();
-        const scheduleItem = tasksToScheduleItems([createdTask], users)[0];
+        const usersResult = await listUsers();
+        const users = usersResult.success && usersResult.data ? usersResult.data : [];
+        const scheduleItems = tasksToScheduleItems([result.data], users);
         
-        schedules.value.push(scheduleItem);
-        console.log("新しいスケジュールを作成しました:", scheduleItem.id);
-        return scheduleItem;
+        if (scheduleItems.length > 0) {
+          const scheduleItem = scheduleItems[0];
+          schedules.value.push(scheduleItem);
+          console.log("新しいスケジュールを作成しました:", scheduleItem.id);
+          return scheduleItem;
+        } else {
+          throw new Error("スケジュールアイテムの変換に失敗しました");
+        }
       } else {
-        throw new Error("タスクの作成に失敗しました");
+        throw new Error(result.error || "タスクの作成に失敗しました");
       }
     } catch (error) {
       console.error("スケジュールの作成に失敗:", error);
@@ -207,14 +222,14 @@ export const useScheduleStore = () => ({
       isLoading.value = true;
       errorMessage.value = "";
       // DB から削除
-      const success = await deleteTask(id);
+      const result = await deleteTask(id);
       
-      if (success) {
+      if (result.success && result.data) {
         // ストアからも削除
         removeSchedule(id);
         console.log("スケジュールを削除しました:", id);
       } else {
-        throw new Error("タスクの削除に失敗しました");
+        throw new Error(result.error || "タスクの削除に失敗しました");
       }
     } catch (error) {
       console.error("スケジュールの削除に失敗:", error);

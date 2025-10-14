@@ -17,6 +17,7 @@ import type {
   UserTag
 } from "../types/team";
 import { supabase, selectRows, type SelectFilter, type WhereCondition } from "./supabaseClient";
+import { handleServiceCall, createSuccessResult, createErrorResult, translateSupabaseError, type ServiceResult } from "../utils/errorHandler";
 
 // ユーザー関連のテーブル名
 const USERS_TABLE = "users";
@@ -30,28 +31,36 @@ const PROJECTS_TABLE = "projects";
 export async function listUsers(
   filter?: SelectFilter,
   where?: WhereCondition[]
-): Promise<User[]> {
-  const res = await selectRows<User>(USERS_TABLE, "*", filter, where);
-  if (!res.ok) {
-    console.error("ユーザー一覧の取得に失敗:", res.error);
-    return [];
-  }
-  return res.data ?? [];
+): Promise<ServiceResult<User[]>> {
+  return handleServiceCall(
+    async () => {
+      const res = await selectRows<User>(USERS_TABLE, "*", filter, where);
+      if (!res.ok) {
+        throw new Error(res.error || "ユーザー一覧の取得に失敗しました");
+      }
+      return res.data ?? [];
+    },
+    "ユーザー一覧の取得に失敗しました"
+  );
 }
 
 // アクティブユーザーのみ取得
-export async function listActiveUsers(): Promise<User[]> {
+export async function listActiveUsers(): Promise<ServiceResult<User[]>> {
   return await listUsers({ is_active: true });
 }
 
 // ユーザーIDで取得
-export async function getUserById(id: number): Promise<User | null> {
-  const res = await selectRows<User>(USERS_TABLE, "*", { id });
-  if (!res.ok) {
-    console.error("ユーザー取得に失敗:", res.error);
-    return null;
-  }
-  return (res.data && res.data[0]) ?? null;
+export async function getUserById(id: number): Promise<ServiceResult<User | null>> {
+  return handleServiceCall(
+    async () => {
+      const res = await selectRows<User>(USERS_TABLE, "*", { id });
+      if (!res.ok) {
+        throw new Error(res.error || "ユーザー取得に失敗しました");
+      }
+      return (res.data && res.data[0]) ?? null;
+    },
+    "ユーザー取得に失敗しました"
+  );
 }
 
 // ユーザー作成
@@ -60,27 +69,25 @@ export async function createUser(payload: {
   display_name: string;
   password_hash: string;
   is_active?: boolean;
-}): Promise<User | null> {
-  try {
-    const { data, error } = await supabase
-      .from(USERS_TABLE)
-      .insert([{ 
-        is_active: true, 
-        ...payload 
-      }])
-      .select("*")
-      .single();
-    
-    if (error) {
-      console.error("ユーザー作成に失敗:", error.message);
-      return null;
-    }
-    return data as User;
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("ユーザー作成時に予期せぬエラー:", msg);
-    return null;
-  }
+}): Promise<ServiceResult<User | null>> {
+  return handleServiceCall(
+    async () => {
+      const { data, error } = await supabase
+        .from(USERS_TABLE)
+        .insert([{ 
+          is_active: true, 
+          ...payload 
+        }])
+        .select("*")
+        .single();
+      
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
+      return data as User;
+    },
+    "ユーザー作成に失敗しました"
+  );
 }
 
 // ユーザー更新
@@ -114,8 +121,8 @@ export async function updateUser(id: number, payload: {
 // チームメンバー一覧取得（ユーザー情報含む）
 export async function listTeamMembersWithUsers(
   taskId?: number
-): Promise<TeamMemberWithUser[]> {
-  try {
+): Promise<ServiceResult<TeamMemberWithUser[]>> {
+  return handleServiceCall(async () => {
     let query = supabase
       .from(TASK_MEMBERS_TABLE)
       .select(`
@@ -130,16 +137,11 @@ export async function listTeamMembersWithUsers(
     const { data, error } = await query;
     
     if (error) {
-      console.error("チームメンバー取得に失敗:", error.message);
-      return [];
+      throw new Error(`チームメンバー取得に失敗: ${error.message}`);
     }
     
     return (data as TeamMemberWithUser[]) ?? [];
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("チームメンバー取得でエラー:", msg);
-    return [];
-  }
+  });
 }
 
 // チームメンバー追加
@@ -214,8 +216,8 @@ export async function removeTeamMember(userId: number, taskId: number): Promise<
 // ===== プロジェクト別チーム情報 =====
 
 // プロジェクト別チーム情報取得
-export async function getProjectTeams(): Promise<ProjectTeam[]> {
-  try {
+export async function getProjectTeams(): Promise<ServiceResult<ProjectTeam[]>> {
+  return handleServiceCall(async () => {
     // プロジェクト一覧を取得
     const { data: projects, error: projectsError } = await supabase
       .from(PROJECTS_TABLE)
@@ -223,8 +225,7 @@ export async function getProjectTeams(): Promise<ProjectTeam[]> {
       .eq("is_archived", false);
     
     if (projectsError) {
-      console.error("プロジェクト取得に失敗:", projectsError.message);
-      return [];
+      throw new Error(`プロジェクト取得に失敗: ${projectsError.message}`);
     }
     
     const projectTeams: ProjectTeam[] = [];
@@ -238,7 +239,7 @@ export async function getProjectTeams(): Promise<ProjectTeam[]> {
         .eq("is_archived", false);
       
       if (tasksError) {
-        console.error(`プロジェクト${project.id}のタスク取得に失敗:`, tasksError.message);
+        console.warn(`プロジェクト${project.id}のタスク取得に失敗:`, tasksError.message);
         continue;
       }
       
@@ -265,7 +266,7 @@ export async function getProjectTeams(): Promise<ProjectTeam[]> {
         .in("task_id", taskIds);
       
       if (membersError) {
-        console.error(`プロジェクト${project.id}のメンバー取得に失敗:`, membersError.message);
+        console.warn(`プロジェクト${project.id}のメンバー取得に失敗:`, membersError.message);
         continue;
       }
       
@@ -291,11 +292,7 @@ export async function getProjectTeams(): Promise<ProjectTeam[]> {
     }
     
     return projectTeams;
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("プロジェクトチーム情報取得でエラー:", msg);
-    return [];
-  }
+  });
 }
 
 // ===== 統計情報 =====

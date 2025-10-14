@@ -78,7 +78,12 @@ const statusFilter = ref("all"); // 'all' | 'in-progress' | 'completed' | 'overd
 const ownerFilter = ref("all"); // 'all' | 特定のユーザーID
 const dateRangeFilter = ref("all"); // 'all' | 'this-week' | 'this-month' | 'overdue'
 
-// フィルタリングされたプロジェクト一覧
+// 日付計算をメモ化してパフォーマンスを向上
+const today = computed(() => new Date());
+const weekFromNow = computed(() => new Date(today.value.getTime() + 7 * 24 * 60 * 60 * 1000));
+const monthFromNow = computed(() => new Date(today.value.getTime() + 30 * 24 * 60 * 60 * 1000));
+
+// フィルタリングされたプロジェクト一覧（パフォーマンス最適化）
 const filteredProjects = computed(() => {
   let filtered = projectProgressList.value;
 
@@ -100,10 +105,9 @@ const filteredProjects = computed(() => {
         case "completed":
           return project.status === "完了";
         case "overdue":
-          const today = new Date();
           if (!project.dueDate || project.dueDate === "-") return false;
           const due = new Date(project.dueDate);
-          return due < today && project.status !== "完了";
+          return due < today.value && project.status !== "完了";
         default:
           return true;
       }
@@ -115,22 +119,19 @@ const filteredProjects = computed(() => {
     filtered = filtered.filter(project => project.owner === ownerFilter.value);
   }
 
-  // 日付範囲でフィルタリング
+  // 日付範囲でフィルタリング（メモ化された日付を使用）
   if (dateRangeFilter.value !== "all") {
-    const today = new Date();
     filtered = filtered.filter(project => {
       if (!project.dueDate || project.dueDate === "-") return false;
       const due = new Date(project.dueDate);
       
       switch (dateRangeFilter.value) {
         case "this-week":
-          const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-          return due >= today && due <= weekFromNow;
+          return due >= today.value && due <= weekFromNow.value;
         case "this-month":
-          const monthFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-          return due >= today && due <= monthFromNow;
+          return due >= today.value && due <= monthFromNow.value;
         case "overdue":
-          return due < today && project.status !== "完了";
+          return due < today.value && project.status !== "完了";
         default:
           return true;
       }
@@ -184,7 +185,7 @@ const handleCreateProject = async () => {
 
     // 실제 DB에 프로젝트 생성
     const { createProject } = await import("./services/projectService");
-    const newProject = await createProject({
+    const result = await createProject({
       name: projectName.trim(),
       description: "",
       owner_user_id: null, // 現在のユーザーIDは認証システム実装後に設定
@@ -193,10 +194,10 @@ const handleCreateProject = async () => {
       is_archived: false
     });
 
-    if (newProject) {
+    if (result.success && result.data) {
       // 活動ログ生成
       const { logProjectCreated } = await import("./services/activityService");
-      await logProjectCreated(newProject.id, projectName, "システム");
+      await logProjectCreated(result.data.id, projectName, "システム");
       
       alert(`プロジェクト "${projectName}"が正常に作成されました！`);
       // ダッシュボードデータの更新
@@ -204,7 +205,7 @@ const handleCreateProject = async () => {
       // 活動フィードの更新
       await loadActivityFeed();
     } else {
-      alert("プロジェクトの作成に失敗しました。再試行してください。");
+      alert(result.error || "プロジェクトの作成に失敗しました。再試行してください。");
     }
   } catch (error) {
     console.error("プロジェクト作成中のエラー:", error);
@@ -228,7 +229,7 @@ const handleAddTask = async () => {
 
     // 実際の DB にタスクを作成
     const { createTask } = await import("./services/taskService");
-    const newTask = await createTask({
+    const result = await createTask({
       project_id: firstProject.id,
       task_name: taskName.trim(),
       description: "",
@@ -239,10 +240,10 @@ const handleAddTask = async () => {
       is_archived: false
     });
 
-    if (newTask) {
+    if (result.success && result.data) {
       // 活動ログ生成
       const { logTaskCreated } = await import("./services/activityService");
-      await logTaskCreated(firstProject.id, newTask.id, firstProject.name, taskName);
+      await logTaskCreated(firstProject.id, result.data.id, firstProject.name, taskName);
       
       alert(`タスク "${taskName}"が正常に作成されました！`);
       // ダッシュボードデータの更新
@@ -250,7 +251,7 @@ const handleAddTask = async () => {
       // 活動フィードの更新
       await loadActivityFeed();
     } else {
-      alert("タスクの作成に失敗しました。再試行してください。");
+      alert(result.error || "タスクの作成に失敗しました。再試行してください。");
     }
   } catch (error) {
     console.error("タスク作成中のエラー:", error);
@@ -298,10 +299,10 @@ const loadRecentActivities = async (): Promise<ActivityLog[]> => {
   try {
     // 実際の notifications テーブルから活動データを取得
     const { fetchRecentActivities } = await import('./services/activityService');
-    const activities = await fetchRecentActivities(10);
+    const result = await fetchRecentActivities(10);
     
     // DBから取得したデータのみを返す（Mockデータは削除）
-    return activities;
+    return result.success && result.data ? result.data : [];
   } catch (error) {
     console.error("活動データの読み込みに失敗:", error);
     return [];
@@ -378,7 +379,13 @@ const loadDashboardFromDb = async (): Promise<void> => {
   try {
     isDashboardLoading.value = true;
     dashboardErrorMessage.value = "";
-    projectProgressList.value = await fetchProjectProgress(10);
+    const result = await fetchProjectProgress(10);
+    if (result.success && result.data) {
+      projectProgressList.value = result.data;
+    } else {
+      projectProgressList.value = [];
+      dashboardErrorMessage.value = result.error || "ダッシュボードの読み込みに失敗しました。しばらくしてから再試行してください。";
+    }
   } catch (e) {
     console.error("ダッシュボードの読み込みに失敗", e);
     projectProgressList.value = [];

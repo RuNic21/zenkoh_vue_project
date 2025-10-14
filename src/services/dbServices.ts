@@ -1,5 +1,6 @@
 // 自動生成型に合わせた各テーブルのCRUDサービスを作成
 import { createCrudRepo } from "./crud";
+import type { ServiceResult } from "../utils/errorHandler";
 
 import type { Projects, ProjectsInsert, ProjectsUpdate } from "../types/db/projects";
 import type { Tasks, TasksInsert, TasksUpdate } from "../types/db/tasks";
@@ -20,7 +21,7 @@ export const alertRulesRepo = createCrudRepo<AlertRules, AlertRulesInsert, Alert
 export const notificationsRepo = createCrudRepo<Notifications, NotificationsInsert, NotificationsUpdate>("notifications");
 
 // 便利な関数群
-export async function listUsers(): Promise<Users[]> {
+export async function listUsers(): Promise<ServiceResult<Users[]>> {
   return await usersRepo.select("*");
 }
 

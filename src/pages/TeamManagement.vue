@@ -354,10 +354,17 @@ const loadUsers = async () => {
   try {
     isUsersLoading.value = true;
     usersErrorMessage.value = "";
-    users.value = await listUsers();
+    const result = await listUsers();
+    if (result.success && result.data) {
+      users.value = result.data;
+    } else {
+      usersErrorMessage.value = result.error || "ユーザーの読み込みに失敗しました";
+      users.value = [];
+    }
   } catch (error) {
     console.error("ユーザー読み込みエラー:", error);
     usersErrorMessage.value = "ユーザーの読み込みに失敗しました";
+    users.value = [];
   } finally {
     isUsersLoading.value = false;
   }
@@ -367,10 +374,17 @@ const loadTeamMembers = async () => {
   try {
     isTeamMembersLoading.value = true;
     teamMembersErrorMessage.value = "";
-    teamMembers.value = await listTeamMembersWithUsers();
+    const result = await listTeamMembersWithUsers();
+    if (result.success && result.data) {
+      teamMembers.value = result.data;
+    } else {
+      teamMembersErrorMessage.value = result.error || "チームメンバーの読み込みに失敗しました";
+      teamMembers.value = [];
+    }
   } catch (error) {
     console.error("チームメンバー読み込みエラー:", error);
     teamMembersErrorMessage.value = "チームメンバーの読み込みに失敗しました";
+    teamMembers.value = [];
   } finally {
     isTeamMembersLoading.value = false;
   }
@@ -380,10 +394,17 @@ const loadProjectTeams = async () => {
   try {
     isProjectTeamsLoading.value = true;
     projectTeamsErrorMessage.value = "";
-    projectTeams.value = await getProjectTeams();
+    const result = await getProjectTeams();
+    if (result.success && result.data) {
+      projectTeams.value = result.data;
+    } else {
+      projectTeamsErrorMessage.value = result.error || "プロジェクトチームの読み込みに失敗しました";
+      projectTeams.value = [];
+    }
   } catch (error) {
     console.error("プロジェクトチーム読み込みエラー:", error);
     projectTeamsErrorMessage.value = "プロジェクトチームの読み込みに失敗しました";
+    projectTeams.value = [];
   } finally {
     isProjectTeamsLoading.value = false;
   }
@@ -415,10 +436,17 @@ const loadNotifications = async () => {
   try {
     isNotificationsLoading.value = true;
     notificationsErrorMessage.value = "";
-    notifications.value = await listNotifications({}, 50);
+    const result = await listNotifications({}, 50);
+    if (result.success && result.data) {
+      notifications.value = result.data;
+    } else {
+      notificationsErrorMessage.value = result.error || "通知の読み込みに失敗しました";
+      notifications.value = [];
+    }
   } catch (error) {
     console.error("通知読み込みエラー:", error);
     notificationsErrorMessage.value = "通知の読み込みに失敗しました";
+    notifications.value = [];
   } finally {
     isNotificationsLoading.value = false;
   }

@@ -90,9 +90,16 @@ const loadSchedulesFromDb = async (): Promise<void> => {
 const loadProjects = async (): Promise<void> => {
   try {
     const { listProjects } = await import("../services/projectService");
-    projects.value = await listProjects();
+    const result = await listProjects();
+    if (result.success && result.data) {
+      projects.value = result.data;
+    } else {
+      console.error("プロジェクトの読み込みに失敗:", result.error);
+      projects.value = [];
+    }
   } catch (e) {
     console.error("プロジェクトの読み込みに失敗", e);
+    projects.value = [];
   }
 };
 

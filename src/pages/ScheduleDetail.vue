@@ -148,12 +148,17 @@ const availableUsers = ref<Array<{ id: number; name: string; avatar: string }>>(
 // ユーザーデータをロードする関数
 const loadUsers = async () => {
   try {
-    const users = await listUsers();
-    availableUsers.value = users.map(user => ({
-      id: user.id,
-      name: user.display_name,
-      avatar: user.display_name.charAt(0).toUpperCase()
-    }));
+    const result = await listUsers() as any;
+    if (result.success && result.data) {
+      availableUsers.value = result.data.map((user: any) => ({
+        id: user.id,
+        name: user.display_name,
+        avatar: user.display_name.charAt(0).toUpperCase()
+      }));
+    } else {
+      console.error("ユーザーデータの読み込みに失敗:", result.error);
+      availableUsers.value = [];
+    }
   } catch (error) {
     console.error("ユーザーデータの読み込みに失敗:", error);
     availableUsers.value = [];

@@ -68,6 +68,7 @@ import {
   type ProjectDetailStats
 } from "../services/dashboardService";
 import type { Task } from "../types/task";
+import { getStatusBadgeClass } from "../utils/uiHelpers";
 
 // プロジェクト一覧の状態管理
 const projects = ref<Project[]>([]);
@@ -169,7 +170,13 @@ const loadProjects = async () => {
   try {
     isLoading.value = true;
     errorMessage.value = "";
-    projects.value = await listProjects();
+    const result = await listProjects();
+    if (result.success && result.data) {
+      projects.value = result.data;
+    } else {
+      errorMessage.value = result.error || "プロジェクト一覧の読み込みに失敗しました。";
+      projects.value = [];
+    }
   } catch (error) {
     console.error("プロジェクト一覧の読み込みに失敗:", error);
     errorMessage.value = "プロジェクト一覧の読み込みに失敗しました。";
@@ -204,22 +211,22 @@ const handleCreateProject = async () => {
       return;
     }
 
-    const newProject = await createProject(formData.value);
-    if (newProject) {
-      projects.value.push(newProject);
+    const result = await createProject(formData.value);
+    if (result.success && result.data) {
+      projects.value.push(result.data);
       showCreateModal.value = false;
       resetForm();
       
       // 活動ログを生成
-      const ownerName = getOwnerName(newProject.owner_user_id ?? null);
-      await logProjectCreated(newProject.id, newProject.name, ownerName);
+      const ownerName = getOwnerName(result.data.owner_user_id ?? null);
+      await logProjectCreated(result.data.id, result.data.name, ownerName);
       
       // ダッシュボード統計を更新
       await loadDashboardStats();
       
       alert("プロジェクトが正常に作成されました！");
     } else {
-      alert("プロジェクトの作成に失敗しました。");
+      alert(result.error || "プロジェクトの作成に失敗しました。");
     }
   } catch (error) {
     console.error("プロジェクト作成エラー:", error);
@@ -244,11 +251,11 @@ const handleEditProject = async () => {
       is_archived: formData.value.is_archived
     };
 
-    const updatedProject = await updateProject(selectedProject.value.id, updateData);
-    if (updatedProject) {
+    const result = await updateProject(selectedProject.value.id, updateData);
+    if (result.success && result.data) {
       const index = projects.value.findIndex(p => p.id === selectedProject.value!.id);
       if (index !== -1) {
-        projects.value[index] = updatedProject;
+        projects.value[index] = result.data;
       }
       showEditModal.value = false;
       selectedProject.value = null;
@@ -259,7 +266,7 @@ const handleEditProject = async () => {
       
       alert("プロジェクトが正常に更新されました！");
     } else {
-      alert("プロジェクトの更新に失敗しました。");
+      alert(result.error || "プロジェクトの更新に失敗しました。");
     }
   } catch (error) {
     console.error("プロジェクト更新エラー:", error);
@@ -272,8 +279,8 @@ const handleDeleteProject = async () => {
   try {
     if (!selectedProject.value) return;
 
-    const success = await deleteProject(selectedProject.value.id);
-    if (success) {
+    const result = await deleteProject(selectedProject.value.id);
+    if (result.success && result.data) {
       projects.value = projects.value.filter(p => p.id !== selectedProject.value!.id);
       showDeleteModal.value = false;
       selectedProject.value = null;
@@ -283,7 +290,7 @@ const handleDeleteProject = async () => {
       
       alert("プロジェクトが正常に削除されました。");
     } else {
-      alert("プロジェクトの削除に失敗しました。");
+      alert(result.error || "プロジェクトの削除に失敗しました。");
     }
   } catch (error) {
     console.error("プロジェクト削除エラー:", error);
@@ -349,28 +356,21 @@ const getProjectStatus = (project: Project): string => {
   return "進行中";
 };
 
-// プロジェクト状態のバッジクラス
-const getStatusBadgeClass = (status: string): string => {
-  switch (status) {
-    case "進行中":
-      return "badge bg-gradient-success";
-    case "期限切れ":
-      return "badge bg-gradient-danger";
-    case "アーカイブ":
-      return "badge bg-gradient-secondary";
-    default:
-      return "badge bg-gradient-info";
-  }
-};
 
 // ダッシュボード統計情報の読み込み
 const loadDashboardStats = async () => {
   try {
-    const [stats, detailStats] = await Promise.all([
+    const [statsResult, detailStats] = await Promise.all([
       getProjectStats(),
       getProjectDetailStats()
     ]);
-    projectStats.value = stats;
+    
+    if (statsResult.success && statsResult.data) {
+      projectStats.value = statsResult.data;
+    } else {
+      console.error("プロジェクト統計の読み込みに失敗:", statsResult.error);
+    }
+    
     projectDetailStats.value = detailStats;
   } catch (error) {
     console.error("ダッシュボード統計の読み込みに失敗:", error);

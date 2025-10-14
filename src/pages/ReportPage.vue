@@ -55,18 +55,22 @@ const reportOptions = computed((): ReportOptions => ({
 
 // チャートデータ
 const taskStatusChartData = computed(() => {
-  if (!reportData.value) return null;
+  if (!reportData.value || !reportData.value.taskStatistics) return null;
   return generateTaskStatusChartData(reportData.value.taskStatistics);
 });
 
 const priorityChartData = computed(() => {
-  if (!reportData.value) return null;
+  if (!reportData.value || !reportData.value.priorityReport || !Array.isArray(reportData.value.priorityReport)) {
+    return null;
+  }
   return generatePriorityChartData(reportData.value.priorityReport);
 });
 
 // プロジェクト進捗チャートデータ
 const projectProgressChartData = computed(() => {
-  if (!reportData.value) return null;
+  if (!reportData.value || !reportData.value.projectProgress || !Array.isArray(reportData.value.projectProgress)) {
+    return null;
+  }
   
   return {
     labels: reportData.value.projectProgress.map(p => p.projectName),
@@ -96,7 +100,9 @@ const projectProgressChartData = computed(() => {
 
 // ユーザー作業量チャートデータ
 const userWorkloadChartData = computed(() => {
-  if (!reportData.value) return null;
+  if (!reportData.value || !reportData.value.userWorkload || !Array.isArray(reportData.value.userWorkload)) {
+    return null;
+  }
   
   return {
     labels: reportData.value.userWorkload.map(u => u.userName),
@@ -112,7 +118,9 @@ const userWorkloadChartData = computed(() => {
 
 // 期限別レポートチャートデータ
 const deadlineChartData = computed(() => {
-  if (!reportData.value) return null;
+  if (!reportData.value || !reportData.value.deadlineReport || !Array.isArray(reportData.value.deadlineReport)) {
+    return null;
+  }
   
   return {
     labels: reportData.value.deadlineReport.map(d => d.period),
@@ -179,8 +187,12 @@ const resetFilters = () => {
 const loadFilterOptions = async () => {
   try {
     // プロジェクト一覧取得
-    const projects = await listProjects();
-    availableProjects.value = projects.map(p => ({ id: p.id, name: p.name }));
+    const result = await listProjects();
+    if (result.success && result.data) {
+      availableProjects.value = result.data.map((p: any) => ({ id: p.id, name: p.name }));
+    } else {
+      availableProjects.value = [];
+    }
     
     // ユーザー一覧取得
     const { data: users, error } = await supabase
@@ -203,7 +215,9 @@ const loadFilterOptions = async () => {
 
 // レポートエクスポート（CSV）
 const exportToCSV = () => {
-  if (!reportData.value) return;
+  if (!reportData.value || !reportData.value.projectProgress || !Array.isArray(reportData.value.projectProgress)) {
+    return;
+  }
   
   // プロジェクト進捗レポートをCSV形式でエクスポート
   const csvContent = [
@@ -446,7 +460,7 @@ onMounted(async () => {
               <div class="d-flex justify-content-between">
                 <div>
                   <p class="text-sm mb-0 text-capitalize">総タスク数</p>
-                  <h4 class="mb-0">{{ reportData.taskStatistics.totalTasks }}</h4>
+                  <h4 class="mb-0">{{ reportData.taskStatistics?.totalTasks || 0 }}</h4>
                 </div>
                 <div class="icon icon-md icon-shape bg-gradient-primary shadow-dark shadow text-center border-radius-lg">
                   <i class="material-symbols-rounded opacity-10">task</i>
@@ -462,7 +476,7 @@ onMounted(async () => {
               <div class="d-flex justify-content-between">
                 <div>
                   <p class="text-sm mb-0 text-capitalize">完了タスク</p>
-                  <h4 class="mb-0">{{ reportData.taskStatistics.completedTasks }}</h4>
+                  <h4 class="mb-0">{{ reportData.taskStatistics?.completedTasks || 0 }}</h4>
                 </div>
                 <div class="icon icon-md icon-shape bg-gradient-success shadow-dark shadow text-center border-radius-lg">
                   <i class="material-symbols-rounded opacity-10">check_circle</i>
@@ -478,7 +492,7 @@ onMounted(async () => {
               <div class="d-flex justify-content-between">
                 <div>
                   <p class="text-sm mb-0 text-capitalize">完了率</p>
-                  <h4 class="mb-0">{{ reportData.taskStatistics.completionRate }}%</h4>
+                  <h4 class="mb-0">{{ reportData.taskStatistics?.completionRate || 0 }}%</h4>
                 </div>
                 <div class="icon icon-md icon-shape bg-gradient-info shadow-dark shadow text-center border-radius-lg">
                   <i class="material-symbols-rounded opacity-10">trending_up</i>
@@ -494,7 +508,7 @@ onMounted(async () => {
               <div class="d-flex justify-content-between">
                 <div>
                   <p class="text-sm mb-0 text-capitalize">期限切れ</p>
-                  <h4 class="mb-0">{{ reportData.taskStatistics.overdueTasks }}</h4>
+                  <h4 class="mb-0">{{ reportData.taskStatistics?.overdueTasks || 0 }}</h4>
                 </div>
                 <div class="icon icon-md icon-shape bg-gradient-warning shadow-dark shadow text-center border-radius-lg">
                   <i class="material-symbols-rounded opacity-10">warning</i>
@@ -624,7 +638,7 @@ onMounted(async () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="project in reportData.projectProgress" :key="project.projectId">
+                    <tr v-for="project in (reportData.projectProgress || [])" :key="project.projectId">
                       <td>
                         <div class="d-flex px-3 py-1">
                           <div class="d-flex flex-column justify-content-center">

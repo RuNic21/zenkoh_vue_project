@@ -2,17 +2,17 @@
 export interface TaskMembers {
   task_id: number;
   user_id: number;
-  role: string;
+  role: "OWNER" | "CONTRIBUTOR" | "REVIEWER";
 }
 
 export interface TaskMembersInsert {
   task_id: number;
   user_id: number;
-  role?: string;
+  role?: "OWNER" | "CONTRIBUTOR" | "REVIEWER";
 }
 
 export interface TaskMembersUpdate {
   task_id?: number;
   user_id?: number;
-  role?: string;
+  role?: "OWNER" | "CONTRIBUTOR" | "REVIEWER";
 }

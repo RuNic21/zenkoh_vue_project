@@ -29,6 +29,7 @@
 
 import { supabase } from "./supabaseClient";
 import { listUsers } from "./dbServices";
+import { handleServiceCall, createSuccessResult, createErrorResult, translateSupabaseError, type ServiceResult } from "../utils/errorHandler";
 
 // 活動ログの型定義
 export interface ActivityLog {
@@ -44,52 +45,51 @@ export interface ActivityLog {
 }
 
 // notifications テーブルから活動データを取得
-export async function fetchRecentActivities(limit: number = 10): Promise<ActivityLog[]> {
-  try {
-    // notifications テーブルから最新の活動を取得
-    const { data: notifications, error } = await supabase
-      .from('notifications')
-      .select(`
-        id,
-        project_id,
-        task_id,
-        subject,
-        body_text,
-        created_at,
-        projects!inner(name),
-        tasks(task_name)
-      `)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+export async function fetchRecentActivities(limit: number = 10): Promise<ServiceResult<ActivityLog[]>> {
+  return handleServiceCall(
+    async () => {
+      // notifications テーブルから最新の活動を取得
+      const { data: notifications, error } = await supabase
+        .from('notifications')
+        .select(`
+          id,
+          project_id,
+          task_id,
+          subject,
+          body_text,
+          created_at,
+          projects!inner(name),
+          tasks(task_name)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(limit);
 
-    if (error) {
-      console.error('活動データの取得に失敗:', error);
-      return [];
-    }
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
 
-    // notifications を ActivityLog に変換
-    const activities: ActivityLog[] = (notifications || []).map(notification => {
-      const activityType = determineActivityType(notification.subject, notification.body_text);
-      const description = generateActivityDescription(activityType, notification);
-      
-      return {
-        id: notification.id,
-        type: activityType,
-        description: description,
-        user: extractUserFromNotification(notification.body_text),
-        timestamp: new Date(notification.created_at),
-        projectId: notification.project_id,
-        taskId: notification.task_id,
-        projectName: (notification.projects as any)?.name,
-        taskName: (notification.tasks as any)?.task_name
-      };
-    });
+      // notifications を ActivityLog に変換
+      const activities: ActivityLog[] = (notifications || []).map(notification => {
+        const activityType = determineActivityType(notification.subject, notification.body_text);
+        const description = generateActivityDescription(activityType, notification);
+        
+        return {
+          id: notification.id,
+          type: activityType,
+          description: description,
+          user: extractUserFromNotification(notification.body_text),
+          timestamp: new Date(notification.created_at),
+          projectId: notification.project_id,
+          taskId: notification.task_id,
+          projectName: (notification.projects as any)?.name,
+          taskName: (notification.tasks as any)?.task_name
+        };
+      });
 
-    return activities;
-  } catch (error) {
-    console.error('活動フィードの読み込み中にエラー:', error);
-    return [];
-  }
+      return activities;
+    },
+    "活動データ取得に失敗しました"
+  );
 }
 
 // 通知の件名・本文から活動タイプを判定
@@ -191,8 +191,9 @@ export async function createActivityNotification(
 // プロジェクト作成時の活動ログ生成
 export async function logProjectCreated(projectId: number, projectName: string, ownerName: string): Promise<void> {
   // 実際のユーザー情報を取得してから通知を作成
-  const users = await listUsers();
-  const adminUser = users.find(user => user.display_name === ownerName) || users[0];
+  const usersResult = await listUsers();
+  const users = usersResult.success && usersResult.data ? usersResult.data : [];
+  const adminUser = users.find((user: any) => user.display_name === ownerName) || users[0];
   const toEmail = adminUser ? adminUser.email : 'system@zenkoh.com';
   
   await createActivityNotification(
@@ -207,7 +208,8 @@ export async function logProjectCreated(projectId: number, projectName: string, 
 // タスク作成時の活動ログ生成
 export async function logTaskCreated(projectId: number, taskId: number, projectName: string, taskName: string): Promise<void> {
   // 実際のユーザー情報を取得してから通知を作成
-  const users = await listUsers();
+  const usersResult = await listUsers();
+  const users = usersResult.success && usersResult.data ? usersResult.data : [];
   const toEmail = users.length > 0 ? users[0].email : 'system@zenkoh.com';
   
   await createActivityNotification(
@@ -222,7 +224,8 @@ export async function logTaskCreated(projectId: number, taskId: number, projectN
 // タスク 完了時の活動ログ生成
 export async function logTaskCompleted(projectId: number, taskId: number, projectName: string, taskName: string): Promise<void> {
   // 実際のユーザー情報を取得してから通知を作成
-  const users = await listUsers();
+  const usersResult = await listUsers();
+  const users = usersResult.success && usersResult.data ? usersResult.data : [];
   const toEmail = users.length > 0 ? users[0].email : 'system@zenkoh.com';
   
   await createActivityNotification(

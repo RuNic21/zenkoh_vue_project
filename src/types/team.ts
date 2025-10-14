@@ -6,6 +6,7 @@ export interface User {
   id: number;
   email: string;
   display_name: string;
+  password_hash: string; // データベーススキーマに合わせて追加
   is_active: boolean;
   created_at: string;
   updated_at: string;

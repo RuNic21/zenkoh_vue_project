@@ -180,8 +180,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="chart-container" :style="{ height: height + 'px' }">
-    <canvas ref="canvasRef"></canvas>
+  <div class="panel panel-default">
+    <div class="panel-body">
+      <div class="chart-container" :style="{ height: height + 'px' }">
+        <canvas ref="canvasRef"></canvas>
+      </div>
+    </div>
   </div>
 </template>
 

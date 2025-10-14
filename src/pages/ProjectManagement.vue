@@ -91,6 +91,20 @@ import { listUsers } from "../services/dbServices";
 import { logProjectCreated } from "../services/activityService";
 import type { Project } from "../types/project";
 import type { Users } from "../types/db/users";
+import PerformanceOptimizedTable from "../components/table/PerformanceOptimizedTable.vue";
+import OptimizedDataTable from "../components/table/OptimizedDataTable.vue";
+import ProjectFilterPanel from "../components/project/ProjectFilterPanel.vue";
+import TaskStatsHeader from "../components/task/TaskStatsHeader.vue";
+import LoadingSpinner from "@/components/common/LoadingSpinner.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
+import StatusBadge from "@/components/common/StatusBadge.vue";
+import PriorityBadge from "@/components/common/PriorityBadge.vue";
+import PageHeader from "@/components/common/PageHeader.vue";
+import CardHeader from "@/components/common/CardHeader.vue";
+import ActionBar from "@/components/common/ActionBar.vue";
+import StatCards from "@/components/common/StatCards.vue";
+import ModalShell from "@/components/common/ModalShell.vue";
+import TableControls from "@/components/table/TableControls.vue";
 import { 
   getProjectStats, 
   getProjectDetailStats, 
@@ -104,6 +118,7 @@ import {
 } from "../services/dashboardService";
 import type { Task } from "../types/task";
 import { getStatusBadgeClass } from "../utils/uiHelpers";
+import { formatDateJP, formatPercent, truncate } from "@/utils/formatters";
 
 // プロジェクト一覧の状態管理
 const projects = ref<Project[]>([]);
@@ -200,6 +215,105 @@ const filteredProjects = computed(() => {
   return filtered;
 });
 
+// テーブルコントロール用のセレクト設定
+const tableSelects = computed(() => [
+  {
+    key: "status",
+    label: "状態",
+    options: [
+      { label: "アクティブ", value: "active" },
+      { label: "アーカイブ", value: "archived" }
+    ],
+    modelValue: statusFilter.value === "all" ? "" : statusFilter.value
+  },
+  {
+    key: "date",
+    label: "期限",
+    options: [
+      { label: "今月", value: "this-month" },
+      { label: "期限切れ", value: "overdue" }
+    ],
+    modelValue: dateFilter.value === "all" ? "" : dateFilter.value
+  }
+]);
+
+const handleTableSelectUpdate = (key: string, value: string | number | null) => {
+  const v = (value ?? "") as string;
+  if (key === "status") {
+    statusFilter.value = v === "" ? "all" : v;
+  } else if (key === "date") {
+    dateFilter.value = v === "" ? "all" : v;
+  }
+};
+
+// =============================
+// テーブル用: 表示データと列定義
+// 目的: テーブル専用の平坦なデータに整形し、ソート/ページングを親で管理
+// =============================
+// プロジェクト一覧テーブル: ページングとソート状態
+const projectCurrentPage = ref(1);
+const projectPageSize = ref(10);
+const projectSortColumn = ref<string>("");
+const projectSortDirection = ref<"asc" | "desc">("asc");
+
+// 列定義（表示名とキー、必要に応じてフォーマッタ）
+const projectTableColumns = [
+  { key: "name", label: "プロジェクト名", sortable: true },
+  { key: "description", label: "説明" },
+  { key: "ownerName", label: "オーナー", sortable: true },
+  { key: "startDate", label: "開始日", sortable: true, formatter: (v: string) => v || "-" },
+  { key: "endDate", label: "終了日", sortable: true, formatter: (v: string) => v || "-" },
+  { key: "status", label: "状態", sortable: true },
+  { key: "createdAt", label: "作成日", sortable: true }
+];
+
+// テーブル用にフラットな形へ変換
+const projectTableRows = computed(() => {
+  // フィルタ済みを基準にする
+  const base = filteredProjects.value.map((p) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description || "-",
+    ownerName: getOwnerName(p.owner_user_id ?? null),
+    startDate: p.start_date || "-",
+    endDate: p.end_date || "-",
+    status: getProjectStatus(p),
+    createdAt: formatDate(p.created_at)
+  }));
+
+  // ソート適用
+  if (projectSortColumn.value) {
+    const col = projectSortColumn.value as keyof (typeof base)[number];
+    base.sort((a, b) => {
+      const aVal = a[col] ?? "";
+      const bVal = b[col] ?? "";
+      if (aVal < bVal) return projectSortDirection.value === "asc" ? -1 : 1;
+      if (aVal > bVal) return projectSortDirection.value === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
+
+  return base;
+});
+
+// ソートハンドラ
+const handleProjectSortChange = (column: string, direction: "asc" | "desc") => {
+  // 日本語コメント: 列が同じなら方向をトグル、異なるなら昇順から開始
+  if (projectSortColumn.value === column) {
+    projectSortDirection.value = direction;
+  } else {
+    projectSortColumn.value = column;
+    projectSortDirection.value = direction;
+  }
+};
+
+// ページ変更ハンドラ
+const handleProjectPageChange = (page: number) => {
+  // 日本語コメント: 安全のためページ境界をチェック
+  if (page < 1) return;
+  projectCurrentPage.value = page;
+};
+
 // プロジェクト一覧の読み込み
 const loadProjects = async () => {
   try {
@@ -224,7 +338,19 @@ const loadProjects = async () => {
 // ユーザー一覧の読み込み
 const loadUsers = async () => {
   try {
-    users.value = await listUsers();
+    // ServiceResult を展開し、data のみ Users[] として代入する
+    const result = await listUsers();
+    if (result && typeof result === "object" && "success" in result) {
+      if (result.success && result.data) {
+        users.value = result.data as Users[];
+      } else {
+        console.error("ユーザー一覧の読み込みに失敗:", result.error);
+        users.value = [];
+      }
+    } else {
+      // 後方互換（配列が直接返る場合）
+      users.value = (result as unknown as Users[]) ?? [];
+    }
   } catch (error) {
     console.error("ユーザー一覧の読み込みに失敗:", error);
     users.value = [];
@@ -372,11 +498,8 @@ const clearFilters = () => {
   dateFilter.value = "all";
 };
 
-// 日付フォーマット
-const formatDate = (dateString: string | null): string => {
-  if (!dateString) return "-";
-  return new Date(dateString).toLocaleDateString("ja-JP");
-};
+// 日付フォーマット（共通フォーマッター使用）
+const formatDate = (dateString: string | null): string => formatDateJP(dateString ?? null);
 
 // プロジェクト状態の表示
 const getProjectStatus = (project: Project): string => {
@@ -443,17 +566,10 @@ onMounted(async () => {
 
 <template>
   <div class="container-fluid py-4">
-    <!-- ページヘッダー -->
-    <div class="row mb-4">
-      <div class="col-12">
-        <div class="ms-3">
-          <h3 class="mb-0 h4 font-weight-bolder">プロジェクト管理</h3>
-          <p class="mb-4">
-            プロジェクトの作成・編集・削除・一覧表示を行えます。
-          </p>
-        </div>
-      </div>
-    </div>
+    <PageHeader 
+      title="プロジェクト管理"
+      description="プロジェクトの作成・編集・削除・一覧表示を行えます。"
+    />
 
     <!-- エラー表示 -->
     <div v-if="errorMessage" class="alert alert-danger" role="alert">
@@ -464,104 +580,16 @@ onMounted(async () => {
     <div class="row mb-4">
       <div class="col-12">
         <div class="card">
-          <div class="card-header pb-0">
-            <h6>プロジェクト分析ダッシュボード</h6>
-            <p class="text-sm mb-0">
-              <i class="fa fa-chart-bar text-info" aria-hidden="true"></i>
-              <span class="font-weight-bold ms-1">プロジェクト</span>の統計情報
-            </p>
-          </div>
+          <CardHeader title="プロジェクト分析ダッシュボード" subtitle="プロジェクトの統計情報" />
           <div class="card-body">
-            <!-- 統計カード -->
-            <div class="row">
-              <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-                <div class="card">
-                  <div class="card-header p-2 ps-3">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <p class="text-sm mb-0 text-capitalize">総プロジェクト数</p>
-                        <h4 class="mb-0">{{ projectStats.totalProjects }}</h4>
-                      </div>
-                      <div class="icon icon-md icon-shape bg-gradient-primary shadow-dark shadow text-center border-radius-lg">
-                        <i class="material-symbols-rounded opacity-10">folder</i>
-                      </div>
-                    </div>
-                  </div>
-                  <hr class="dark horizontal my-0">
-                  <div class="card-footer p-2 ps-3">
-                    <p class="mb-0 text-sm">
-                      <span class="text-success font-weight-bolder">{{ projectStats.activeProjects }}</span> アクティブ
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-                <div class="card">
-                  <div class="card-header p-2 ps-3">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <p class="text-sm mb-0 text-capitalize">総タスク数</p>
-                        <h4 class="mb-0">{{ projectStats.totalTasks }}</h4>
-                      </div>
-                      <div class="icon icon-md icon-shape bg-gradient-success shadow-dark shadow text-center border-radius-lg">
-                        <i class="material-symbols-rounded opacity-10">task</i>
-                      </div>
-                    </div>
-                  </div>
-                  <hr class="dark horizontal my-0">
-                  <div class="card-footer p-2 ps-3">
-                    <p class="mb-0 text-sm">
-                      <span class="text-success font-weight-bolder">{{ projectStats.completedTasks }}</span> 完了済み
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-                <div class="card">
-                  <div class="card-header p-2 ps-3">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <p class="text-sm mb-0 text-capitalize">平均進捗率</p>
-                        <h4 class="mb-0">{{ projectStats.averageProgress }}%</h4>
-                      </div>
-                      <div class="icon icon-md icon-shape bg-gradient-info shadow-dark shadow text-center border-radius-lg">
-                        <i class="material-symbols-rounded opacity-10">trending_up</i>
-                      </div>
-                    </div>
-                  </div>
-                  <hr class="dark horizontal my-0">
-                  <div class="card-footer p-2 ps-3">
-                    <p class="mb-0 text-sm">
-                      <span class="text-info font-weight-bolder">{{ projectStats.inProgressTasks }}</span> 進行中
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-                <div class="card">
-                  <div class="card-header p-2 ps-3">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <p class="text-sm mb-0 text-capitalize">期限切れ</p>
-                        <h4 class="mb-0">{{ projectStats.overdueProjects }}</h4>
-                      </div>
-                      <div class="icon icon-md icon-shape bg-gradient-danger shadow-dark shadow text-center border-radius-lg">
-                        <i class="material-symbols-rounded opacity-10">warning</i>
-                      </div>
-                    </div>
-                  </div>
-                  <hr class="dark horizontal my-0">
-                  <div class="card-footer p-2 ps-3">
-                    <p class="mb-0 text-sm">
-                      <span class="text-danger font-weight-bolder">{{ projectStats.blockedTasks }}</span> ブロック
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <StatCards
+              :items="[
+                { label: '総プロジェクト数', value: projectStats.totalProjects, icon: 'folder', color: 'primary', footer: `アクティブ ${projectStats.activeProjects}` },
+                { label: '総タスク数', value: projectStats.totalTasks, icon: 'task', color: 'success', footer: `完了済み ${projectStats.completedTasks}` },
+                { label: '平均進捗率', value: `${projectStats.averageProgress}%`, icon: 'trending_up', color: 'info', footer: `進行中 ${projectStats.inProgressTasks}` },
+                { label: '期限切れ', value: projectStats.overdueProjects, icon: 'warning', color: 'danger', footer: `ブロック ${projectStats.blockedTasks}` }
+              ]"
+            />
           </div>
         </div>
       </div>
@@ -571,64 +599,43 @@ onMounted(async () => {
     <div class="row mb-4">
       <!-- フィルタリングパネル -->
       <div class="col-lg-8 col-md-12">
-        <div class="card">
-          <div class="card-header pb-0">
-            <h6>フィルタリング・検索</h6>
-          </div>
-          <div class="card-body">
-            <div class="row">
-              <div class="col-md-4 col-sm-6 mb-3">
-                <label class="form-label text-sm">検索</label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  placeholder="プロジェクト名で検索..."
-                  v-model="searchQuery"
-                >
-              </div>
-              <div class="col-md-3 col-sm-6 mb-3">
-                <label class="form-label text-sm">状態</label>
-                <select class="form-control" v-model="statusFilter">
-                  <option value="all">すべての状態</option>
-                  <option value="active">アクティブ</option>
-                  <option value="archived">アーカイブ</option>
-                </select>
-              </div>
-              <div class="col-md-3 col-sm-6 mb-3">
-                <label class="form-label text-sm">期限</label>
-                <select class="form-control" v-model="dateFilter">
-                  <option value="all">すべての期限</option>
-                  <option value="this-month">今月</option>
-                  <option value="overdue">期限切れ</option>
-                </select>
-              </div>
-              <div class="col-md-2 col-sm-6 mb-3 d-flex align-items-end">
-                <button 
-                  class="btn btn-sm bg-gradient-secondary mb-0 w-100"
-                  @click="clearFilters"
-                >
-                  リセット
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ProjectFilterPanel
+          :search="searchQuery"
+          :status="statusFilter"
+          :date="dateFilter"
+          @update:search="(v: string) => searchQuery = v"
+          @update:status="(v: string) => statusFilter = v"
+          @update:date="(v: string) => dateFilter = v"
+          @reset="clearFilters"
+        />
+        <TableControls
+          class="mt-3"
+          :search="searchQuery"
+          :searchable="true"
+          search-placeholder="プロジェクトを検索..."
+          :selects="tableSelects"
+          @update:search="(v: string) => searchQuery = v"
+          @update:select="handleTableSelectUpdate"
+          @reset="clearFilters"
+        />
       </div>
 
       <!-- アクションパネル -->
       <div class="col-lg-4 col-md-12">
         <div class="card">
-          <div class="card-header pb-0">
-            <h6>アクション</h6>
-          </div>
+          <CardHeader title="アクション" />
           <div class="card-body">
+            <ActionBar>
+              <template #right>
             <button 
-              class="btn bg-gradient-primary mb-0 w-100"
+                  class="btn bg-gradient-primary"
               @click="showCreateModal = true"
             >
               <i class="material-symbols-rounded me-2">add</i>
               新しいプロジェクト作成
             </button>
+              </template>
+            </ActionBar>
           </div>
         </div>
       </div>
@@ -653,103 +660,48 @@ onMounted(async () => {
           <div class="card-body px-0 pt-0 pb-2">
             <!-- ローディング表示 -->
             <div v-if="isLoading" class="text-center py-4">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">読み込み中...</span>
-              </div>
-              <p class="text-sm text-secondary mt-2">プロジェクトデータを読み込み中...</p>
+              <LoadingSpinner message="プロジェクトデータを読み込み中..." />
             </div>
 
-            <!-- プロジェクト一覧テーブル -->
-            <div v-else class="table-responsive p-0">
-              <table class="table align-items-center mb-0">
-                <thead>
-                  <tr>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">プロジェクト名</th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">説明</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">オーナー</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">開始日</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">終了日</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">状態</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">作成日</th>
-                    <th class="text-secondary opacity-7">アクション</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="project in filteredProjects" :key="project.id">
-                    <td>
-                      <div class="d-flex px-3 py-1">
-                        <div class="d-flex flex-column justify-content-center">
-                          <h6 class="mb-0 text-sm">{{ project.name }}</h6>
-                          <p class="text-xs text-secondary mb-0">ID: {{ project.id }}</p>
-                        </div>
+            <!-- パフォーマンス最適化テーブルを使用 -->
+            <div v-else class="p-3">
+              <PerformanceOptimizedTable
+                :data="projectTableRows"
+                :columns="projectTableColumns"
+                :page-size="projectPageSize"
+                :current-page="projectCurrentPage"
+                :loading="isLoading"
+                empty-message="プロジェクトが見つかりません"
+                @page-change="handleProjectPageChange"
+                @sort-change="handleProjectSortChange"
+                @row-click="(row) => {
+                  // 日本語コメント: 行クリックで該当プロジェクトのタスクモーダルを開く
+                  const project = projects.find(p => p.id === row.id);
+                  if (project) {
+                    showProjectTasks(project);
+                  }
+                }"
+              >
+                <template #cell-status="{ value }">
+                  <StatusBadge :status="value" />
+                </template>
+              </PerformanceOptimizedTable>
+
+              <!-- 行アクション: 簡易な別テーブル操作を補完するため、下に選択不要の操作ガイドを提示 -->
+              <div class="mt-3 text-xs text-secondary">
+                <span class="me-2">操作:</span>
+                <span class="me-2">行の「オーナー/状態」でソート可能</span>
+                <span class="me-2">上部フィルターで件数を絞り込み</span>
                       </div>
-                    </td>
-                    <td>
-                      <p class="text-xs font-weight-bold mb-0">
-                        {{ project.description || "-" }}
-                      </p>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span class="text-secondary text-xs font-weight-normal">
-                        {{ getOwnerName(project.owner_user_id ?? null) }}
-                      </span>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span class="text-secondary text-xs font-weight-normal">
-                        {{ formatDate(project.start_date ?? null) }}
-                      </span>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span class="text-secondary text-xs font-weight-normal">
-                        {{ formatDate(project.end_date ?? null) }}
-                      </span>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span :class="getStatusBadgeClass(getProjectStatus(project))">
-                        {{ getProjectStatus(project) }}
-                      </span>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span class="text-secondary text-xs font-weight-normal">
-                        {{ formatDate(project.created_at) }}
-                      </span>
-                    </td>
-                    <td class="align-middle">
-                      <div class="btn-group" role="group">
-                        <button 
-                          class="btn btn-sm bg-gradient-success mb-0 me-1"
-                          @click="showProjectTasks(project)"
-                          title="タスク管理"
-                        >
-                          <i class="material-symbols-rounded">task</i>
-                        </button>
-                        <button 
-                          class="btn btn-sm bg-gradient-info mb-0 me-1"
-                          @click="openEditModal(project)"
-                          title="編集"
-                        >
-                          <i class="material-symbols-rounded">edit</i>
-                        </button>
-                        <button 
-                          class="btn btn-sm bg-gradient-danger mb-0"
-                          @click="openDeleteModal(project)"
-                          title="削除"
-                        >
-                          <i class="material-symbols-rounded">delete</i>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  
-                  <!-- プロジェクトがない場合 -->
-                  <tr v-if="!isLoading && filteredProjects.length === 0">
-                    <td colspan="8" class="text-center py-4">
-                      <i class="material-symbols-rounded text-secondary opacity-50" style="font-size: 48px;">folder_open</i>
-                      <p class="text-sm text-secondary mt-2">プロジェクトが見つかりません</p>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+
+              <!-- フィルタ後にデータが無い場合の表示 -->
+              <div v-if="filteredProjects.length === 0" class="mt-3">
+                <EmptyState 
+                  icon="folder_open" 
+                  title="プロジェクトが見つかりません" 
+                  subtitle="検索やフィルター条件を変更して再度お試しください"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -757,15 +709,9 @@ onMounted(async () => {
     </div>
 
     <!-- 新規作成モーダル -->
-    <div v-if="showCreateModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">新しいプロジェクト作成</h5>
-            <button type="button" class="btn-close" @click="showCreateModal = false"></button>
-          </div>
-          <div class="modal-body">
-            <form>
+    <ModalShell :show="showCreateModal" title="新しいプロジェクト作成" size="md" @close="showCreateModal = false">
+      <template #default>
+        <form>
               <div class="mb-3">
                 <label class="form-label">プロジェクト名 <span class="text-danger">*</span></label>
                 <input 
@@ -829,26 +775,18 @@ onMounted(async () => {
                   </label>
                 </div>
               </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showCreateModal = false">キャンセル</button>
-            <button type="button" class="btn bg-gradient-primary" @click="handleCreateProject">作成</button>
-          </div>
-        </div>
-      </div>
-    </div>
+        </form>
+      </template>
+      <template #footer>
+        <button type="button" class="btn btn-secondary" @click="showCreateModal = false">キャンセル</button>
+        <button type="button" class="btn bg-gradient-primary" @click="handleCreateProject">作成</button>
+      </template>
+    </ModalShell>
 
     <!-- 編集モーダル -->
-    <div v-if="showEditModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">プロジェクト編集</h5>
-            <button type="button" class="btn-close" @click="showEditModal = false"></button>
-          </div>
-          <div class="modal-body">
-            <form>
+    <ModalShell :show="showEditModal" title="プロジェクト編集" size="md" @close="showEditModal = false">
+      <template #default>
+        <form>
               <div class="mb-3">
                 <label class="form-label">プロジェクト名 <span class="text-danger">*</span></label>
                 <input 
@@ -912,39 +850,29 @@ onMounted(async () => {
                   </label>
                 </div>
               </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showEditModal = false">キャンセル</button>
-            <button type="button" class="btn bg-gradient-primary" @click="handleEditProject">更新</button>
-          </div>
-        </div>
-      </div>
-    </div>
+        </form>
+      </template>
+      <template #footer>
+        <button type="button" class="btn btn-secondary" @click="showEditModal = false">キャンセル</button>
+        <button type="button" class="btn bg-gradient-primary" @click="handleEditProject">更新</button>
+      </template>
+    </ModalShell>
 
     <!-- 削除確認モーダル -->
-    <div v-if="showDeleteModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">プロジェクト削除確認</h5>
-            <button type="button" class="btn-close" @click="showDeleteModal = false"></button>
-          </div>
-          <div class="modal-body">
-            <p>以下のプロジェクトを削除してもよろしいですか？</p>
-            <div class="alert alert-warning">
-              <strong>{{ selectedProject?.name }}</strong>
-              <br>
-              <small>この操作は取り消すことができません。</small>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showDeleteModal = false">キャンセル</button>
-            <button type="button" class="btn bg-gradient-danger" @click="handleDeleteProject">削除</button>
-          </div>
+    <ModalShell :show="showDeleteModal" title="プロジェクト削除確認" size="md" @close="showDeleteModal = false">
+      <template #default>
+        <p>以下のプロジェクトを削除してもよろしいですか？</p>
+        <div class="alert alert-warning">
+          <strong>{{ selectedProject?.name }}</strong>
+          <br>
+          <small>この操作は取り消すことができません。</small>
         </div>
-      </div>
-    </div>
+      </template>
+      <template #footer>
+        <button type="button" class="btn btn-secondary" @click="showDeleteModal = false">キャンセル</button>
+        <button type="button" class="btn bg-gradient-danger" @click="handleDeleteProject">削除</button>
+      </template>
+    </ModalShell>
 
     <!-- タスク管理モーダル -->
     <div v-if="showTaskModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
@@ -959,144 +887,33 @@ onMounted(async () => {
           </div>
           <div class="modal-body">
             <!-- タスク統計 -->
-            <div class="row mb-4">
-              <div class="col-md-3">
-                <div class="card bg-gradient-primary text-white">
-                  <div class="card-body p-3">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <p class="text-sm mb-0">総タスク数</p>
-                        <h4 class="mb-0">{{ selectedProjectTasks.length }}</h4>
-                      </div>
-                      <div class="icon icon-md">
-                        <i class="material-symbols-rounded opacity-10">task</i>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="card bg-gradient-success text-white">
-                  <div class="card-body p-3">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <p class="text-sm mb-0">完了済み</p>
-                        <h4 class="mb-0">{{ selectedProjectTasks.filter(t => t.status === 'DONE').length }}</h4>
-                      </div>
-                      <div class="icon icon-md">
-                        <i class="material-symbols-rounded opacity-10">check_circle</i>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="card bg-gradient-info text-white">
-                  <div class="card-body p-3">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <p class="text-sm mb-0">進行中</p>
-                        <h4 class="mb-0">{{ selectedProjectTasks.filter(t => t.status === 'IN_PROGRESS').length }}</h4>
-                      </div>
-                      <div class="icon icon-md">
-                        <i class="material-symbols-rounded opacity-10">play_circle</i>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="card bg-gradient-warning text-white">
-                  <div class="card-body p-3">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <p class="text-sm mb-0">ブロック</p>
-                        <h4 class="mb-0">{{ selectedProjectTasks.filter(t => t.status === 'BLOCKED').length }}</h4>
-                      </div>
-                      <div class="icon icon-md">
-                        <i class="material-symbols-rounded opacity-10">block</i>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- タスク一覧テーブル -->
-            <div class="table-responsive">
-              <table class="table align-items-center mb-0">
-                <thead>
-                  <tr>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">タスク名</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">状態</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">優先度</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">進捗率</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">計画終了日</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">担当者</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="task in selectedProjectTasks" :key="task.id">
-                    <td>
-                      <div class="d-flex px-3 py-1">
-                        <div class="d-flex flex-column justify-content-center">
-                          <h6 class="mb-0 text-sm">{{ task.task_name }}</h6>
-                          <p class="text-xs text-secondary mb-0" v-if="task.description">
-                            {{ task.description.length > 50 ? task.description.substring(0, 50) + '...' : task.description }}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span :class="getTaskStatusBadgeClass(task.status)">
-                        {{ getTaskStatusLabel(task.status) }}
-                      </span>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span :class="getTaskPriorityBadgeClass(task.priority)">
-                        {{ getTaskPriorityLabel(task.priority) }}
-                      </span>
-                    </td>
-                    <td class="align-middle text-center">
-                      <div class="progress-wrapper w-75 mx-auto">
-                        <div class="progress-info">
-                          <div class="progress-percentage">
-                            <span class="text-xs font-weight-bold">{{ task.progress_percent }}%</span>
-                          </div>
-                        </div>
-                        <div class="progress">
-                          <div 
-                            class="progress-bar bg-gradient-info" 
-                            role="progressbar" 
-                            :style="{ width: task.progress_percent + '%' }"
-                            :aria-valuenow="task.progress_percent" 
-                            aria-valuemin="0" 
-                            aria-valuemax="100"
-                          ></div>
-                        </div>
-                      </div>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span class="text-secondary text-xs font-weight-normal">
-                        {{ formatDate(task.planned_end ?? null) }}
-                      </span>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span class="text-secondary text-xs font-weight-normal">
-                        {{ getOwnerName(task.primary_assignee_id ?? null) }}
-                      </span>
-                    </td>
-                  </tr>
-                  
-                  <!-- タスクがない場合 -->
-                  <tr v-if="selectedProjectTasks.length === 0">
-                    <td colspan="6" class="text-center py-4">
-                      <i class="material-symbols-rounded text-secondary opacity-50" style="font-size: 48px;">task_alt</i>
-                      <p class="text-sm text-secondary mt-2">タスクが見つかりません</p>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <TaskStatsHeader :tasks="selectedProjectTasks" />
+            <!-- タスク一覧: 最適化データテーブルを使用 -->
+            <div class="mt-3">
+              <OptimizedDataTable
+                :data="selectedProjectTasks"
+                :columns="[
+                  { key: 'task_name', label: 'タスク名', sortable: true },
+                  { key: 'status', label: '状態', sortable: true, filterable: true, formatter: (v: any) => getTaskStatusLabel(v) },
+                  { key: 'priority', label: '優先度', sortable: true, filterable: true, formatter: (v: any) => getTaskPriorityLabel(v) },
+                  { key: 'progress_percent', label: '進捗率', sortable: true, formatter: (v: number) => `${v}%` },
+                  { key: 'planned_end', label: '計画終了日', sortable: true, formatter: (v: string | null) => formatDate(v ?? null) },
+                  { key: 'primary_assignee_id', label: '担当者', formatter: (v: number | null) => getOwnerName(v ?? null) }
+                ]"
+                :page-size="20"
+                :virtual-scroll="true"
+                :item-height="48"
+                :container-height="360"
+                :loading="false"
+                empty-message="タスクが見つかりません"
+              >
+                <template #cell-status="{ value }">
+                  <StatusBadge :status="value" />
+                </template>
+                <template #cell-priority="{ value }">
+                  <PriorityBadge :priority="value" />
+                </template>
+              </OptimizedDataTable>
             </div>
           </div>
           <div class="modal-footer">

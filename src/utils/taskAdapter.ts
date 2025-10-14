@@ -2,6 +2,27 @@
 // 目的: DBのTask型とUIのScheduleItem型の相互変換を担当
 // 新しく追加されたDB構造を既存UIと互換させるための接続
 
+// TODO: DB連携されていない機能のアダプター実装が必要
+// 1. コメントシステムアダプター
+//    - Task.comments (JSONB) ↔ ScheduleItem.comments 変換ロジック実装が必要
+//    - コメントデータシリアライズ/デシリアライズロジック実装が必要
+//
+// 2. 添付ファイルシステムアダプター
+//    - Task.attachments (JSONB) ↔ ScheduleItem.attachments 変換ロジック実装が必要
+//    - 添付ファイルメタデータシリアライズ/デシリアライズロジック実装が必要
+//
+// 3. タグシステムアダプター
+//    - Task.tags (TEXT[]) ↔ ScheduleItem.tags 変換ロジック実装が必要
+//    - タグ配列処理ロジック実装が必要
+//
+// 4. メモ/ノートシステムアダプター
+//    - Task.notes (TEXT) ↔ ScheduleItem.notes 変換ロジック実装が必要
+//    - メモデータ処理ロジック実装が必要
+//
+// 5. ユーザー情報アダプター改善
+//    - primary_assignee_id ↔ assignee (ユーザー名) 双方向変換実装が必要
+//    - ユーザーID ↔ ユーザー名マッピングキャッシュロジック実装が必要
+
 import type { Task, TaskWithProject, TaskUpdate } from "../types/task";
 import type { ScheduleItem, ScheduleStatus, SchedulePriority } from "../types/schedule";
 import type { Users } from "../types/db/users";

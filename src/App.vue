@@ -17,6 +17,11 @@ const store = useScheduleStore();
 // ページ切り替えメソッド
 const navigateToPage = (pageName: string) => {
   currentPage.value = pageName;
+  
+  // スケジュール一覧ページに戻る際は選択状態をクリア
+  if (pageName === "schedule-list") {
+    store.selectSchedule(null);
+  }
 };
 
 // ダッシュボードの「詳細を見る」クリック時の処理
@@ -441,8 +446,9 @@ const loadActivityFeed = async () => {
 };
 
 // ストアでスケジュールが選択されたら詳細ページへ遷移
-watch(() => store.selectedScheduleId.value, (id) => {
-  if (id != null) {
+watch(() => store.selectedScheduleId.value, (id, oldId) => {
+  if (id != null && id !== oldId) {
+    console.log("スケジュールが選択されました:", id);
     currentPage.value = "schedule-detail";
   }
 });

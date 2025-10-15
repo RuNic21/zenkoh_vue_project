@@ -3,6 +3,7 @@
 // 目的: 大量データの効率的な表示とメモ化による最適化
 
 import { computed } from "vue";
+import TablePagination from "./TablePagination.vue";
 
 // Props定義
 interface Props {
@@ -30,6 +31,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   'page-change': [page: number];
   'sort-change': [column: string, direction: 'asc' | 'desc'];
+  'row-click': [item: any];
 }>();
 
 // ページネーション計算（メモ化）
@@ -75,7 +77,7 @@ const handleSort = (column: string) => {
 
     <!-- テーブル表示 -->
     <div v-else-if="data.length > 0" class="table-responsive">
-      <table class="table align-items-center mb-0">
+      <table class="table table-striped table-hover">
         <thead>
           <tr>
             <th 
@@ -91,14 +93,16 @@ const handleSort = (column: string) => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(item, index) in paginatedData" :key="index">
+          <tr v-for="(item, index) in paginatedData" :key="index" @click="emit('row-click', item)" class="row-clickable">
             <td v-for="column in columns" :key="column.key">
-              <span v-if="column.formatter">
-                {{ column.formatter(item[column.key]) }}
-              </span>
-              <span v-else>
-                {{ item[column.key] }}
-              </span>
+              <slot :name="`cell-${column.key}`" :item="item" :value="item[column.key]">
+                <span v-if="column.formatter">
+                  {{ column.formatter(item[column.key]) }}
+                </span>
+                <span v-else>
+                  {{ item[column.key] }}
+                </span>
+              </slot>
             </td>
           </tr>
         </tbody>
@@ -112,48 +116,16 @@ const handleSort = (column: string) => {
     </div>
 
     <!-- ページネーション -->
-    <div v-if="data.length > 0 && totalPages > 1" class="d-flex justify-content-between align-items-center mt-3">
-      <div class="text-sm text-secondary">
+    <TablePagination 
+      v-if="data.length > 0 && totalPages > 1"
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      @change="handlePageChange"
+    >
+      <template #info>
         {{ pageInfo }}
-      </div>
-      <nav>
-        <ul class="pagination pagination-sm mb-0">
-          <li class="page-item" :class="{ disabled: currentPage === 1 }">
-            <button 
-              class="page-link" 
-              @click="handlePageChange(currentPage - 1)"
-              :disabled="currentPage === 1"
-            >
-              前へ
-            </button>
-          </li>
-          
-          <li 
-            v-for="page in Math.min(5, totalPages)" 
-            :key="page"
-            class="page-item" 
-            :class="{ active: page === currentPage }"
-          >
-            <button 
-              class="page-link" 
-              @click="handlePageChange(page)"
-            >
-              {{ page }}
-            </button>
-          </li>
-          
-          <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-            <button 
-              class="page-link" 
-              @click="handlePageChange(currentPage + 1)"
-              :disabled="currentPage === totalPages"
-            >
-              次へ
-            </button>
-          </li>
-        </ul>
-      </nav>
-    </div>
+      </template>
+    </TablePagination>
   </div>
 </template>
 
@@ -208,3 +180,5 @@ const handleSort = (column: string) => {
   }
 }
 </style>
+
+

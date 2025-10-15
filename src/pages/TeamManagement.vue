@@ -14,6 +14,19 @@ import type {
   UserProfileStats,
   UserActivityLog
 } from "../types/team";
+
+// 共通コンポーネントのインポート
+import PageHeader from "../components/common/PageHeader.vue";
+import ActionBar from "../components/common/ActionBar.vue";
+import StatCards from "../components/common/StatCards.vue";
+import StatusBadge from "../components/common/StatusBadge.vue";
+import PriorityBadge from "../components/common/PriorityBadge.vue";
+import ModalShell from "../components/common/ModalShell.vue";
+import LoadingSpinner from "../components/common/LoadingSpinner.vue";
+import EmptyState from "../components/common/EmptyState.vue";
+import CardHeader from "../components/common/CardHeader.vue";
+import TableControls from "../components/table/TableControls.vue";
+import PerformanceOptimizedTable from "../components/table/PerformanceOptimizedTable.vue";
 import type {
   Notification,
   AlertRule,
@@ -1312,6 +1325,15 @@ const clearFilters = () => {
   handleClearAdvancedSearch();
 };
 
+// フィルター更新ハンドラー
+const handleFilterUpdate = (key: string, value: any) => {
+  if (key === 'status') {
+    statusFilter.value = value;
+  } else if (key === 'role') {
+    roleFilter.value = value;
+  }
+};
+
 // 相対時間表示
 const getRelativeTime = (timestamp: string): string => {
   if (!timestamp) return "未活動";
@@ -1327,6 +1349,82 @@ const getRelativeTime = (timestamp: string): string => {
   if (hours > 0) return `${hours}時間前`;
   if (minutes > 0) return `${minutes}分前`;
   return "たった今";
+};
+
+// ヘッダーアクションを生成する関数
+const getHeaderActions = () => {
+  return [
+    {
+      label: '新しいユーザー',
+      icon: 'person_add',
+      variant: 'primary',
+      onClick: () => {
+        // ユーザー作成モーダルを開く
+        showUserModal.value = true;
+      }
+    },
+    {
+      label: 'チームメンバー追加',
+      icon: 'group_add',
+      variant: 'outline-primary',
+      onClick: () => {
+        // チームメンバー追加モーダルを開く
+        showMemberModal.value = true;
+      }
+    }
+  ];
+};
+
+// 統計カードデータを生成する関数
+const getStatCardsData = () => {
+  return [
+    {
+      label: '総ユーザー数',
+      value: teamStats.value.total_users,
+      icon: 'group',
+      color: 'primary' as const,
+      footer: `${teamStats.value.active_users} アクティブ`
+    },
+    {
+      label: 'プロジェクト数',
+      value: teamStats.value.total_projects,
+      icon: 'work',
+      color: 'success' as const,
+      footer: `${teamStats.value.total_tasks} タスク`
+    },
+    {
+      label: '平均タスク数',
+      value: teamStats.value.average_tasks_per_user,
+      icon: 'analytics',
+      color: 'info' as const,
+      footer: 'ユーザーあたり'
+    },
+    {
+      label: 'アクティブ率',
+      value: `${teamStats.value.total_users > 0 ? Math.round((teamStats.value.active_users / teamStats.value.total_users) * 100) : 0}%`,
+      icon: 'trending_up',
+      color: 'warning' as const,
+      footer: 'ユーザー利用率'
+    }
+  ];
+};
+
+// ユーザーの重要度を取得（ログイン回数や最終ログイン日時を基に判定）
+const getUserPriority = (user: User): "LOW" | "MEDIUM" | "HIGH" | "URGENT" => {
+  // ログイン回数が多く、最近ログインしているユーザーを高優先度とする
+  const loginCount = user.login_count || 0;
+  const lastLogin = user.last_login_at ? new Date(user.last_login_at) : null;
+  const now = new Date();
+  
+  if (loginCount > 50 && lastLogin && (now.getTime() - lastLogin.getTime()) < 7 * 24 * 60 * 60 * 1000) {
+    return "URGENT"; // アクティブユーザー
+  } else if (loginCount > 20 && lastLogin && (now.getTime() - lastLogin.getTime()) < 30 * 24 * 60 * 60 * 1000) {
+    return "HIGH"; // 定期的なユーザー
+  } else if (loginCount > 5) {
+    return "MEDIUM"; // 時々使用するユーザー
+  } else {
+    return "LOW"; // 新規または非アクティブユーザー
+  }
 };
 
 // 初期化
@@ -1349,109 +1447,14 @@ onMounted(async () => {
   <!-- チーム管理ページ -->
   <div class="team-management">
     <!-- ページヘッダー -->
-    <div class="row mb-4">
-      <div class="col-12">
-        <div class="ms-3">
-          <h3 class="mb-0 h4 font-weight-bolder">チーム管理</h3>
-          <p class="mb-4">
-            ユーザー管理、チームメンバー管理、権限管理を行います。
-          </p>
-        </div>
-      </div>
-    </div>
+    <PageHeader
+      title="チーム管理"
+      description="ユーザー管理、チームメンバー管理、権限管理を行います。"
+      :actions="getHeaderActions()"
+    />
 
     <!-- 統計カード -->
-    <div class="row mb-4">
-      <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-        <div class="card">
-          <div class="card-header p-2 ps-3">
-            <div class="d-flex justify-content-between">
-              <div>
-                <p class="text-sm mb-0 text-capitalize">総ユーザー数</p>
-                <h4 class="mb-0">{{ teamStats.total_users }}</h4>
-              </div>
-              <div class="icon icon-md icon-shape bg-gradient-primary shadow-dark shadow text-center border-radius-lg">
-                <i class="material-symbols-rounded opacity-10">group</i>
-              </div>
-            </div>
-          </div>
-          <hr class="dark horizontal my-0">
-          <div class="card-footer p-2 ps-3">
-            <p class="mb-0 text-sm">
-              <span class="text-success font-weight-bolder">{{ teamStats.active_users }}</span> アクティブ
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-        <div class="card">
-          <div class="card-header p-2 ps-3">
-            <div class="d-flex justify-content-between">
-              <div>
-                <p class="text-sm mb-0 text-capitalize">プロジェクト数</p>
-                <h4 class="mb-0">{{ teamStats.total_projects }}</h4>
-              </div>
-              <div class="icon icon-md icon-shape bg-gradient-success shadow-dark shadow text-center border-radius-lg">
-                <i class="material-symbols-rounded opacity-10">work</i>
-              </div>
-            </div>
-          </div>
-          <hr class="dark horizontal my-0">
-          <div class="card-footer p-2 ps-3">
-            <p class="mb-0 text-sm">
-              <span class="text-info font-weight-bolder">{{ teamStats.total_tasks }}</span> タスク
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-        <div class="card">
-          <div class="card-header p-2 ps-3">
-            <div class="d-flex justify-content-between">
-              <div>
-                <p class="text-sm mb-0 text-capitalize">平均タスク数</p>
-                <h4 class="mb-0">{{ teamStats.average_tasks_per_user }}</h4>
-              </div>
-              <div class="icon icon-md icon-shape bg-gradient-info shadow-dark shadow text-center border-radius-lg">
-                <i class="material-symbols-rounded opacity-10">analytics</i>
-              </div>
-            </div>
-          </div>
-          <hr class="dark horizontal my-0">
-          <div class="card-footer p-2 ps-3">
-            <p class="mb-0 text-sm">
-              <span class="text-success font-weight-bolder">ユーザーあたり</span>
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-xl-3 col-sm-6">
-        <div class="card">
-          <div class="card-header p-2 ps-3">
-            <div class="d-flex justify-content-between">
-              <div>
-                <p class="text-sm mb-0 text-capitalize">アクティブ率</p>
-                <h4 class="mb-0">
-                  {{ teamStats.total_users > 0 ? Math.round((teamStats.active_users / teamStats.total_users) * 100) : 0 }}%
-                </h4>
-              </div>
-              <div class="icon icon-md icon-shape bg-gradient-warning shadow-dark shadow text-center border-radius-lg">
-                <i class="material-symbols-rounded opacity-10">trending_up</i>
-              </div>
-            </div>
-          </div>
-          <hr class="dark horizontal my-0">
-          <div class="card-footer p-2 ps-3">
-            <p class="mb-0 text-sm">
-              <span class="text-success font-weight-bolder">ユーザー稼働率</span>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <StatCards :items="getStatCardsData()" />
 
     <!-- 通知統計カード -->
     <div class="row mb-4">
@@ -1548,9 +1551,8 @@ onMounted(async () => {
     <div class="row mb-4">
       <div class="col-lg-8 col-md-12">
         <div class="card">
-          <div class="card-header pb-0">
-            <div class="d-flex justify-content-between align-items-center">
-              <h6>フィルタリング</h6>
+          <CardHeader title="フィルタリング" subtitle="ユーザー検索とフィルタリング">
+            <template #actions>
               <div class="btn-group" role="group">
                 <button 
                   class="btn btn-sm btn-outline-primary"
@@ -1574,59 +1576,49 @@ onMounted(async () => {
                   保存
                 </button>
               </div>
-            </div>
-          </div>
+            </template>
+          </CardHeader>
           <div class="card-body">
             <!-- 基本検索 -->
-            <div class="row">
-              <div class="col-md-4 col-sm-6 mb-3">
-                <label class="form-label text-sm">検索</label>
-                <div class="input-group">
-                  <input 
-                    type="text" 
-                    class="form-control" 
-                    placeholder="ユーザー名、メール、部署、役職..."
-                    v-model="searchQuery"
-                    list="searchHistory"
-                  >
-                  <datalist id="searchHistory">
-                    <option v-for="query in searchHistory" :key="query" :value="query"></option>
-                  </datalist>
-                  <button 
-                    class="btn btn-outline-secondary" 
-                    type="button"
-                    @click="searchQuery = ''"
-                  >
-                    <i class="material-symbols-rounded">clear</i>
-                  </button>
-                </div>
-              </div>
-              <div class="col-md-3 col-sm-6 mb-3">
-                <label class="form-label text-sm">ステータス</label>
-                <select class="form-control" v-model="statusFilter">
-                  <option value="all">すべて</option>
-                  <option value="active">アクティブ</option>
-                  <option value="inactive">非アクティブ</option>
-                </select>
-              </div>
-              <div class="col-md-3 col-sm-6 mb-3">
-                <label class="form-label text-sm">役割</label>
-                <select class="form-control" v-model="roleFilter">
-                  <option value="all">すべて</option>
-                  <option value="OWNER">オーナー</option>
-                  <option value="CONTRIBUTOR">貢献者</option>
-                  <option value="REVIEWER">レビューアー</option>
-                </select>
-              </div>
-              <div class="col-md-2 col-sm-6 mb-3 d-flex align-items-end">
-                <button 
-                  class="btn btn-sm bg-gradient-secondary mb-0 w-100"
-                  @click="clearFilters"
-                >
-                  リセット
-                </button>
-              </div>
-            </div>
+            <ActionBar
+              :search-query="searchQuery"
+              :search-placeholder="'ユーザー名、メール、部署、役職...'"
+              @update:search-query="searchQuery = $event"
+              :filters="[
+                {
+                  key: 'status',
+                  label: 'ステータス',
+                  type: 'select',
+                  value: statusFilter,
+                  options: [
+                    { value: 'all', label: 'すべて' },
+                    { value: 'active', label: 'アクティブ' },
+                    { value: 'inactive', label: '非アクティブ' }
+                  ]
+                },
+                {
+                  key: 'role',
+                  label: '役割',
+                  type: 'select',
+                  value: roleFilter,
+                  options: [
+                    { value: 'all', label: 'すべて' },
+                    { value: 'OWNER', label: 'オーナー' },
+                    { value: 'CONTRIBUTOR', label: '貢献者' },
+                    { value: 'REVIEWER', label: 'レビューアー' }
+                  ]
+                }
+              ]"
+              @update:filter="handleFilterUpdate"
+              :actions="[
+                {
+                  label: 'リセット',
+                  icon: 'refresh',
+                  variant: 'outline-secondary',
+                  onClick: clearFilters
+                }
+              ]"
+            />
 
             <!-- 高級検索パネル -->
             <div v-if="showAdvancedSearch" class="advanced-search-panel mt-3 p-3 border rounded">
@@ -1738,9 +1730,7 @@ onMounted(async () => {
 
       <div class="col-lg-4 col-md-12">
         <div class="card">
-          <div class="card-header pb-0">
-            <h6>クイックアクション</h6>
-          </div>
+          <CardHeader title="クイックアクション" subtitle="よく使用する操作" />
           <div class="card-body">
             <div class="row">
               <div class="col-6 mb-3">
@@ -1802,12 +1792,20 @@ onMounted(async () => {
             </div>
           </div>
           <div class="card-body px-0 pt-0 pb-2">
+            <!-- テーブルコントロール -->
+            <div class="p-3">
+              <TableControls
+                :search="searchQuery"
+                :searchable="true"
+                search-placeholder="ユーザー名、メールアドレスで検索..."
+                @update:search="(v: string) => searchQuery = v"
+                @reset="() => searchQuery = ''"
+              />
+            </div>
+            
             <!-- ローディング状態 -->
             <div v-if="isUsersLoading" class="text-center py-4">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">読み込み中...</span>
-              </div>
-              <p class="text-sm text-secondary mt-2">ユーザーデータを読み込み中...</p>
+              <LoadingSpinner message="ユーザーデータを読み込み中..." />
             </div>
             
             <!-- エラー表示 -->
@@ -1816,7 +1814,7 @@ onMounted(async () => {
             </div>
             
             <!-- ユーザー一覧テーブル -->
-            <div v-else class="table-responsive p-0">
+            <div v-else-if="filteredUsers.length > 0" class="table-responsive p-0">
               <table class="table align-items-center mb-0">
                 <thead>
                   <tr>
@@ -1832,6 +1830,7 @@ onMounted(async () => {
                     <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">ユーザー</th>
                     <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">メールアドレス</th>
                     <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">ステータス</th>
+                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">重要度</th>
                     <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">登録日</th>
                     <th class="text-secondary opacity-7"></th>
                   </tr>
@@ -1857,9 +1856,10 @@ onMounted(async () => {
                       <p class="text-xs font-weight-bold mb-0">{{ user.email }}</p>
                     </td>
                     <td class="align-middle text-center">
-                      <span :class="user.is_active ? 'badge bg-gradient-success' : 'badge bg-gradient-secondary'">
-                        {{ user.is_active ? 'アクティブ' : '非アクティブ' }}
-                      </span>
+                      <StatusBadge :status="user.is_active ? 'active' : 'inactive'" />
+                    </td>
+                    <td class="align-middle text-center">
+                      <PriorityBadge :priority="getUserPriority(user)" />
                     </td>
                     <td class="align-middle text-center">
                       <span class="text-secondary text-xs font-weight-normal">
@@ -1885,6 +1885,22 @@ onMounted(async () => {
                   </tr>
                 </tbody>
               </table>
+            </div>
+            
+            <!-- ユーザーが存在しない場合 -->
+            <div v-else class="p-3">
+              <EmptyState 
+                icon="person_off" 
+                title="ユーザーが見つかりません" 
+                subtitle="検索条件を変更するか、新しいユーザーを作成してください"
+              >
+                <template #actions>
+                  <button class="btn bg-gradient-primary" @click="showUserModal = true">
+                    <i class="material-symbols-rounded me-1">add</i>
+                    新しいユーザーを作成
+                  </button>
+                </template>
+              </EmptyState>
             </div>
           </div>
         </div>
@@ -2456,118 +2472,114 @@ onMounted(async () => {
     </div>
 
     <!-- ユーザー編集モーダル -->
-    <div v-if="showUserModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              {{ editingUser ? 'ユーザー編集' : 'ユーザー追加' }}
-            </h5>
-            <button type="button" class="btn-close" @click="closeUserModal"></button>
-          </div>
-          <div class="modal-body">
-            <form>
-              <div class="mb-3">
-                <label class="form-label">メールアドレス</label>
-                <input 
-                  type="email" 
-                  class="form-control" 
-                  v-model="userForm.email"
-                  required
-                >
-              </div>
-              <div class="mb-3">
-                <label class="form-label">表示名</label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  v-model="userForm.display_name"
-                  required
-                >
-              </div>
-              <div v-if="!editingUser" class="mb-3">
-                <label class="form-label">パスワード</label>
-                <input 
-                  type="password" 
-                  class="form-control" 
-                  v-model="userForm.password_hash"
-                  required
-                >
-              </div>
-              <div class="mb-3">
-                <div class="form-check">
-                  <input 
-                    class="form-check-input" 
-                    type="checkbox" 
-                    v-model="userForm.is_active"
-                    id="isActive"
-                  >
-                  <label class="form-check-label" for="isActive">
-                    アクティブ
-                  </label>
-                </div>
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="closeUserModal">キャンセル</button>
-            <button 
-              type="button" 
-              class="btn btn-primary" 
-              @click="editingUser ? handleUpdateUser() : handleCreateUser()"
+    <ModalShell
+      :show="showUserModal"
+      :title="editingUser ? 'ユーザー編集' : 'ユーザー追加'"
+      @close="closeUserModal"
+      :actions="[
+        {
+          label: 'キャンセル',
+          variant: 'secondary',
+          onClick: closeUserModal
+        },
+        {
+          label: editingUser ? '更新' : '作成',
+          variant: 'primary',
+          onClick: editingUser ? handleUpdateUser : handleCreateUser
+        }
+      ]"
+    >
+      <form>
+        <div class="mb-3">
+          <label class="form-label">メールアドレス</label>
+          <input 
+            type="email" 
+            class="form-control" 
+            v-model="userForm.email"
+            required
+          >
+        </div>
+        <div class="mb-3">
+          <label class="form-label">表示名</label>
+          <input 
+            type="text" 
+            class="form-control" 
+            v-model="userForm.display_name"
+            required
+          >
+        </div>
+        <div v-if="!editingUser" class="mb-3">
+          <label class="form-label">パスワード</label>
+          <input 
+            type="password" 
+            class="form-control" 
+            v-model="userForm.password_hash"
+            required
+          >
+        </div>
+        <div class="mb-3">
+          <div class="form-check">
+            <input 
+              class="form-check-input" 
+              type="checkbox" 
+              v-model="userForm.is_active"
+              id="isActive"
             >
-              {{ editingUser ? '更新' : '作成' }}
-            </button>
+            <label class="form-check-label" for="isActive">
+              アクティブ
+            </label>
           </div>
         </div>
-      </div>
-    </div>
+      </form>
+    </ModalShell>
 
     <!-- チームメンバー追加モーダル -->
-    <div v-if="showMemberModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">チームメンバー追加</h5>
-            <button type="button" class="btn-close" @click="closeMemberModal"></button>
-          </div>
-          <div class="modal-body">
-            <form>
-              <div class="mb-3">
-                <label class="form-label">ユーザーID</label>
-                <input 
-                  type="number" 
-                  class="form-control" 
-                  v-model="memberForm.user_id"
-                  required
-                >
-              </div>
-              <div class="mb-3">
-                <label class="form-label">タスクID</label>
-                <input 
-                  type="number" 
-                  class="form-control" 
-                  v-model="memberForm.task_id"
-                  required
-                >
-              </div>
-              <div class="mb-3">
-                <label class="form-label">役割</label>
-                <select class="form-control" v-model="memberForm.role">
-                  <option value="OWNER">オーナー</option>
-                  <option value="CONTRIBUTOR">貢献者</option>
-                  <option value="REVIEWER">レビューアー</option>
-                </select>
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="closeMemberModal">キャンセル</button>
-            <button type="button" class="btn btn-primary" @click="handleAddTeamMember">追加</button>
-          </div>
+    <ModalShell
+      :show="showMemberModal"
+      title="チームメンバー追加"
+      @close="closeMemberModal"
+      :actions="[
+        {
+          label: 'キャンセル',
+          variant: 'secondary',
+          onClick: closeMemberModal
+        },
+        {
+          label: '追加',
+          variant: 'primary',
+          onClick: handleAddTeamMember
+        }
+      ]"
+    >
+      <form>
+        <div class="mb-3">
+          <label class="form-label">ユーザーID</label>
+          <input 
+            type="number" 
+            class="form-control" 
+            v-model="memberForm.user_id"
+            required
+          >
         </div>
-      </div>
-    </div>
+        <div class="mb-3">
+          <label class="form-label">タスクID</label>
+          <input 
+            type="number" 
+            class="form-control" 
+            v-model="memberForm.task_id"
+            required
+          >
+        </div>
+        <div class="mb-3">
+          <label class="form-label">役割</label>
+          <select class="form-control" v-model="memberForm.role">
+            <option value="OWNER">オーナー</option>
+            <option value="CONTRIBUTOR">貢献者</option>
+            <option value="REVIEWER">レビューアー</option>
+          </select>
+        </div>
+      </form>
+    </ModalShell>
 
     <!-- 通知作成・編集モーダル -->
     <div v-if="showNotificationModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">

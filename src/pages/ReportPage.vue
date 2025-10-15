@@ -16,7 +16,17 @@ import type {
   DeadlineReport,
   PriorityReport
 } from "../types/report";
-import ReportChart from "../components/Charts/ReportChart.vue";
+import ReportChartBlock from "@/components/report/ReportChartBlock.vue";
+import LoadingSpinner from "@/components/common/LoadingSpinner.vue";
+import EmptyState from "@/components/common/EmptyState.vue";
+import StatusBadge from "@/components/common/StatusBadge.vue";
+import PriorityBadge from "@/components/common/PriorityBadge.vue";
+import PageHeader from "@/components/common/PageHeader.vue";
+import CardHeader from "@/components/common/CardHeader.vue";
+import ActionBar from "@/components/common/ActionBar.vue";
+import ModalShell from "@/components/common/ModalShell.vue";
+import { toCsv, downloadFile } from "@/utils/exportUtils";
+import StatCards from "@/components/common/StatCards.vue";
 
 // TODO: 高度な分析機能の実装
 // 1. 時間追跡・生産性分析 - 実際の作業時間 vs 計画時間の比較分析
@@ -72,6 +82,10 @@ const availableUsers = ref<Array<{ id: number; display_name: string }>>([]);
 
 // アーカイブフィルター
 const includeArchived = ref(false);
+
+// プロジェクト詳細モーダル
+const showProjectDetailModal = ref(false);
+const selectedProjectDetail = ref<any>(null);
 
 // レポート生成オプション
 const reportOptions = computed((): ReportOptions => ({
@@ -250,11 +264,9 @@ const exportToCSV = () => {
     return;
   }
   
-  // プロジェクト進捗レポートをCSV形式でエクスポート
-  const csvContent = [
-    // ヘッダー
-    ["プロジェクト名", "担当者", "総タスク数", "完了タスク数", "進行中タスク数", "未開始タスク数", "期限切れタスク数", "平均進捗率", "状態"].join(","),
-    // データ行
+  // プロジェクト進捗レポートをCSV形式でエクスポート（共通ユーティリティ使用）
+  const rows: Array<Array<string | number>> = [
+    ["プロジェクト名", "担当者", "総タスク数", "完了タスク数", "進行中タスク数", "未開始タスク数", "期限切れタスク数", "平均進捗率", "状態"],
     ...reportData.value.projectProgress.map(p => [
       p.projectName,
       p.ownerName,
@@ -265,19 +277,47 @@ const exportToCSV = () => {
       p.overdueTasks,
       p.averageProgress,
       p.status
-    ].join(","))
-  ].join("\n");
+    ])
+  ];
+  const csvContent = toCsv(rows);
+  downloadFile(csvContent, `project_report_${new Date().toISOString().split('T')[0]}.csv`);
+};
+
+// プロジェクトの優先度を取得（進捗率と期限切れタスク数に基づく）
+const getProjectPriority = (project: any): "LOW" | "MEDIUM" | "HIGH" | "URGENT" => {
+  const progress = project.averageProgress || 0;
+  const overdueTasks = project.overdueTasks || 0;
+  const totalTasks = project.totalTasks || 0;
   
-  // ファイルダウンロード
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute("download", `project_report_${new Date().toISOString().split('T')[0]}.csv`);
-  link.style.visibility = "hidden";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  // 期限切れタスクが多い場合は緊急
+  if (overdueTasks > 0 && overdueTasks / totalTasks > 0.3) {
+    return "URGENT";
+  }
+  
+  // 進捗率が低く、期限切れタスクがある場合は高優先度
+  if (progress < 50 && overdueTasks > 0) {
+    return "HIGH";
+  }
+  
+  // 進捗率が低い場合は中優先度
+  if (progress < 70) {
+    return "MEDIUM";
+  }
+  
+  // それ以外は低優先度
+  return "LOW";
+};
+
+// プロジェクト詳細を表示
+const showProjectDetail = (project: any) => {
+  selectedProjectDetail.value = project;
+  showProjectDetailModal.value = true;
+};
+
+// プロジェクト詳細モーダルを閉じる
+const closeProjectDetailModal = () => {
+  showProjectDetailModal.value = false;
+  selectedProjectDetail.value = null;
 };
 
 // 初期化
@@ -294,26 +334,44 @@ onMounted(async () => {
 
 <template>
   <div class="container-fluid">
-    <!-- ページヘッダー -->
-    <div class="row mb-4">
-      <div class="col-12">
-        <div class="ms-3">
-          <h3 class="mb-0 h4 font-weight-bolder">レポート</h3>
-          <p class="mb-4">
-            プロジェクト・タスク・ユーザーの統計情報を確認できます。
-          </p>
-        </div>
-      </div>
-    </div>
+    <PageHeader 
+      title="レポート"
+      description="プロジェクト・タスク・ユーザーの統計情報を確認できます。"
+    />
 
     <!-- フィルター・アクションパネル -->
     <div class="row mb-4">
       <div class="col-12">
         <div class="card">
-          <div class="card-header pb-0">
-            <h6>レポートフィルター</h6>
-          </div>
+          <CardHeader title="レポートフィルター" />
           <div class="card-body">
+            <ActionBar>
+              <template #right>
+                <button 
+                  class="btn bg-gradient-primary me-2"
+                  @click="generateReportData"
+                  :disabled="isLoading"
+                >
+                  <i class="material-symbols-rounded me-1">refresh</i>
+                  {{ isLoading ? "生成中..." : "レポート生成" }}
+                </button>
+                <button 
+                  class="btn bg-gradient-success me-2"
+                  @click="exportToCSV"
+                  :disabled="!reportData"
+                >
+                  <i class="material-symbols-rounded me-1">download</i>
+                  CSV エクスポート
+                </button>
+                <button 
+                  class="btn bg-gradient-secondary"
+                  @click="resetFilters"
+                >
+                  <i class="material-symbols-rounded me-1">clear</i>
+                  フィルターリセット
+                </button>
+              </template>
+            </ActionBar>
             <div class="row">
               <!-- プロジェクトフィルター -->
               <div class="col-md-3 col-sm-6 mb-3">
@@ -436,37 +494,6 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
-
-            <!-- アクションボタン -->
-            <div class="row">
-              <div class="col-12">
-                <button 
-                  class="btn bg-gradient-primary me-2"
-                  @click="generateReportData"
-                  :disabled="isLoading"
-                >
-                  <i class="material-symbols-rounded me-1">refresh</i>
-                  {{ isLoading ? "生成中..." : "レポート生成" }}
-                </button>
-                
-                <button 
-                  class="btn bg-gradient-success me-2"
-                  @click="exportToCSV"
-                  :disabled="!reportData"
-                >
-                  <i class="material-symbols-rounded me-1">download</i>
-                  CSV エクスポート
-                </button>
-                
-                <button 
-                  class="btn bg-gradient-secondary"
-                  @click="resetFilters"
-                >
-                  <i class="material-symbols-rounded me-1">clear</i>
-                  フィルターリセット
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -485,163 +512,71 @@ onMounted(async () => {
     <!-- レポートデータ表示 -->
     <div v-if="reportData && !isLoading">
       <!-- 統計サマリー -->
-      <div class="row mb-4">
-        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-          <div class="card">
-            <div class="card-header p-2 ps-3">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <p class="text-sm mb-0 text-capitalize">総タスク数</p>
-                  <h4 class="mb-0">{{ reportData.taskStatistics?.totalTasks || 0 }}</h4>
-                </div>
-                <div class="icon icon-md icon-shape bg-gradient-primary shadow-dark shadow text-center border-radius-lg">
-                  <i class="material-symbols-rounded opacity-10">task</i>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-          <div class="card">
-            <div class="card-header p-2 ps-3">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <p class="text-sm mb-0 text-capitalize">完了タスク</p>
-                  <h4 class="mb-0">{{ reportData.taskStatistics?.completedTasks || 0 }}</h4>
-                </div>
-                <div class="icon icon-md icon-shape bg-gradient-success shadow-dark shadow text-center border-radius-lg">
-                  <i class="material-symbols-rounded opacity-10">check_circle</i>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-          <div class="card">
-            <div class="card-header p-2 ps-3">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <p class="text-sm mb-0 text-capitalize">完了率</p>
-                  <h4 class="mb-0">{{ reportData.taskStatistics?.completionRate || 0 }}%</h4>
-                </div>
-                <div class="icon icon-md icon-shape bg-gradient-info shadow-dark shadow text-center border-radius-lg">
-                  <i class="material-symbols-rounded opacity-10">trending_up</i>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-xl-3 col-sm-6">
-          <div class="card">
-            <div class="card-header p-2 ps-3">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <p class="text-sm mb-0 text-capitalize">期限切れ</p>
-                  <h4 class="mb-0">{{ reportData.taskStatistics?.overdueTasks || 0 }}</h4>
-                </div>
-                <div class="icon icon-md icon-shape bg-gradient-warning shadow-dark shadow text-center border-radius-lg">
-                  <i class="material-symbols-rounded opacity-10">warning</i>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <StatCards
+        class="mb-4"
+        :items="[
+          { label: '総タスク数', value: reportData.taskStatistics?.totalTasks || 0, icon: 'task', color: 'primary' },
+          { label: '完了タスク', value: reportData.taskStatistics?.completedTasks || 0, icon: 'check_circle', color: 'success' },
+          { label: '完了率', value: `${reportData.taskStatistics?.completionRate || 0}%`, icon: 'trending_up', color: 'info' },
+          { label: '期限切れ', value: reportData.taskStatistics?.overdueTasks || 0, icon: 'warning', color: 'warning' }
+        ]"
+      />
 
       <!-- チャート表示 -->
       <div class="row mb-4">
-        <!-- タスクステータスチャート -->
         <div class="col-lg-6 col-md-12 mb-4">
-          <div class="card">
-            <div class="card-header pb-0">
-              <h6>タスクステータス分布</h6>
-            </div>
-            <div class="card-body">
-              <ReportChart 
-                v-if="taskStatusChartData"
-                :data="taskStatusChartData"
-                type="doughnut"
-                :height="300"
-              />
-            </div>
-          </div>
+          <ReportChartBlock 
+            v-if="taskStatusChartData"
+            title="タスクステータス分布"
+            :data="taskStatusChartData"
+            type="doughnut"
+            :height="300"
+          />
         </div>
-
-        <!-- 優先度別チャート -->
         <div class="col-lg-6 col-md-12 mb-4">
-          <div class="card">
-            <div class="card-header pb-0">
-              <h6>優先度別タスク分布</h6>
-            </div>
-            <div class="card-body">
-              <ReportChart 
-                v-if="priorityChartData"
-                :data="priorityChartData"
-                type="bar"
-                :height="300"
-              />
-            </div>
-          </div>
+          <ReportChartBlock 
+            v-if="priorityChartData"
+            title="優先度別タスク分布"
+            :data="priorityChartData"
+            type="bar"
+            :height="300"
+          />
         </div>
       </div>
 
-      <!-- プロジェクト進捗チャート -->
       <div class="row mb-4">
         <div class="col-12">
-          <div class="card">
-            <div class="card-header pb-0">
-              <h6>プロジェクト別進捗率</h6>
-            </div>
-            <div class="card-body">
-              <ReportChart 
-                v-if="projectProgressChartData"
-                :data="projectProgressChartData"
-                type="bar"
-                :height="400"
-              />
-            </div>
-          </div>
+          <ReportChartBlock 
+            v-if="projectProgressChartData"
+            title="プロジェクト別進捗率"
+            :data="projectProgressChartData"
+            type="bar"
+            :height="400"
+          />
         </div>
       </div>
 
-      <!-- ユーザー作業量チャート -->
       <div class="row mb-4">
         <div class="col-12">
-          <div class="card">
-            <div class="card-header pb-0">
-              <h6>ユーザー別完了率</h6>
-            </div>
-            <div class="card-body">
-              <ReportChart 
-                v-if="userWorkloadChartData"
-                :data="userWorkloadChartData"
-                type="bar"
-                :height="400"
-              />
-            </div>
-          </div>
+          <ReportChartBlock 
+            v-if="userWorkloadChartData"
+            title="ユーザー別完了率"
+            :data="userWorkloadChartData"
+            type="bar"
+            :height="400"
+          />
         </div>
       </div>
 
-      <!-- 期限別レポートチャート -->
       <div class="row mb-4">
         <div class="col-12">
-          <div class="card">
-            <div class="card-header pb-0">
-              <h6>期限別タスク分布</h6>
-            </div>
-            <div class="card-body">
-              <ReportChart 
-                v-if="deadlineChartData"
-                :data="deadlineChartData"
-                type="bar"
-                :height="400"
-              />
-            </div>
-          </div>
+          <ReportChartBlock 
+            v-if="deadlineChartData"
+            title="期限別タスク分布"
+            :data="deadlineChartData"
+            type="bar"
+            :height="400"
+          />
         </div>
       </div>
 
@@ -666,7 +601,9 @@ onMounted(async () => {
                       <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">未開始</th>
                       <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">期限切れ</th>
                       <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">進捗率</th>
+                      <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">優先度</th>
                       <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">状態</th>
+                      <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -700,16 +637,19 @@ onMounted(async () => {
                         <span class="text-xs font-weight-bold">{{ project.averageProgress }}%</span>
                       </td>
                       <td class="align-middle text-center">
-                        <span 
-                          :class="{
-                            'badge bg-gradient-success': project.status === '完了',
-                            'badge bg-gradient-primary': project.status === '進行中',
-                            'badge bg-gradient-warning': project.status === '遅延',
-                            'badge bg-gradient-secondary': project.status === '未開始'
-                          }"
+                        <PriorityBadge :priority="getProjectPriority(project)" />
+                      </td>
+                      <td class="align-middle text-center">
+                        <StatusBadge :status="project.status" />
+                      </td>
+                      <td class="align-middle text-center">
+                        <button 
+                          class="btn btn-sm bg-gradient-info"
+                          @click="showProjectDetail(project)"
                         >
-                          {{ project.status }}
-                        </span>
+                          <i class="material-symbols-rounded me-1">visibility</i>
+                          詳細
+                        </button>
                       </td>
                     </tr>
                   </tbody>
@@ -724,31 +664,94 @@ onMounted(async () => {
     <!-- ローディング表示 -->
     <div v-if="isLoading" class="row">
       <div class="col-12">
-        <div class="text-center py-5">
-          <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">読み込み中...</span>
-          </div>
-          <p class="text-sm text-secondary mt-3">レポートを生成中...</p>
-        </div>
+        <LoadingSpinner message="レポートを生成中..." />
       </div>
     </div>
 
     <!-- データなし表示 -->
     <div v-if="!reportData && !isLoading && !errorMessage" class="row">
       <div class="col-12">
-        <div class="text-center py-5">
-          <i class="material-symbols-rounded text-secondary opacity-50" style="font-size: 64px;">assessment</i>
-          <p class="text-sm text-secondary mt-3">レポートデータがありません</p>
-          <p class="text-xs text-secondary mb-3">
-            プロジェクトやタスクが存在しないか、フィルター条件に一致するデータがありません
-          </p>
-          <button class="btn bg-gradient-primary" @click="generateReportData">
-            <i class="material-symbols-rounded me-1">refresh</i>
-            レポートを生成
-          </button>
-        </div>
+        <EmptyState 
+          icon="assessment" 
+          title="レポートデータがありません" 
+          subtitle="プロジェクトやタスクが存在しないか、フィルター条件に一致するデータがありません"
+        >
+          <template #actions>
+            <button class="btn bg-gradient-primary" @click="generateReportData">
+              <i class="material-symbols-rounded me-1">refresh</i>
+              レポートを生成
+            </button>
+          </template>
+        </EmptyState>
       </div>
     </div>
+
+    <!-- プロジェクト詳細モーダル -->
+    <ModalShell 
+      :show="showProjectDetailModal" 
+      title="プロジェクト詳細" 
+      size="lg" 
+      @close="closeProjectDetailModal"
+    >
+      <template #default>
+        <div v-if="selectedProjectDetail">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <h6>プロジェクト名</h6>
+              <p class="text-sm">{{ selectedProjectDetail.projectName }}</p>
+            </div>
+            <div class="col-md-6">
+              <h6>担当者</h6>
+              <p class="text-sm">{{ selectedProjectDetail.ownerName }}</p>
+            </div>
+          </div>
+          
+          <div class="row mb-3">
+            <div class="col-md-3">
+              <h6>総タスク数</h6>
+              <p class="text-sm font-weight-bold">{{ selectedProjectDetail.totalTasks }}</p>
+            </div>
+            <div class="col-md-3">
+              <h6>完了タスク</h6>
+              <p class="text-sm font-weight-bold text-success">{{ selectedProjectDetail.completedTasks }}</p>
+            </div>
+            <div class="col-md-3">
+              <h6>進行中タスク</h6>
+              <p class="text-sm font-weight-bold text-primary">{{ selectedProjectDetail.inProgressTasks }}</p>
+            </div>
+            <div class="col-md-3">
+              <h6>未開始タスク</h6>
+              <p class="text-sm font-weight-bold text-secondary">{{ selectedProjectDetail.notStartedTasks }}</p>
+            </div>
+          </div>
+          
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <h6>期限切れタスク</h6>
+              <p class="text-sm font-weight-bold text-warning">{{ selectedProjectDetail.overdueTasks }}</p>
+            </div>
+            <div class="col-md-4">
+              <h6>平均進捗率</h6>
+              <p class="text-sm font-weight-bold">{{ selectedProjectDetail.averageProgress }}%</p>
+            </div>
+            <div class="col-md-4">
+              <h6>優先度</h6>
+              <PriorityBadge :priority="getProjectPriority(selectedProjectDetail)" />
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <h6>状態</h6>
+              <StatusBadge :status="selectedProjectDetail.status" />
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <button type="button" class="btn btn-secondary" @click="closeProjectDetailModal">閉じる</button>
+      </template>
+    </ModalShell>
   </div>
 </template>
 

@@ -364,7 +364,7 @@ const getRelativeTime = (timestamp: Date): string => {
   return `${days}日前`;
 };
 
-// 活動タイプ별アイコン
+// 活動タイプ別アイコン
 const getActivityIcon = (type: ActivityLog['type']): string => {
   switch (type) {
     case 'project_created': return 'add_circle';
@@ -377,7 +377,7 @@ const getActivityIcon = (type: ActivityLog['type']): string => {
   }
 };
 
-// 活動タイプ별色
+// 活動タイプ別色
 const getActivityColor = (type: ActivityLog['type']): string => {
   switch (type) {
     case 'project_created': return 'bg-gradient-primary';
@@ -501,7 +501,7 @@ watch(() => store.selectedScheduleId.value, (id, oldId) => {
             <div class="collapse navbar-collapse mt-sm-0 mt-2 me-md-0 me-sm-4" id="navbar">
               <div class="ms-md-auto pe-md-3 d-flex align-items-center">
                 <div class="input-group input-group-outline">
-                  <label class="form-label">検索...</label>
+                  <label class="form-label"></label>
                   <input 
                     type="text" 
                     class="form-control" 
@@ -529,6 +529,7 @@ watch(() => store.selectedScheduleId.value, (id, oldId) => {
                               <i class="material-symbols-rounded text-white">schedule</i>
                             </div>
                           </div>
+                          <!-- ダミーデータ -->
                           <div class="d-flex flex-column justify-content-center">
                             <h6 class="text-sm font-weight-normal mb-1">
                               <span class="font-weight-bold">新しいスケジュール</span>が追加されました
@@ -837,7 +838,7 @@ watch(() => store.selectedScheduleId.value, (id, oldId) => {
                   </div>
                 </div>
                 <div class="card-body px-0 pt-0 pb-2">
-                  <!-- 로딩 상태 -->
+                  <!-- ローディング状態表示用コメント -->
                   <div v-if="isActivityLoading" class="text-center py-4">
                     <div class="spinner-border text-primary" role="status">
                       <span class="visually-hidden">読み込み中...</span>
@@ -845,7 +846,7 @@ watch(() => store.selectedScheduleId.value, (id, oldId) => {
                     <p class="text-sm text-secondary mt-2">活動データを読み込み中...</p>
                   </div>
                   
-                  <!-- 활동 목록 -->
+                  <!-- 活動フィード リスト -->
                   <div v-else class="list-group list-group-flush">
                     <div 
                       v-for="activity in recentActivities" 
@@ -864,7 +865,7 @@ watch(() => store.selectedScheduleId.value, (id, oldId) => {
                       </div>
                     </div>
                     
-                    <!-- 활동이 없는 경우 -->
+                    <!-- 活動がない場合 -->
                     <div v-if="!isActivityLoading && recentActivities.length === 0" class="text-center py-4">
                       <i class="material-symbols-rounded text-secondary opacity-50" style="font-size: 48px;">history</i>
                       <p class="text-sm text-secondary mt-2">最近の活動がありません</p>

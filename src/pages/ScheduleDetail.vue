@@ -2,9 +2,19 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useScheduleStore } from "../store/schedule";
 import type { ScheduleItem, ScheduleStatus, SchedulePriority, ScheduleAttachment, ScheduleComment } from "../types/schedule";
-import { getStatusBadgeClass, getPriorityColorClass } from "../utils/uiHelpers";
 import { listUsers } from "../services/dbServices";
 import type { Users } from "../types/db/users";
+
+// 共通コンポーネントのインポート
+import PageHeader from "../components/common/PageHeader.vue";
+import ActionBar from "../components/common/ActionBar.vue";
+import StatusBadge from "../components/common/StatusBadge.vue";
+import PriorityBadge from "../components/common/PriorityBadge.vue";
+import LoadingSpinner from "../components/common/LoadingSpinner.vue";
+import EmptyState from "../components/common/EmptyState.vue";
+import CardHeader from "../components/common/CardHeader.vue";
+import StatCards from "../components/common/StatCards.vue";
+import ModalShell from "../components/common/ModalShell.vue";
 
 // スケジュール詳細ページ: 個別スケジュールの詳細表示・編集
 
@@ -133,8 +143,8 @@ const scheduleDetail = computed<ScheduleItem>(() => {
     description: "左の一覧からスケジュールを選択してください",
     startDate: "",
     endDate: "",
-    status: "予定" as ScheduleStatus,
-    priority: "中" as SchedulePriority,
+    status: "NOT_STARTED" as ScheduleStatus,
+    priority: "MEDIUM" as SchedulePriority,
     assignee: "",
     progress: 0,
     category: "",
@@ -170,6 +180,10 @@ const newComment = ref("");
 const newTag = ref("");
 const availableTags = ref<string[]>([]);
 
+// モーダル状態
+const showTagModal = ref(false);
+const showFileModal = ref(false);
+
 // 状態変更履歴（DBから取得するように変更予定）
 const statusHistory = ref<Array<{ from: string; to: string; user: string; timestamp: string; reason: string }>>([]);
 
@@ -198,10 +212,10 @@ const loadUsers = async () => {
 
 // クイックアクション
 const quickActions = ref([
-  { label: "開始", status: "進行中", icon: "play_arrow", color: "success" },
-  { label: "完了", status: "完了", icon: "check", color: "primary" },
-  { label: "保留", status: "保留", icon: "pause", color: "warning" },
-  { label: "遅延", status: "遅延", icon: "schedule", color: "danger" }
+  { label: "開始", status: "IN_PROGRESS", icon: "play_arrow", color: "success" },
+  { label: "完了", status: "DONE", icon: "check", color: "primary" },
+  { label: "ブロック", status: "BLOCKED", icon: "pause", color: "warning" },
+  { label: "キャンセル", status: "CANCELLED", icon: "cancel", color: "danger" }
 ]);
 
 // ステータス別の色を取得（uiHelpersからインポート済み）
@@ -324,6 +338,50 @@ const executeQuickAction = async (action: any) => {
   }
 };
 
+// ヘッダーアクションを生成する関数
+const getHeaderActions = () => {
+  const actions = [];
+  
+  // クイックアクションボタン（編集モードでない場合のみ）
+  if (!isEditMode.value) {
+    quickActions.value.forEach(action => {
+      actions.push({
+        label: action.label,
+        icon: action.icon,
+        variant: `outline-${action.color}`,
+        size: 'sm',
+        onClick: () => executeQuickAction(action),
+        title: `${action.label}に変更`
+      });
+    });
+  }
+  
+  // 編集/保存/キャンセルボタン
+  if (!isEditMode.value) {
+    actions.push({
+      label: '編集',
+      icon: 'edit',
+      variant: 'outline-primary',
+      onClick: toggleEditMode
+    });
+  } else {
+    actions.push({
+      label: '保存',
+      icon: 'save',
+      variant: 'primary',
+      onClick: saveChanges
+    });
+    actions.push({
+      label: 'キャンセル',
+      icon: 'cancel',
+      variant: 'outline-secondary',
+      onClick: cancelEdit
+    });
+  }
+  
+  return actions;
+};
+
 // コンポーネント初期化
 onMounted(async () => {
   console.log("スケジュール詳細ページが読み込まれました");
@@ -336,61 +394,57 @@ onMounted(async () => {
   <!-- スケジュール詳細ページ -->
   <div class="schedule-detail-page">
     <!-- ローディング/エラー表示 -->
-    <div v-if="isLoading" class="alert alert-secondary" role="alert">
-      読み込み中です...
+    <div v-if="isLoading" class="text-center py-4">
+      <LoadingSpinner message="スケジュール詳細を読み込み中..." />
     </div>
     <div v-if="!isLoading && errorMessage" class="alert alert-danger" role="alert">
       {{ errorMessage }}
     </div>
     <!-- ページヘッダー -->
-    <div class="row mb-4">
+    <PageHeader
+      title="スケジュール詳細"
+      description="スケジュールの詳細情報を確認・編集できます"
+      :actions="getHeaderActions()"
+    />
+
+    <!-- スケジュール統計サマリー -->
+    <div v-if="!isLoading && scheduleDetail.id > 0" class="row mb-4">
       <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <h3 class="mb-0 h4 font-weight-bolder">スケジュール詳細</h3>
-            <p class="mb-0 text-sm text-muted">
-              スケジュールの詳細情報を確認・編集できます
-            </p>
-          </div>
-          <div class="d-flex gap-2">
-            <!-- クイックアクションボタン -->
-            <div v-if="!isEditMode" class="d-flex gap-1 me-3">
-              <button 
-                v-for="action in quickActions" 
-                :key="action.status"
-                class="btn btn-sm"
-                :class="`btn-outline-${action.color}`"
-                @click="executeQuickAction(action)"
-                :title="`${action.label}に変更`"
-              >
-                <i class="material-symbols-rounded">{{ action.icon }}</i>
-              </button>
-            </div>
-            
-            <button 
-              v-if="!isEditMode"
-              class="btn btn-outline-primary"
-              @click="toggleEditMode"
-            >
-              <i class="material-symbols-rounded me-2">edit</i>
-              編集
-            </button>
-            <button 
-              v-else
-              class="btn bg-gradient-primary"
-              @click="saveChanges"
-            >
-              <i class="material-symbols-rounded me-2">save</i>
-              保存
-            </button>
-            <button 
-              v-if="isEditMode"
-              class="btn btn-outline-secondary"
-              @click="cancelEdit"
-            >
-              <i class="material-symbols-rounded me-2">cancel</i>
-              キャンセル
-            </button>
+        <div class="card">
+          <CardHeader title="スケジュール統計" subtitle="タスクの進捗と活動状況" />
+          <div class="card-body">
+            <StatCards
+              :items="[
+                { 
+                  label: '進捗率', 
+                  value: `${scheduleDetail.progress}%`, 
+                  icon: 'trending_up', 
+                  color: 'primary',
+                  footer: '完了度'
+                },
+                { 
+                  label: 'コメント数', 
+                  value: scheduleDetail.comments?.length || 0, 
+                  icon: 'comment', 
+                  color: 'info',
+                  footer: '総コメント'
+                },
+                { 
+                  label: '添付ファイル', 
+                  value: scheduleDetail.attachments?.length || 0, 
+                  icon: 'attach_file', 
+                  color: 'success',
+                  footer: 'ファイル数'
+                },
+                { 
+                  label: 'タグ数', 
+                  value: scheduleDetail.tags?.length || 0, 
+                  icon: 'label', 
+                  color: 'warning',
+                  footer: '関連タグ'
+                }
+              ]"
+            />
           </div>
         </div>
       </div>
@@ -401,9 +455,7 @@ onMounted(async () => {
       <div class="col-lg-8">
         <!-- 基本情報カード -->
         <div class="card mb-4">
-          <div class="card-header pb-0">
-            <h6 class="mb-0">基本情報</h6>
-          </div>
+          <CardHeader title="基本情報" subtitle="タスクの基本情報を編集できます" />
           <div class="card-body">
             <div class="row">
               <div class="col-md-6 mb-3">
@@ -446,9 +498,7 @@ onMounted(async () => {
 
         <!-- 進捗とメモ -->
         <div class="card mb-4">
-          <div class="card-header pb-0">
-            <h6 class="mb-0">進捗とメモ</h6>
-          </div>
+          <CardHeader title="進捗とメモ" subtitle="タスクの進捗率とメモを管理できます" />
           <div class="card-body">
             <div class="mb-3">
               <label class="form-label">進捗率</label>
@@ -485,9 +535,7 @@ onMounted(async () => {
 
         <!-- 状態変更履歴 -->
         <div class="card mb-4">
-          <div class="card-header pb-0">
-            <h6 class="mb-0">状態変更履歴</h6>
-          </div>
+          <CardHeader title="状態変更履歴" subtitle="タスクの状態変更履歴を確認できます" />
           <div class="card-body">
             <div class="timeline timeline-one-side">
               <div 
@@ -522,12 +570,10 @@ onMounted(async () => {
 
         <!-- コメントセクション -->
         <div class="card">
-          <div class="card-header pb-0">
-            <h6 class="mb-0">コメント</h6>
-          </div>
+          <CardHeader title="コメント" subtitle="タスクに関するコメントを管理できます" />
           <div class="card-body">
             <!-- コメント一覧 -->
-            <div class="timeline timeline-one-side">
+            <div v-if="(scheduleDetail.comments?.length || 0) > 0" class="timeline timeline-one-side">
               <div 
                 v-for="comment in scheduleDetail.comments" 
                 :key="comment.id"
@@ -545,6 +591,14 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
+            
+            <!-- コメントなしの場合 -->
+            <EmptyState 
+              v-else
+              icon="comment" 
+              title="コメントがありません" 
+              subtitle="このタスクに関するコメントを追加してください"
+            />
 
             <!-- 新しいコメント入力 -->
             <div class="mt-4">
@@ -572,27 +626,15 @@ onMounted(async () => {
       <div class="col-lg-4">
         <!-- ステータスと優先度 -->
         <div class="card mb-4">
-          <div class="card-header pb-0">
-            <h6 class="mb-0">ステータス</h6>
-          </div>
+          <CardHeader title="ステータス" subtitle="タスクの状態と優先度を確認できます" />
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <span class="text-sm">ステータス</span>
-              <span 
-                class="badge"
-                :class="getStatusBadgeClass(scheduleDetail.status)"
-              >
-                {{ scheduleDetail.status }}
-              </span>
+              <StatusBadge :status="scheduleDetail.status" />
             </div>
             <div class="d-flex justify-content-between align-items-center mb-3">
               <span class="text-sm">優先度</span>
-              <span 
-                class="text-sm font-weight-bold"
-                :class="getPriorityColorClass(scheduleDetail.priority)"
-              >
-                {{ scheduleDetail.priority }}
-              </span>
+              <PriorityBadge :priority="scheduleDetail.priority" />
             </div>
             <div class="d-flex justify-content-between align-items-center">
               <span class="text-sm">担当者</span>
@@ -621,9 +663,7 @@ onMounted(async () => {
 
         <!-- 日付情報 -->
         <div class="card mb-4">
-          <div class="card-header pb-0">
-            <h6 class="mb-0">スケジュール</h6>
-          </div>
+          <CardHeader title="スケジュール" subtitle="タスクの開始日と終了日を管理できます" />
           <div class="card-body">
             <div class="mb-3">
               <label class="form-label text-sm">開始日</label>
@@ -650,9 +690,7 @@ onMounted(async () => {
 
         <!-- タグ -->
         <div class="card mb-4">
-          <div class="card-header pb-0">
-            <h6 class="mb-0">タグ</h6>
-          </div>
+          <CardHeader title="タグ" subtitle="タスクに関連するタグを管理できます" />
           <div class="card-body">
             <!-- タグ表示 -->
             <div class="d-flex flex-wrap gap-2 mb-3">
@@ -672,55 +710,22 @@ onMounted(async () => {
               </span>
             </div>
             
-            <!-- タグ追加（編集モード時のみ） -->
-            <div v-if="isEditMode">
-              <div class="input-group input-group-sm">
-                <input 
-                  type="text" 
-                  class="form-control"
-                  v-model="newTag"
-                  placeholder="タグを入力..."
-                  @keyup.enter="addTag(newTag)"
-                  list="tag-suggestions"
-                >
-                <button 
-                  class="btn btn-outline-primary"
-                  @click="addTag(newTag)"
-                  :disabled="!newTag.trim()"
-                >
-                  <i class="material-symbols-rounded">add</i>
-                </button>
-              </div>
-              
-              <!-- タグ候補 -->
-              <datalist id="tag-suggestions">
-                <option v-for="tag in filteredTags" :key="tag" :value="tag"></option>
-              </datalist>
-              
-              <!-- 人気タグ -->
-              <div class="mt-2">
-                <small class="text-muted">人気タグ:</small>
-                <div class="d-flex flex-wrap gap-1 mt-1">
-                  <button 
-                    v-for="tag in availableTags.slice(0, 4)" 
-                    :key="tag"
-                    class="btn btn-sm btn-outline-secondary"
-                    @click="addTag(tag)"
-                    :disabled="(scheduleDetail.tags || []).includes(tag)"
-                  >
-                    {{ tag }}
-                  </button>
-                </div>
-              </div>
+            <!-- タグ管理ボタン -->
+            <div v-if="isEditMode" class="mt-3">
+              <button 
+                class="btn btn-sm bg-gradient-primary"
+                @click="showTagModal = true"
+              >
+                <i class="material-symbols-rounded me-1">label</i>
+                タグを管理
+              </button>
             </div>
           </div>
         </div>
 
         <!-- 添付ファイル -->
         <div class="card">
-          <div class="card-header pb-0">
-            <h6 class="mb-0">添付ファイル</h6>
-          </div>
+          <CardHeader title="添付ファイル" subtitle="タスクに関連するファイルを管理できます" />
           <div class="card-body">
             <div v-if="(scheduleDetail.attachments?.length || 0) > 0">
               <div 
@@ -735,9 +740,12 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
-            <div v-else class="text-center text-muted">
-              <p class="text-sm mb-0">添付ファイルはありません</p>
-            </div>
+            <EmptyState 
+              v-else
+              icon="attach_file" 
+              title="添付ファイルがありません" 
+              subtitle="このタスクに関連するファイルを添付してください"
+            />
             <div v-if="isEditMode" class="mt-3">
               <input 
                 type="file" 
@@ -750,6 +758,56 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <!-- タグ管理モーダル -->
+    <ModalShell 
+      :show="showTagModal" 
+      title="タグ管理" 
+      size="md" 
+      @close="showTagModal = false"
+    >
+      <template #default>
+        <div>
+          <div class="mb-3">
+            <label class="form-label">新しいタグを追加</label>
+            <div class="input-group">
+              <input 
+                type="text" 
+                class="form-control"
+                v-model="newTag"
+                placeholder="タグを入力..."
+                @keyup.enter="addTag(newTag)"
+              >
+              <button 
+                class="btn btn-outline-primary"
+                @click="addTag(newTag)"
+                :disabled="!newTag.trim()"
+              >
+                <i class="material-symbols-rounded">add</i>
+              </button>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">人気タグ</label>
+            <div class="d-flex flex-wrap gap-1">
+              <button 
+                v-for="tag in availableTags.slice(0, 8)" 
+                :key="tag"
+                class="btn btn-sm btn-outline-secondary"
+                @click="addTag(tag)"
+                :disabled="(scheduleDetail.tags || []).includes(tag)"
+              >
+                {{ tag }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <button type="button" class="btn btn-secondary" @click="showTagModal = false">閉じる</button>
+      </template>
+    </ModalShell>
   </div>
 </template>
 

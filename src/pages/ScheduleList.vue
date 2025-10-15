@@ -1,9 +1,20 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useScheduleStore } from "../store/schedule";
-import { getStatusBadgeClass, getProgressBarClass, getPriorityColorClass } from "../utils/uiHelpers";
+import { getProgressBarClass } from "../utils/uiHelpers";
 import type { ScheduleItem } from "../types/schedule";
 import type { Project } from "../types/project";
+
+// 共通コンポーネントのインポート
+import PageHeader from "../components/common/PageHeader.vue";
+import ActionBar from "../components/common/ActionBar.vue";
+import StatusBadge from "../components/common/StatusBadge.vue";
+import PriorityBadge from "../components/common/PriorityBadge.vue";
+import LoadingSpinner from "../components/common/LoadingSpinner.vue";
+import EmptyState from "../components/common/EmptyState.vue";
+import CardHeader from "../components/common/CardHeader.vue";
+import StatCards from "../components/common/StatCards.vue";
+import ModalShell from "../components/common/ModalShell.vue";
 
 // TODO: 即座に実装可能な機能（既存スキーマ活用）
 // 1. カードビュー改善（進捗率可視化）
@@ -136,9 +147,9 @@ const projectStats = computed(() => {
   Object.entries(groupedSchedules.value).forEach(([projectName, tasks]) => {
     stats[projectName] = {
       total: tasks.length,
-      completed: tasks.filter(t => t.status === "完了").length,
-      inProgress: tasks.filter(t => t.status === "進行中").length,
-      pending: tasks.filter(t => t.status === "予定").length
+      completed: tasks.filter(t => t.status === "DONE").length,
+      inProgress: tasks.filter(t => t.status === "IN_PROGRESS").length,
+      pending: tasks.filter(t => t.status === "NOT_STARTED").length
     };
   });
   
@@ -157,8 +168,8 @@ const addNewSchedule = async () => {
       description: "",
       startDate: "",
       endDate: "",
-      status: "予定" as const,
-      priority: "中" as const,
+      status: "NOT_STARTED" as const,
+      priority: "MEDIUM" as const,
       assignee: "",
       progress: 0,
       category: "",
@@ -203,6 +214,15 @@ const viewDetails = (scheduleId: number) => {
   // App.vue の watch で自動的に詳細ページへ遷移
 };
 
+// フィルター更新ハンドラー
+const handleFilterUpdate = (key: string, value: any) => {
+  if (key === 'status') {
+    filterStatus.value = value;
+  } else if (key === 'project') {
+    selectedProjectId.value = value;
+  }
+};
+
 // コンポーネント初期化
 onMounted(() => {
   console.log("スケジュール一覧ページが読み込まれました");
@@ -214,80 +234,109 @@ onMounted(() => {
   <!-- スケジュール一覧ページ -->
   <div class="schedule-list-page">
     <!-- ローディング/エラー表示 -->
-    <div v-if="isLoading" class="alert alert-secondary" role="alert">
-      読み込み中です...
+    <div v-if="isLoading" class="text-center py-4">
+      <LoadingSpinner message="スケジュールデータを読み込み中..." />
     </div>
     <div v-if="!isLoading && errorMessage" class="alert alert-danger" role="alert">
       {{ errorMessage }}
     </div>
     <!-- ページヘッダー -->
-    <div class="row mb-4">
+    <PageHeader
+      title="タスク一覧"
+      description="プロジェクト別にタスクを管理・確認できます"
+      :actions="[
+        {
+          label: '新しいタスク',
+          icon: 'add',
+          variant: 'primary',
+          onClick: addNewSchedule
+        }
+      ]"
+    />
+
+    <!-- プロジェクト統計サマリー -->
+    <div v-if="!isLoading && Object.keys(groupedSchedules).length > 0" class="row mb-4">
       <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center">
-          <div>
-            <h3 class="mb-0 h4 font-weight-bolder">タスク一覧</h3>
-            <p class="mb-0 text-sm text-muted">
-              プロジェクト別にタスクを管理・確認できます
-            </p>
+        <div class="card">
+          <CardHeader title="プロジェクト統計サマリー" subtitle="プロジェクト別のタスク状況" />
+          <div class="card-body">
+            <StatCards
+              :items="[
+                { 
+                  label: '総プロジェクト数', 
+                  value: Object.keys(groupedSchedules).length, 
+                  icon: 'folder', 
+                  color: 'primary',
+                  footer: 'アクティブプロジェクト'
+                },
+                { 
+                  label: '総タスク数', 
+                  value: schedules.length, 
+                  icon: 'task', 
+                  color: 'success',
+                  footer: '全タスク'
+                },
+                { 
+                  label: '完了タスク', 
+                  value: schedules.filter(s => s.status === 'DONE').length, 
+                  icon: 'check_circle', 
+                  color: 'info',
+                  footer: '完了済み'
+                },
+                { 
+                  label: '進行中タスク', 
+                  value: schedules.filter(s => s.status === 'IN_PROGRESS').length, 
+                  icon: 'trending_up', 
+                  color: 'warning',
+                  footer: '作業中'
+                }
+              ]"
+            />
           </div>
-          <button 
-            class="btn bg-gradient-primary"
-            @click="addNewSchedule"
-          >
-            <i class="material-symbols-rounded me-2">add</i>
-            新しいタスク
-          </button>
         </div>
       </div>
     </div>
 
     <!-- フィルターと検索 -->
-    <div class="row mb-4">
-      <div class="col-md-4">
-        <div class="input-group input-group-outline">
-          <label class="form-label">検索...</label>
-          <input 
-            type="text" 
-            class="form-control"
-            v-model="searchQuery"
-            placeholder="タスク名、説明、担当者、プロジェクトで検索"
-          >
-        </div>
-      </div>
-      <div class="col-md-3">
-        <select 
-          class="form-select"
-          v-model="filterStatus"
-        >
-          <option value="all">すべてのステータス</option>
-          <option value="予定">予定</option>
-          <option value="進行中">進行中</option>
-          <option value="完了">完了</option>
-          <option value="遅延">遅延</option>
-        </select>
-      </div>
-      <div class="col-md-3">
-        <select 
-          class="form-select"
-          v-model="selectedProjectId"
-        >
-          <option :value="null">すべてのプロジェクト</option>
-          <option 
-            v-for="project in projects" 
-            :key="project.id" 
-            :value="project.id"
-          >
-            {{ project.name }}
-          </option>
-        </select>
-      </div>
-      <div class="col-md-2">
-        <button class="btn btn-outline-secondary w-100">
-          <i class="material-symbols-rounded me-2">filter_list</i>
-          詳細フィルター
-        </button>
-      </div>
-    </div>
+    <ActionBar
+      :search-query="searchQuery"
+      :search-placeholder="'タスク名、説明、担当者、プロジェクトで検索'"
+      @update:search-query="searchQuery = $event"
+      :filters="[
+        {
+          key: 'status',
+          label: 'ステータス',
+          type: 'select',
+          value: filterStatus,
+          options: [
+            { value: 'all', label: 'すべてのステータス' },
+            { value: 'NOT_STARTED', label: '未開始' },
+            { value: 'IN_PROGRESS', label: '進行中' },
+            { value: 'DONE', label: '完了' },
+            { value: 'BLOCKED', label: 'ブロック' },
+            { value: 'CANCELLED', label: 'キャンセル' }
+          ]
+        },
+        {
+          key: 'project',
+          label: 'プロジェクト',
+          type: 'select',
+          value: selectedProjectId,
+          options: [
+            { value: null, label: 'すべてのプロジェクト' },
+            ...projects.map(p => ({ value: p.id, label: p.name }))
+          ]
+        }
+      ]"
+      @update:filter="handleFilterUpdate"
+      :actions="[
+        {
+          label: '詳細フィルター',
+          icon: 'filter_list',
+          variant: 'outline-secondary'
+        }
+      ]"
+    />
 
     <!-- プロジェクト別タスク一覧 -->
     <div class="project-groups">
@@ -384,18 +433,8 @@ onMounted(() => {
               <div class="card-body pt-0">
                 <!-- ステータスと優先度 -->
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                  <span 
-                    class="badge badge-sm"
-                    :class="getStatusBadgeClass(schedule.status)"
-                  >
-                    {{ schedule.status }}
-                  </span>
-                  <span 
-                    class="text-sm font-weight-bold"
-                    :class="getPriorityColorClass(schedule.priority)"
-                  >
-                    優先度: {{ schedule.priority }}
-                  </span>
+                  <StatusBadge :status="schedule.status" />
+                  <PriorityBadge :priority="schedule.priority" />
                 </div>
 
                 <!-- 担当者 -->
@@ -460,19 +499,31 @@ onMounted(() => {
     </div>
 
     <!-- タスクが存在しない場合 -->
-    <div v-if="Object.keys(groupedSchedules).length === 0" class="text-center py-5">
-      <div class="icon icon-shape icon-lg bg-gradient-secondary mx-auto mb-3">
-        <i class="material-symbols-rounded text-white opacity-10">task</i>
+    <div v-if="!isLoading && Object.keys(groupedSchedules).length === 0" class="row">
+      <div class="col-12">
+        <EmptyState 
+          icon="task_alt" 
+          title="タスクが見つかりません" 
+          subtitle="新しいタスクを作成するか、フィルターを調整してください"
+        >
+          <template #actions>
+            <button 
+              class="btn bg-gradient-primary me-2"
+              @click="addNewSchedule"
+            >
+              <i class="material-symbols-rounded me-2">add</i>
+              新しいタスクを作成
+            </button>
+            <button 
+              class="btn bg-gradient-secondary"
+              @click="() => { searchQuery = ''; filterStatus = 'all'; selectedProjectId = null; }"
+            >
+              <i class="material-symbols-rounded me-2">clear</i>
+              フィルターをリセット
+            </button>
+          </template>
+        </EmptyState>
       </div>
-      <h5 class="text-muted">タスクが見つかりません</h5>
-      <p class="text-muted">新しいタスクを作成するか、フィルターを調整してください。</p>
-      <button 
-        class="btn bg-gradient-primary"
-        @click="addNewSchedule"
-      >
-        <i class="material-symbols-rounded me-2">add</i>
-        新しいタスクを作成
-      </button>
     </div>
   </div>
 </template>

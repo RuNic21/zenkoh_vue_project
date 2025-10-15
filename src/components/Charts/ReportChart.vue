@@ -20,6 +20,7 @@ import {
   LineController
 } from "chart.js";
 import type { ChartData, ChartDataset } from "../../types/report";
+import { buildChartOptions } from "../../utils/chartOptions";
 
 // Chart.js コンポーネントを登録
 ChartJS.register(
@@ -59,66 +60,9 @@ const props = withDefaults(defineProps<Props>(), {
 const chartInstance = ref<ChartJS | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
-// チャートオプション
+// チャートオプション（chartOptionsユーティリティを使用）
 const getChartOptions = () => {
-  const baseOptions = {
-    responsive: props.responsive,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: props.showLegend,
-        position: "top" as const,
-      },
-      title: {
-        display: !!props.title,
-        text: props.title,
-        font: {
-          size: 16,
-          weight: "bold" as const
-        }
-      },
-      tooltip: {
-        backgroundColor: "rgba(0, 0, 0, 0.8)",
-        titleColor: "white",
-        bodyColor: "white",
-        borderColor: "rgba(255, 255, 255, 0.1)",
-        borderWidth: 1
-      }
-    }
-  };
-
-  // チャートタイプ別のオプション
-  switch (props.type) {
-    case "bar":
-      return {
-        ...baseOptions,
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              stepSize: 1
-            }
-          }
-        }
-      };
-    case "doughnut":
-    case "pie":
-      return {
-        ...baseOptions,
-        cutout: props.type === "doughnut" ? "50%" : 0
-      };
-    case "line":
-      return {
-        ...baseOptions,
-        scales: {
-          y: {
-            beginAtZero: true
-          }
-        }
-      };
-    default:
-      return baseOptions;
-  }
+  return buildChartOptions(props.type, props.title, props.showLegend);
 };
 
 // チャート作成
@@ -180,8 +124,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="chart-container" :style="{ height: height + 'px' }">
-    <canvas ref="canvasRef"></canvas>
+  <div class="panel panel-default">
+    <div class="panel-body">
+      <div class="chart-container" :style="{ height: height + 'px' }">
+        <canvas ref="canvasRef"></canvas>
+      </div>
+    </div>
   </div>
 </template>
 

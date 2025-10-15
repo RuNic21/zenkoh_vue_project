@@ -3,7 +3,8 @@
 // 目的: 大量データの効率的な表示、仮想スクロール、メモ化による最適化
 
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-import { debounce, throttle, useVirtualScroll, PerformanceMonitor } from "../utils/performanceUtils";
+import { debounce, throttle, useVirtualScroll, PerformanceMonitor } from "../../utils/performanceUtils";
+import TablePagination from "./TablePagination.vue";
 
 // Props定義
 interface Column {
@@ -210,6 +211,10 @@ watch(() => props.data, () => {
     visibleItems.value.items = processedData.value;
   }
 }, { deep: true });
+
+// テンプレートでの import.meta 参照を避けるためのフラグ
+// 開発モードのみパフォーマンス情報を表示するための判定
+const isDev = import.meta.env.DEV;
 </script>
 
 <template>
@@ -277,7 +282,7 @@ watch(() => props.data, () => {
             class="virtual-scroll-content"
             :style="{ transform: `translateY(${visibleItems.offsetY}px)` }"
           >
-            <table class="table align-items-center mb-0">
+            <table class="table table-striped table-hover">
               <thead class="sticky-top">
                 <tr>
                   <th 
@@ -302,12 +307,14 @@ watch(() => props.data, () => {
                   :style="{ height: itemHeight + 'px' }"
                 >
                   <td v-for="column in columns" :key="column.key">
-                    <span v-if="column.formatter">
-                      {{ column.formatter(item[column.key]) }}
-                    </span>
-                    <span v-else>
-                      {{ item[column.key] }}
-                    </span>
+                    <slot :name="`cell-${column.key}`" :item="item" :value="item[column.key]">
+                      <span v-if="column.formatter">
+                        {{ column.formatter(item[column.key]) }}
+                      </span>
+                      <span v-else>
+                        {{ item[column.key] }}
+                      </span>
+                    </slot>
                   </td>
                 </tr>
               </tbody>
@@ -318,7 +325,7 @@ watch(() => props.data, () => {
       
       <!-- 通常のテーブル表示 -->
       <div v-else class="table-responsive">
-        <table class="table align-items-center mb-0">
+        <table class="table table-striped table-hover">
           <thead>
             <tr>
               <th 
@@ -339,12 +346,14 @@ watch(() => props.data, () => {
           <tbody>
             <tr v-for="(item, index) in paginatedData" :key="index">
               <td v-for="column in columns" :key="column.key">
-                <span v-if="column.formatter">
-                  {{ column.formatter(item[column.key]) }}
-                </span>
-                <span v-else>
-                  {{ item[column.key] }}
-                </span>
+                <slot :name="`cell-${column.key}`" :item="item" :value="item[column.key]">
+                  <span v-if="column.formatter">
+                    {{ column.formatter(item[column.key]) }}
+                  </span>
+                  <span v-else>
+                    {{ item[column.key] }}
+                  </span>
+                </slot>
               </td>
             </tr>
           </tbody>
@@ -359,51 +368,19 @@ watch(() => props.data, () => {
     </div>
 
     <!-- ページネーション（仮想スクロールが無効な場合のみ） -->
-    <div v-if="!virtualScroll && totalPages > 1" class="d-flex justify-content-between align-items-center mt-3">
-      <div class="text-sm text-secondary">
+    <TablePagination
+      v-if="!virtualScroll && totalPages > 1"
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      @change="handlePageChange"
+    >
+      <template #info>
         {{ pageInfo }}
-      </div>
-      <nav>
-        <ul class="pagination pagination-sm mb-0">
-          <li class="page-item" :class="{ disabled: currentPage === 1 }">
-            <button 
-              class="page-link" 
-              @click="handlePageChange(currentPage - 1)"
-              :disabled="currentPage === 1"
-            >
-              前へ
-            </button>
-          </li>
-          
-          <li 
-            v-for="page in Math.min(5, totalPages)" 
-            :key="page"
-            class="page-item" 
-            :class="{ active: page === currentPage }"
-          >
-            <button 
-              class="page-link" 
-              @click="handlePageChange(page)"
-            >
-              {{ page }}
-            </button>
-          </li>
-          
-          <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-            <button 
-              class="page-link" 
-              @click="handlePageChange(currentPage + 1)"
-              :disabled="currentPage === totalPages"
-            >
-              次へ
-            </button>
-          </li>
-        </ul>
-      </nav>
-    </div>
+      </template>
+    </TablePagination>
 
     <!-- パフォーマンス情報（開発モードのみ） -->
-    <div v-if="import.meta.env.DEV" class="mt-3">
+    <div v-if="isDev" class="mt-3">
       <small class="text-muted">
         表示中: {{ paginatedData.length }}件 / 総数: {{ processedData.length }}件
         <span v-if="virtualScroll">(仮想スクロール)</span>
@@ -494,3 +471,5 @@ watch(() => props.data, () => {
   }
 }
 </style>
+// ... existing code ...
+

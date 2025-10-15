@@ -7,6 +7,7 @@ import MainLayout from "./layouts/MainLayout.vue";
 import ScheduleList from "./pages/ScheduleList.vue";
 import ScheduleDetail from "./pages/ScheduleDetail.vue";
 import ProjectManagement from "./pages/ProjectManagement.vue";
+import ProjectDetail from "./pages/ProjectDetail.vue";
 import TeamManagement from "./pages/TeamManagement.vue";
 import ReportPage from "./pages/ReportPage.vue";
 // Supabase クライアント（ダッシュボード一覧をDBから取得するために使用）
@@ -67,21 +68,29 @@ const navigateToPage = (pageName: string) => {
 };
 
 // ダッシュボードの「詳細を見る」クリック時の処理
-// 目的: プロジェクト名から該当スケジュールを推測して選択→詳細へ
-const handleViewProjectDetail = (project: ProjectProgressRow) => {
+// 目的: プロジェクトのタスクモーダルを表示する
+const selectedProjectTasks = ref<any[]>([]);
+const showTaskModal = ref(false);
+const selectedProjectForTasks = ref<any>(null);
+
+const handleViewProjectDetail = async (project: ProjectProgressRow) => {
   try {
-    const list = store.schedules.value || [];
-    const target = list.find((s) => typeof s.title === "string" && s.title.startsWith(project.name));
-    if (target) {
-      store.selectSchedule(target.id);
-      return;
-    }
-    // 一致が無ければページのみ遷移
-    currentPage.value = "schedule-detail";
-  } catch (e) {
-    console.error("詳細遷移に失敗しました", e);
-    currentPage.value = "schedule-detail";
+    // プロジェクトのタスク一覧을 가져와서 모달에 표시
+    const { getProjectTasks } = await import("./services/dashboardService");
+    selectedProjectForTasks.value = project;
+    selectedProjectTasks.value = await getProjectTasks(project.id);
+    showTaskModal.value = true;
+  } catch (error) {
+    console.error("プロジェクトタスクの読み込みに失敗:", error);
+    alert("タスクの読み込みに失敗しました。");
   }
+};
+
+// タスクモーダルを閉じる
+const closeTaskModal = () => {
+  showTaskModal.value = false;
+  selectedProjectForTasks.value = null;
+  selectedProjectTasks.value = [];
 };
 
 // 現在のページコンポーネントを計算
@@ -93,6 +102,8 @@ const currentComponent = computed(() => {
       return ScheduleDetail;
     case "project-management":
       return ProjectManagement;
+    case "project-detail":
+      return ProjectDetail;
     case "team":
       return TeamManagement;
     case "report":
@@ -418,6 +429,7 @@ const loadDashboardFromDb = async (): Promise<void> => {
   try {
     isDashboardLoading.value = true;
     dashboardErrorMessage.value = "";
+    // 最新の更新履歴があるプロジェクト上位10件のみを取得
     const result = await fetchProjectProgress(10);
     if (result.success && result.data) {
       projectProgressList.value = result.data;
@@ -467,6 +479,14 @@ watch(() => store.selectedScheduleId.value, (id, oldId) => {
     currentPage.value = "schedule-detail";
   }
 });
+
+// ProjectManagement.vueからプロジェクト詳細ページ遷移イベントをリッスン
+onMounted(() => {
+  window.addEventListener('navigate-to-project-detail', (event: any) => {
+    const { projectId } = event.detail;
+    currentPage.value = "project-detail";
+  });
+});
 </script>
 
 <template>
@@ -491,6 +511,7 @@ watch(() => store.selectedScheduleId.value, (id, oldId) => {
                   {{ 
                     currentPage === 'dashboard' ? 'ダッシュボード' : 
                     currentPage === 'project-management' ? 'プロジェクト管理' : 
+                    currentPage === 'project-detail' ? 'プロジェクト詳細' :
                     currentPage === 'team' ? 'チーム管理' :
                     currentPage === 'report' ? 'レポート' :
                     'スケジュール管理' 
@@ -757,11 +778,11 @@ watch(() => store.selectedScheduleId.value, (id, oldId) => {
                 <div class="card-header pb-0">
                   <div class="row">
                     <div class="col-lg-6 col-8">
-                      <h6>プロジェクト別進捗</h6>
+                      <h6>最近更新されたプロジェクト</h6>
                       <p class="text-sm mb-0">
                         <i class="fa fa-chart-line text-info" aria-hidden="true"></i>
-                        <span class="font-weight-bold ms-1">主要プロジェクト</span>の進捗状況
-                        <span class="badge bg-gradient-info ms-2">{{ filteredProjects.length }}個のプロジェクト</span>
+                        <span class="font-weight-bold ms-1">最近更新履歴</span>があるプロジェクトの進捗状況
+                        <span class="badge bg-gradient-info ms-2">{{ filteredProjects.length }}件のプロジェクト</span>
                       </p>
                     </div>
                   </div>
@@ -881,6 +902,73 @@ watch(() => store.selectedScheduleId.value, (id, oldId) => {
         </div>
       </div>
     </MainLayout>
+
+    <!-- タスク管理モーダル -->
+    <div v-if="showTaskModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+      <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="material-symbols-rounded me-2">task</i>
+              {{ selectedProjectForTasks?.name }} - タスク管理
+            </h5>
+            <button type="button" class="btn-close" @click="closeTaskModal"></button>
+          </div>
+          <div class="modal-body">
+            <!-- タスク一覧 -->
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>タスク名</th>
+                    <th>状態</th>
+                    <th>優先度</th>
+                    <th>進捗率</th>
+                    <th>計画終了日</th>
+                    <th>担当者</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="task in selectedProjectTasks" :key="task.id">
+                    <td>{{ task.task_name }}</td>
+                    <td>
+                      <span class="badge" :class="{
+                        'bg-success': task.status === 'DONE',
+                        'bg-warning': task.status === 'IN_PROGRESS',
+                        'bg-danger': task.status === 'BLOCKED',
+                        'bg-secondary': task.status === 'NOT_STARTED'
+                      }">
+                        {{ task.status === 'DONE' ? '完了' : 
+                           task.status === 'IN_PROGRESS' ? '進行中' : 
+                           task.status === 'BLOCKED' ? 'ブロック' : '未開始' }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="badge" :class="{
+                        'bg-danger': task.priority === 'URGENT',
+                        'bg-warning': task.priority === 'HIGH',
+                        'bg-info': task.priority === 'MEDIUM',
+                        'bg-secondary': task.priority === 'LOW'
+                      }">
+                        {{ task.priority === 'URGENT' ? '緊急' : 
+                           task.priority === 'HIGH' ? '高' : 
+                           task.priority === 'MEDIUM' ? '中' : '低' }}
+                      </span>
+                    </td>
+                    <td>{{ task.progress_percent }}%</td>
+                    <td>{{ task.planned_end ? new Date(task.planned_end).toLocaleDateString('ja-JP') : '-' }}</td>
+                    <td>{{ task.primary_assignee_id ? `ユーザー${task.primary_assignee_id}` : '-' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeTaskModal">閉じる</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 

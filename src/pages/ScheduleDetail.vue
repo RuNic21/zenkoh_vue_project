@@ -135,7 +135,7 @@ import ModalShell from "../components/common/ModalShell.vue";
 // 共有ストアから選択中スケジュールを参照（欠損プロパティを安全に補完）
 const store = useScheduleStore();
 const isLoading = store.isLoading;
-const errorMessage = store.errorMessage;
+const errorMessage = ref("");
 const scheduleDetail = computed<ScheduleItem>(() => {
   const base = {
     id: 0,

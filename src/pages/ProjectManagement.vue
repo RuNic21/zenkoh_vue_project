@@ -92,13 +92,10 @@ import { logProjectCreated } from "../services/activityService";
 import type { Project } from "../types/project";
 import type { Users } from "../types/db/users";
 import PerformanceOptimizedTable from "../components/table/PerformanceOptimizedTable.vue";
-import OptimizedDataTable from "../components/table/OptimizedDataTable.vue";
 import ProjectFilterPanel from "../components/project/ProjectFilterPanel.vue";
-import TaskStatsHeader from "../components/task/TaskStatsHeader.vue";
 import LoadingSpinner from "@/components/common/LoadingSpinner.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import StatusBadge from "@/components/common/StatusBadge.vue";
-import PriorityBadge from "@/components/common/PriorityBadge.vue";
 import PageHeader from "@/components/common/PageHeader.vue";
 import CardHeader from "@/components/common/CardHeader.vue";
 import ActionBar from "@/components/common/ActionBar.vue";
@@ -107,15 +104,9 @@ import ModalShell from "@/components/common/ModalShell.vue";
 import { 
   getProjectStats, 
   getProjectDetailStats, 
-  getProjectTasks,
-  getTaskStatusLabel,
-  getTaskPriorityLabel,
-  getTaskStatusBadgeClass,
-  getTaskPriorityBadgeClass,
   type ProjectStats,
   type ProjectDetailStats
 } from "../services/dashboardService";
-import type { Task } from "../types/task";
 import { formatDateJP, formatPercent, truncate } from "@/utils/formatters";
 
 // プロジェクト一覧の状態管理
@@ -138,10 +129,7 @@ const projectStats = ref<ProjectStats>({
 });
 const projectDetailStats = ref<ProjectDetailStats[]>([]);
 
-// タスク管理
-const selectedProjectTasks = ref<Task[]>([]);
-const showTaskModal = ref(false);
-const selectedProjectForTasks = ref<Project | null>(null);
+// タスク管理（プロジェクト詳細ページ遷移に変更されたため不要）
 
 // モーダル表示状態
 const showCreateModal = ref(false);
@@ -486,7 +474,7 @@ const getProjectStatus = (project: Project): string => {
 // ダッシュボード統計情報の読み込み
 const loadDashboardStats = async () => {
   try {
-    const [statsResult, detailStats] = await Promise.all([
+    const [statsResult, detailStatsResult] = await Promise.all([
       getProjectStats(),
       getProjectDetailStats()
     ]);
@@ -497,30 +485,47 @@ const loadDashboardStats = async () => {
       console.error("プロジェクト統計の読み込みに失敗:", statsResult.error);
     }
     
-    projectDetailStats.value = detailStats;
+    if (detailStatsResult.success && detailStatsResult.data) {
+      projectDetailStats.value = detailStatsResult.data;
+    } else {
+      console.error("プロジェクト詳細統計の読み込みに失敗:", detailStatsResult.error);
+    }
   } catch (error) {
     console.error("ダッシュボード統計の読み込みに失敗:", error);
   }
 };
 
-// プロジェクトのタスク一覧を表示
+// プロジェクトの詳細ページに遷移
 const showProjectTasks = async (project: Project) => {
   try {
-    selectedProjectForTasks.value = project;
-    selectedProjectTasks.value = await getProjectTasks(project.id);
-    showTaskModal.value = true;
+    // プロジェクト詳細ページに遷移（URLパラメータでプロジェクトIDを渡す）
+    const projectId = project.id;
+    
+    // URLパラメータを設定（ProjectDetail.vueで使用）
+    const url = new URL(window.location.href);
+    url.searchParams.set('id', projectId.toString());
+    window.history.pushState({}, '', url.toString());
+    
+    // プロジェクト詳細ページに遷移
+    // App.vueのcurrentPageを変更するためにイベントを発火させる
+    window.dispatchEvent(new CustomEvent('navigate-to-project-detail', { 
+      detail: { projectId } 
+    }));
+    
+    // URL変更イベントも発火してProjectDetail.vueが反応するようにする
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    
+    // ProjectDetail.vueがURLの変更を強制的に検知できるようにトリガーを送る
+    setTimeout(() => {
+      window.dispatchEvent(new Event('hashchange'));
+    }, 100);
   } catch (error) {
-    console.error("プロジェクトタスクの読み込みに失敗:", error);
-    alert("タスクの読み込みに失敗しました。");
+    console.error("プロジェクト詳細への遷移に失敗:", error);
+    alert("プロジェクト詳細ページへの遷移に失敗しました。");
   }
 };
 
-// タスクモーダルを閉じる
-const closeTaskModal = () => {
-  showTaskModal.value = false;
-  selectedProjectForTasks.value = null;
-  selectedProjectTasks.value = [];
-};
+// タスクモーダル関連（プロジェクト詳細ページ遷移に変更されたため不要）
 
 // コンポーネントマウント時にデータを読み込み
 onMounted(async () => {
@@ -832,54 +837,7 @@ onMounted(async () => {
       </template>
     </ModalShell>
 
-    <!-- タスク管理モーダル -->
-    <div v-if="showTaskModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="material-symbols-rounded me-2">task</i>
-              {{ selectedProjectForTasks?.name }} - タスク管理
-            </h5>
-            <button type="button" class="btn-close" @click="closeTaskModal"></button>
-          </div>
-          <div class="modal-body">
-            <!-- タスク統計 -->
-            <TaskStatsHeader :tasks="selectedProjectTasks" />
-            <!-- タスク一覧: 最適化データテーブルを使用 -->
-            <div class="mt-3">
-              <OptimizedDataTable
-                :data="selectedProjectTasks"
-                :columns="[
-                  { key: 'task_name', label: 'タスク名', sortable: true },
-                  { key: 'status', label: '状態', sortable: true, filterable: true, formatter: (v: any) => getTaskStatusLabel(v) },
-                  { key: 'priority', label: '優先度', sortable: true, filterable: true, formatter: (v: any) => getTaskPriorityLabel(v) },
-                  { key: 'progress_percent', label: '進捗率', sortable: true, formatter: (v: number) => `${v}%` },
-                  { key: 'planned_end', label: '計画終了日', sortable: true, formatter: (v: string | null) => formatDate(v ?? null) },
-                  { key: 'primary_assignee_id', label: '担当者', formatter: (v: number | null) => getOwnerName(v ?? null) }
-                ]"
-                :page-size="20"
-                :virtual-scroll="true"
-                :item-height="48"
-                :container-height="360"
-                :loading="false"
-                empty-message="タスクが見つかりません"
-              >
-                <template #cell-status="{ value }">
-                  <StatusBadge :status="value" />
-                </template>
-                <template #cell-priority="{ value }">
-                  <PriorityBadge :priority="value" />
-                </template>
-              </OptimizedDataTable>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="closeTaskModal">閉じる</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- タスク管理モーダル（プロジェクト詳細ページ遷移に変更されたため削除） -->
   </div>
 </template>
 

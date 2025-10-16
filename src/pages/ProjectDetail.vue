@@ -1,13 +1,8 @@
 <script setup lang="ts">
 // プロジェクト詳細ページ: 個別プロジェクトの詳細表示・編集機能
-import { ref, computed, onMounted, watch } from "vue";
+import { ref } from "vue";
 import { useScheduleStore } from "../store/schedule";
-import { listUsers } from "../services/dbServices";
-import { getProjectTasks, getProjectDetailStats } from "../services/dashboardService";
-import type { Project } from "../types/project";
-import type { Task } from "../types/task";
-import type { Users } from "../types/db/users";
-import type { ProjectDetailStats } from "../services/dashboardService";
+import { useProjectDetail } from "@/composables/useProjectDetail";
 
 // 共通コンポーネントのインポート
 import PageHeader from "../components/common/PageHeader.vue";
@@ -19,160 +14,35 @@ import EmptyState from "../components/common/EmptyState.vue";
 import CardHeader from "../components/common/CardHeader.vue";
 import StatCards from "../components/common/StatCards.vue";
 import ModalShell from "../components/common/ModalShell.vue";
+import ProjectSummary from "@/components/project/ProjectSummary.vue";
 
-// プロジェクト詳細ページの状態管理
-const isLoading = ref(false);
-const errorMessage = ref("");
-const projectDetail = ref<Project | null>(null);
-const projectTasks = ref<Task[]>([]);
-const projectStats = ref<ProjectDetailStats | null>(null);
-const users = ref<Users[]>([]);
-
-// 編集モードの管理
-const isEditMode = ref(false);
-const editForm = ref<Partial<Project>>({});
-
-// タスク管理モーダル
-const showTaskModal = ref(false);
-const selectedTask = ref<Task | null>(null);
+// プロジェクト詳細の状態・ロジックは composable から取得
+const {
+  isLoading,
+  errorMessage,
+  projectDetail,
+  projectTasks,
+  projectStats,
+  users,
+  isEditMode,
+  editForm,
+  showTaskModal,
+  selectedTask,
+  getOwnerName,
+  toggleEditMode,
+  saveProject,
+  cancelEdit,
+  deleteProject,
+  showTaskDetail,
+  closeTaskModal,
+  projectProgress,
+  completedTasksCount,
+  inProgressTasksCount,
+  notStartedTasksCount,
+} = useProjectDetail();
 
 // 共有ストアから選択中プロジェクトを取得
 const store = useScheduleStore();
-
-// プロジェクト詳細データをロード
-const loadProjectDetail = async (projectId: number) => {
-  try {
-    isLoading.value = true;
-    errorMessage.value = "";
-    
-    // プロジェクト情報を取得（仮実装 - 실제로는 projectService에서 가져와야 함）
-    const { listProjects } = await import("../services/projectService");
-    const projectsResult = await listProjects();
-    
-    if (projectsResult.success && projectsResult.data) {
-      const project = projectsResult.data.find(p => p.id === projectId);
-      if (project) {
-        projectDetail.value = project;
-        editForm.value = { ...project };
-      } else {
-        errorMessage.value = "プロジェクトが見つかりません";
-        return;
-      }
-    } else {
-      errorMessage.value = "プロジェクトの読み込みに失敗しました";
-      return;
-    }
-    
-    // プロジェクトのタスク一覧を取得
-    const tasksResult = await getProjectTasks(projectId);
-    if (Array.isArray(tasksResult)) {
-      projectTasks.value = tasksResult;
-    }
-    
-    // プロジェクト統計情報を取得
-    const statsResult = await getProjectDetailStats(projectId);
-    if (statsResult.success && statsResult.data && statsResult.data.length > 0) {
-      projectStats.value = statsResult.data[0]; // 最初の統計情報を使用
-    }
-    
-  } catch (error) {
-    console.error("プロジェクト詳細の読み込みに失敗:", error);
-    errorMessage.value = "プロジェクト詳細の読み込みに失敗しました";
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-// ユーザーデータをロード
-const loadUsers = async () => {
-  try {
-    const result = await listUsers() as any;
-    if (result.success && result.data) {
-      users.value = result.data;
-    }
-  } catch (error) {
-    console.error("ユーザーデータの読み込みに失敗:", error);
-  }
-};
-
-// オーナー名を取得
-const getOwnerName = (ownerId: number | null | undefined): string => {
-  if (!ownerId) return '未設定';
-  const owner = users.value.find(user => user.id === ownerId);
-  return owner ? owner.display_name : '未設定';
-};
-
-// 編集モードの切り替え
-const toggleEditMode = () => {
-  isEditMode.value = !isEditMode.value;
-  if (isEditMode.value && projectDetail.value) {
-    editForm.value = { ...projectDetail.value };
-  }
-};
-
-// プロジェクト情報を保存
-const saveProject = async () => {
-  if (!projectDetail.value) return;
-  
-  try {
-    const { updateProject } = await import("../services/projectService");
-    const result = await updateProject(projectDetail.value.id, editForm.value);
-    
-    if (result.success && result.data) {
-      projectDetail.value = result.data;
-      isEditMode.value = false;
-      console.log("プロジェクトが保存されました");
-    } else {
-      errorMessage.value = result.error || "プロジェクトの保存に失敗しました";
-    }
-  } catch (error) {
-    console.error("プロジェクトの保存に失敗:", error);
-    errorMessage.value = "プロジェクトの保存に失敗しました";
-  }
-};
-
-// 編集をキャンセル
-const cancelEdit = () => {
-  if (projectDetail.value) {
-    editForm.value = { ...projectDetail.value };
-  }
-  isEditMode.value = false;
-};
-
-// タスク詳細を表示
-const showTaskDetail = (task: Task) => {
-  selectedTask.value = task;
-  showTaskModal.value = true;
-};
-
-// タスクモーダルを閉じる
-const closeTaskModal = () => {
-  showTaskModal.value = false;
-  selectedTask.value = null;
-};
-
-// プロジェクトを削除
-const deleteProject = async () => {
-  if (!projectDetail.value) return;
-  
-  if (confirm("このプロジェクトを削除してもよろしいですか？")) {
-    try {
-      const { deleteProject } = await import("../services/projectService");
-      const result = await deleteProject(projectDetail.value.id);
-      
-      if (result.success) {
-        alert("プロジェクトが削除されました");
-        // プロジェクト管理ページに戻る
-        window.history.back();
-      } else {
-        errorMessage.value = result.error || "プロジェクトの削除に失敗しました";
-      }
-    } catch (error) {
-      console.error("プロジェクトの削除に失敗:", error);
-      errorMessage.value = "プロジェクトの削除に失敗しました";
-    }
-  }
-};
 
 // ヘッダーアクションを生成
 const getHeaderActions = () => {
@@ -209,64 +79,8 @@ const getHeaderActions = () => {
   return actions;
 };
 
-// プロジェクトの進捗率を計算
-const projectProgress = computed(() => {
-  if (!projectTasks.value.length) return 0;
-  const totalProgress = projectTasks.value.reduce((sum, task) => sum + (task.progress_percent || 0), 0);
-  return Math.round(totalProgress / projectTasks.value.length);
-});
-
-// 完了タスク数を計算
-const completedTasksCount = computed(() => {
-  return projectTasks.value.filter(task => task.status === 'DONE').length;
-});
-
-// 進行中タスク数を計算
-const inProgressTasksCount = computed(() => {
-  return projectTasks.value.filter(task => task.status === 'IN_PROGRESS').length;
-});
-
-// 未開始タスク数を計算
-const notStartedTasksCount = computed(() => {
-  return projectTasks.value.filter(task => task.status === 'NOT_STARTED').length;
-});
-
-// URLパラメータからプロジェクトIDを取得してロード
-const loadProjectFromUrl = async () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const projectId = urlParams.get('id');
-  
-  if (projectId) {
-    await loadProjectDetail(parseInt(projectId));
-  } else {
-    errorMessage.value = "プロジェクトIDが指定されていません";
-  }
-};
-
-// コンポーネント初期化
-onMounted(async () => {
-  console.log("プロジェクト詳細ページが読み込まれました");
-  await loadUsers();
-  await loadProjectFromUrl();
-});
-
-// URL変更を監視（ブラウザの戻る/進むボタン対応）
-watch(() => window.location.search, () => {
-  loadProjectFromUrl();
-}, { immediate: false });
-
-// イベントリスナーでURL変更を監視
-onMounted(() => {
-  const handleUrlChange = () => {
-    loadProjectFromUrl();
-  };
-  
-  window.addEventListener('popstate', handleUrlChange);
-  window.addEventListener('hashchange', handleUrlChange);
-  
-  // カスタムイベントも監視
-  window.addEventListener('navigate-to-project-detail', handleUrlChange);
-});
+// 初期化ログのみ維持
+console.log("プロジェクト詳細ページが読み込まれました");
 </script>
 
 <template>
@@ -289,46 +103,17 @@ onMounted(() => {
         :actions="getHeaderActions()"
       />
 
-      <!-- プロジェクト統計サマリー -->
+      <!-- プロジェクト統計サマリー（コンポーネント化） -->
       <div class="row mb-4">
         <div class="col-12">
-          <div class="card">
-            <CardHeader title="プロジェクト統計" subtitle="プロジェクトの進捗と活動状況" />
-            <div class="card-body">
-              <StatCards
-                :items="[
-                  { 
-                    label: '進捗率', 
-                    value: `${projectProgress}%`, 
-                    icon: 'trending_up', 
-                    color: 'primary',
-                    footer: '全体進捗'
-                  },
-                  { 
-                    label: '総タスク数', 
-                    value: projectTasks.length, 
-                    icon: 'task', 
-                    color: 'info',
-                    footer: '全タスク'
-                  },
-                  { 
-                    label: '完了タスク', 
-                    value: completedTasksCount, 
-                    icon: 'check_circle', 
-                    color: 'success',
-                    footer: '完了済み'
-                  },
-                  { 
-                    label: '進行中タスク', 
-                    value: inProgressTasksCount, 
-                    icon: 'play_circle', 
-                    color: 'warning',
-                    footer: '作業中'
-                  }
-                ]"
-              />
-            </div>
-          </div>
+          <ProjectSummary 
+            :project-name="projectDetail.name"
+            :description="projectDetail.description || 'プロジェクトの詳細情報を確認・編集できます'"
+            :progress-percent="projectProgress"
+            :total-tasks="projectTasks.length"
+            :completed-tasks="completedTasksCount"
+            :in-progress-tasks="inProgressTasksCount"
+          />
         </div>
       </div>
 

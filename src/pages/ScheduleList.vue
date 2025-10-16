@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
-import { useScheduleStore } from "../store/schedule";
+import { ref } from "vue";
+import { useScheduleList } from "@/composables/useScheduleList";
 import { getProgressBarClass } from "../utils/uiHelpers";
 import type { ScheduleItem } from "../types/schedule";
 import type { Project } from "../types/project";
@@ -56,178 +56,23 @@ import ModalShell from "../components/common/ModalShell.vue";
 //    - 検索履歴保存
 //    - お気に入りフィルター設定
 
-// 共有ストア（DB値に置き換えて利用）
-const store = useScheduleStore();
-const schedules = store.schedules;
-const isLoading = store.isLoading;
-const errorMessage = store.errorMessage;
-
-// プロジェクト情報を格納
-const projects = ref<Project[]>([]);
-
-// DBからスケジュールとプロジェクトを読み込み（ストア経由）
-const loadSchedulesFromDb = async (): Promise<void> => {
-  try {
-    await store.loadAll();
-    // プロジェクト情報も取得
-    await loadProjects();
-  } catch (e) {
-    console.error("スケジュールの読み込みに失敗", e);
-  }
-};
-
-// プロジェクト一覧を読み込み
-const loadProjects = async (): Promise<void> => {
-  try {
-    const { listProjects } = await import("../services/projectService");
-    const result = await listProjects();
-    if (result.success && result.data) {
-      projects.value = result.data;
-    } else {
-      console.error("プロジェクトの読み込みに失敗:", result.error);
-      projects.value = [];
-    }
-  } catch (e) {
-    console.error("プロジェクトの読み込みに失敗", e);
-    projects.value = [];
-  }
-};
-
-// フィルター状態の管理
-const filterStatus = ref("all");
-const searchQuery = ref("");
-const selectedProjectId = ref<number | null>(null);
-
-// プロジェクト別にスケジュールをグループ化
-const groupedSchedules = computed(() => {
-  let filtered = schedules.value;
-  
-  // ステータスでフィルター
-  if (filterStatus.value !== "all") {
-    filtered = filtered.filter(schedule => schedule.status === filterStatus.value);
-  }
-  
-  // 検索クエリでフィルター
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase();
-    filtered = filtered.filter(schedule => 
-      schedule.title.toLowerCase().includes(query) ||
-      schedule.description.toLowerCase().includes(query) ||
-      schedule.assignee.toLowerCase().includes(query) ||
-      (schedule.category || "").toLowerCase().includes(query)
-    );
-  }
-  
-  // プロジェクトでフィルター
-  if (selectedProjectId.value !== null) {
-    const selectedProject = projects.value.find(p => p.id === selectedProjectId.value);
-    if (selectedProject) {
-      filtered = filtered.filter(schedule => schedule.category === selectedProject.name);
-    }
-  }
-  
-  // プロジェクト別にグループ化
-  const groups: { [key: string]: ScheduleItem[] } = {};
-  
-  filtered.forEach(schedule => {
-    const projectName = schedule.category || "プロジェクト未設定";
-    if (!groups[projectName]) {
-      groups[projectName] = [];
-    }
-    groups[projectName].push(schedule);
-  });
-  
-  return groups;
-});
-
-// プロジェクト統計情報を計算
-const projectStats = computed(() => {
-  const stats: { [key: string]: { total: number; completed: number; inProgress: number; pending: number } } = {};
-  
-  Object.entries(groupedSchedules.value).forEach(([projectName, tasks]) => {
-    stats[projectName] = {
-      total: tasks.length,
-      completed: tasks.filter(t => t.status === "DONE").length,
-      inProgress: tasks.filter(t => t.status === "IN_PROGRESS").length,
-      pending: tasks.filter(t => t.status === "NOT_STARTED").length
-    };
-  });
-  
-  return stats;
-});
-
-// ステータス別の色を取得（uiHelpersからインポート済み）
-// 優先度別の色を取得（uiHelpersからインポート済み）
-
-// 新しいスケジュール追加
-const addNewSchedule = async () => {
-  try {
-    // デフォルトの新しいスケジュールを作成
-    const newSchedule = {
-      title: "新しいスケジュール",
-      description: "",
-      startDate: "",
-      endDate: "",
-      status: "NOT_STARTED" as const,
-      priority: "MEDIUM" as const,
-      assignee: "",
-      progress: 0,
-      category: "",
-    };
-    
-    const created = await store.create(newSchedule);
-    if (created) {
-      console.log("新しいスケジュールを作成しました:", created.id);
-    } else {
-      throw new Error("スケジュールの作成に失敗しました");
-    }
-  } catch (e) {
-    console.error("スケジュールの作成に失敗", e);
-    const message = e instanceof Error ? e.message : "スケジュールの作成に失敗しました";
-    errorMessage.value = message;
-  }
-};
-
-// スケジュール編集
-const editSchedule = (scheduleId: number) => {
-  // 一覧から選択して詳細へ遷移できるように選択IDをセット
-  store.selectSchedule(scheduleId);
-  // App.vue の watch で自動的に詳細ページへ遷移
-};
-
-// スケジュール削除（ストア経由）
-const deleteSchedule = async (scheduleId: number) => {
-  if (!confirm("このスケジュールを削除しますか？")) return;
-  try {
-    await store.delete(scheduleId);
-    console.log("スケジュールを削除しました:", scheduleId);
-  } catch (e) {
-    console.error("削除に失敗", e);
-    const message = e instanceof Error ? e.message : "削除に失敗しました";
-    errorMessage.value = message;
-  }
-};
-
-// 詳細表示（選択して App 側のウォッチで詳細へ遷移）
-const viewDetails = (scheduleId: number) => {
-  store.selectSchedule(scheduleId);
-  // App.vue の watch で自動的に詳細ページへ遷移
-};
-
-// フィルター更新ハンドラー
-const handleFilterUpdate = (key: string, value: any) => {
-  if (key === 'status') {
-    filterStatus.value = value;
-  } else if (key === 'project') {
-    selectedProjectId.value = value;
-  }
-};
-
-// コンポーネント初期化
-onMounted(() => {
-  console.log("スケジュール一覧ページが読み込まれました");
-  loadSchedulesFromDb();
-});
+// composable から状態・ロジックを取得
+const {
+  schedules,
+  isLoading,
+  errorMessage,
+  projects,
+  filterStatus,
+  searchQuery,
+  selectedProjectId,
+  handleFilterUpdate,
+  groupedSchedules,
+  projectStats,
+  addNewSchedule,
+  editSchedule,
+  deleteSchedule,
+  viewDetails,
+} = useScheduleList();
 </script>
 
 <template>

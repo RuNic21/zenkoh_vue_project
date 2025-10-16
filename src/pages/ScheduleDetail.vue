@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { useScheduleDetail } from "@/composables/useScheduleDetail";
 import { useScheduleStore } from "../store/schedule";
 import type { ScheduleItem, ScheduleStatus, SchedulePriority, ScheduleAttachment, ScheduleComment } from "../types/schedule";
 import { listUsers } from "../services/dbServices";
@@ -132,94 +133,32 @@ import ModalShell from "../components/common/ModalShell.vue";
 //    - JSONBフィールドの型安全な変換実装が必要
 //    - デフォルト値処理の統一実装が必要
 
-// 共有ストアから選択中スケジュールを参照（欠損プロパティを安全に補完）
+const {
+  isLoading,
+  errorMessage,
+  scheduleDetail,
+  isEditMode,
+  editForm,
+  newComment,
+  newTag,
+  availableTags,
+  showTagModal,
+  showFileModal,
+  statusHistory,
+  availableUsers,
+  changeStatus,
+  changePriority,
+  changeProgress,
+  addTag,
+  removeTag,
+  addComment,
+} = useScheduleDetail();
 const store = useScheduleStore();
-const isLoading = store.isLoading;
-const errorMessage = ref("");
-const scheduleDetail = computed<ScheduleItem>(() => {
-  const base = {
-    id: 0,
-    title: "スケジュール未選択",
-    description: "左の一覧からスケジュールを選択してください",
-    startDate: "",
-    endDate: "",
-    status: "NOT_STARTED" as ScheduleStatus,
-    priority: "MEDIUM" as SchedulePriority,
-    assignee: "",
-    progress: 0,
-    category: "",
-    tags: [] as string[],
-    notes: "",
-    attachments: [] as ScheduleAttachment[],
-    comments: [] as ScheduleComment[],
-  };
-  const src = (store.selectedSchedule.value as ScheduleItem | null) || ({} as Partial<ScheduleItem>);
-  return { ...base, ...src, 
-    // 配列/文字列系は欠損時に既定値を強制
-    tags: Array.isArray(src.tags) ? src.tags : base.tags,
-    attachments: Array.isArray(src.attachments) ? src.attachments : base.attachments,
-    comments: Array.isArray(src.comments) ? src.comments : base.comments,
-    notes: typeof src.notes === "string" ? src.notes : base.notes,
-    category: typeof src.category === "string" ? src.category : base.category,
-  };
-});
 
-// 編集モードの管理
-const isEditMode = ref(false);
-const editForm = ref<ScheduleItem>({ ...scheduleDetail.value });
-
-// 選択スケジュールが変わったら編集フォームを同期
-watch(scheduleDetail, (val) => {
-  editForm.value = { ...val };
-});
-
-// 新しいコメントの入力
-const newComment = ref("");
-
-// タグ管理
-const newTag = ref("");
-const availableTags = ref<string[]>([]);
-
-// モーダル状態
-const showTagModal = ref(false);
-const showFileModal = ref(false);
-
-// 状態変更履歴（DBから取得するように変更予定）
-const statusHistory = ref<Array<{ from: string; to: string; user: string; timestamp: string; reason: string }>>([]);
-
-// 利用可能なユーザー一覧（DBから取得）
-const availableUsers = ref<Array<{ id: number; name: string; avatar: string }>>([]);
-
-// ユーザーデータをロードする関数
-const loadUsers = async () => {
-  try {
-    const result = await listUsers() as any;
-    if (result.success && result.data) {
-      availableUsers.value = result.data.map((user: any) => ({
-        id: user.id,
-        name: user.display_name,
-        avatar: user.display_name.charAt(0).toUpperCase()
-      }));
-    } else {
-      console.error("ユーザーデータの読み込みに失敗:", result.error);
-      availableUsers.value = [];
-    }
-  } catch (error) {
-    console.error("ユーザーデータの読み込みに失敗:", error);
-    availableUsers.value = [];
-  }
+// コメント追加（composable 関数に入力値を渡すラッパー）
+const onAddComment = () => {
+  addComment(newComment.value);
 };
-
-// クイックアクション
-const quickActions = ref([
-  { label: "開始", status: "IN_PROGRESS", icon: "play_arrow", color: "success" },
-  { label: "完了", status: "DONE", icon: "check", color: "primary" },
-  { label: "ブロック", status: "BLOCKED", icon: "pause", color: "warning" },
-  { label: "キャンセル", status: "CANCELLED", icon: "cancel", color: "danger" }
-]);
-
-// ステータス別の色を取得（uiHelpersからインポート済み）
-// 優先度別の色を取得（uiHelpersからインポート済み）
 
 // 編集モードの切り替え
 const toggleEditMode = () => {
@@ -248,21 +187,18 @@ const cancelEdit = () => {
   isEditMode.value = false;
 };
 
-// コメント追加
-const addComment = () => {
-  if (newComment.value.trim()) {
-    const comment: ScheduleComment = {
-      id: Date.now(),
-      author: "現在のユーザー",
-      content: newComment.value,
-      timestamp: new Date().toLocaleString('ja-JP'),
-      avatar: "U"
-    };
-    // comments は computed で必ず配列に正規化されるため non-null で扱う
-    scheduleDetail.value.comments!.push(comment);
-    newComment.value = "";
-  }
-};
+// クイックアクション
+const quickActions = ref([
+  { label: "開始", status: "IN_PROGRESS", icon: "play_arrow", color: "success" },
+  { label: "完了", status: "DONE", icon: "check", color: "primary" },
+  { label: "ブロック", status: "BLOCKED", icon: "pause", color: "warning" },
+  { label: "キャンセル", status: "CANCELLED", icon: "cancel", color: "danger" }
+]);
+
+// ステータス別の色を取得（uiHelpersからインポート済み）
+// 優先度別の色を取得（uiHelpersからインポート済み）
+
+// コメント追加は composable の addComment を使用
 
 // ファイル添付
 const handleFileUpload = (event: Event) => {
@@ -283,23 +219,7 @@ const handleFileUpload = (event: Event) => {
   }
 };
 
-// タグ追加
-const addTag = (tag: string) => {
-  if (tag.trim() && !(editForm.value.tags || []).includes(tag.trim())) {
-    if (!editForm.value.tags) {
-      editForm.value.tags = [];
-    }
-    editForm.value.tags.push(tag.trim());
-    newTag.value = "";
-  }
-};
-
-// タグ削除
-const removeTag = (tagToRemove: string) => {
-  if (editForm.value.tags) {
-    editForm.value.tags = editForm.value.tags.filter(tag => tag !== tagToRemove);
-  }
-};
+// タグ追加/削除は composable の関数を使用
 
 // タグ自動補完
 const filteredTags = computed(() => {
@@ -383,10 +303,8 @@ const getHeaderActions = () => {
 };
 
 // コンポーネント初期化
-onMounted(async () => {
+onMounted(() => {
   console.log("スケジュール詳細ページが読み込まれました");
-  // ユーザーデータをロード
-  await loadUsers();
 });
 </script>
 
@@ -608,11 +526,11 @@ onMounted(async () => {
                   class="form-control"
                   v-model="newComment"
                   placeholder="コメントを入力..."
-                  @keyup.enter="addComment"
+                  @keyup.enter="onAddComment"
                 >
                 <button 
                   class="btn bg-gradient-primary"
-                  @click="addComment"
+                  @click="onAddComment"
                 >
                   <i class="material-symbols-rounded">send</i>
                 </button>

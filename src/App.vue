@@ -10,8 +10,15 @@ import ProjectManagement from "./pages/ProjectManagement.vue";
 import ProjectDetail from "./pages/ProjectDetail.vue";
 import TeamManagement from "./pages/TeamManagement.vue";
 import ReportPage from "./pages/ReportPage.vue";
-// Supabase クライアント（ダッシュボード一覧をDBから取得するために使用）
-import { fetchProjectProgress, type ProjectProgressRow } from "./services/dashboardService";
+// 分割したダッシュボード用コンポーネント
+import DashboardFilters from "./components/dashboard/DashboardFilters.vue";
+import DashboardStats from "./components/dashboard/DashboardStats.vue";
+import ProjectProgressTable from "./components/dashboard/ProjectProgressTable.vue";
+import RecentActivities from "./components/dashboard/RecentActivities.vue";
+import ProjectTasksModal from "./components/dashboard/ProjectTasksModal.vue";
+// ダッシュボード用 composable と型
+import { useDashboard } from "./composables/useDashboard";
+import type { ProjectProgressRow } from "./services/dashboardService";
 
 // ========================================
 // Phase 1: 基本分析機能の実装 TODO
@@ -75,7 +82,7 @@ const selectedProjectForTasks = ref<any>(null);
 
 const handleViewProjectDetail = async (project: ProjectProgressRow) => {
   try {
-    // プロジェクトのタスク一覧을 가져와서 모달에 표시
+    // プロジェクトのタスク一覧を モーダルに表示
     const { getProjectTasks } = await import("./services/dashboardService");
     selectedProjectForTasks.value = project;
     selectedProjectTasks.value = await getProjectTasks(project.id);
@@ -113,89 +120,24 @@ const currentComponent = computed(() => {
   }
 });
 
-// ダッシュボード表示用: DB の projects / tasks / users を用いて進捗一覧を構築
-// 仕様: 進捗 = 同一プロジェクトの tasks.progress_percent の平均（小数点四捨五入）
-//       担当者 = projects.owner_user_id に紐づく users.display_name（無ければ "-"）
-//       期限 = projects.end_date（無ければ "-"）
-const projectProgressList = ref<ProjectProgressRow[]>([]);
-// ダッシュボード用ローディング/エラー
-const isDashboardLoading = ref(false);
-const dashboardErrorMessage = ref("");
-
-// フィルタリング・検索機能
-const searchQuery = ref("");
-const statusFilter = ref("all"); // 'all' | 'in-progress' | 'completed' | 'overdue'
-const ownerFilter = ref("all"); // 'all' | 特定のユーザーID
-const dateRangeFilter = ref("all"); // 'all' | 'this-week' | 'this-month' | 'overdue'
-
-// 日付計算をメモ化してパフォーマンスを向上
-const today = computed(() => new Date());
-const weekFromNow = computed(() => new Date(today.value.getTime() + 7 * 24 * 60 * 60 * 1000));
-const monthFromNow = computed(() => new Date(today.value.getTime() + 30 * 24 * 60 * 60 * 1000));
-
-// フィルタリングされたプロジェクト一覧（パフォーマンス最適化）
-const filteredProjects = computed(() => {
-  let filtered = projectProgressList.value;
-
-  // 検索クエリでフィルタリング
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase();
-    filtered = filtered.filter(project => 
-      project.name.toLowerCase().includes(query) ||
-      project.owner.toLowerCase().includes(query)
-    );
-  }
-
-  // 状態でフィルタリング
-  if (statusFilter.value !== "all") {
-    filtered = filtered.filter(project => {
-      switch (statusFilter.value) {
-        case "in-progress":
-          return project.status === "進行中";
-        case "completed":
-          return project.status === "完了";
-        case "overdue":
-          if (!project.dueDate || project.dueDate === "-") return false;
-          const due = new Date(project.dueDate);
-          return due < today.value && project.status !== "完了";
-        default:
-          return true;
-      }
-    });
-  }
-
-  // 担当者でフィルタリング
-  if (ownerFilter.value !== "all") {
-    filtered = filtered.filter(project => project.owner === ownerFilter.value);
-  }
-
-  // 日付範囲でフィルタリング（メモ化された日付を使用）
-  if (dateRangeFilter.value !== "all") {
-    filtered = filtered.filter(project => {
-      if (!project.dueDate || project.dueDate === "-") return false;
-      const due = new Date(project.dueDate);
-      
-      switch (dateRangeFilter.value) {
-        case "this-week":
-          return due >= today.value && due <= weekFromNow.value;
-        case "this-month":
-          return due >= today.value && due <= monthFromNow.value;
-        case "overdue":
-          return due < today.value && project.status !== "完了";
-        default:
-          return true;
-      }
-    });
-  }
-
-  return filtered;
-});
-
-// 利用可能な担当者一覧（フィルタ用）
-const availableOwners = computed(() => {
-  const owners = new Set(projectProgressList.value.map(p => p.owner));
-  return Array.from(owners).filter(owner => owner !== "-");
-});
+// ダッシュボード用状態とロジックは composable へ集約
+const {
+  projectProgressList,
+  isDashboardLoading,
+  dashboardErrorMessage,
+  searchQuery,
+  statusFilter,
+  ownerFilter,
+  dateRangeFilter,
+  clearFilters,
+  filteredProjects,
+  availableOwners,
+  inProgressCount,
+  completedCount,
+  completionRate,
+  overdueCount,
+  loadDashboardFromDb,
+} = useDashboard();
 
 // クイックアクションパネル
 const quickActions = [
@@ -320,14 +262,6 @@ const handleGenerateReport = () => {
   currentPage.value = "report";
 };
 
-// フィルタ初期化
-const clearFilters = () => {
-  searchQuery.value = "";
-  statusFilter.value = "all";
-  ownerFilter.value = "all";
-  dateRangeFilter.value = "all";
-};
-
 // 最近の活動フィード
 interface ActivityLog {
   id: number;
@@ -400,53 +334,6 @@ const getActivityColor = (type: ActivityLog['type']): string => {
     default: return 'bg-gradient-secondary';
   }
 };
-
-// ダッシュボード統計（フィルタリングされたプロジェクト進捗一覧から算出）
-const inProgressCount = computed(() =>
-  filteredProjects.value.filter((p) => p.status === "進行中").length
-);
-const completedCount = computed(() =>
-  filteredProjects.value.filter((p) => p.status === "完了").length
-);
-const completionRate = computed(() => {
-  const total = filteredProjects.value.length;
-  if (total === 0) return 0;
-  return Math.round((completedCount.value / total) * 100);
-});
-const overdueCount = computed(() => {
-  const today = new Date();
-  return filteredProjects.value.filter((p) => {
-    if (!p.dueDate || p.dueDate === "-") return false;
-    // 期限を Date に変換（ISO 文字列想定）
-    const due = new Date(p.dueDate as string);
-    if (isNaN(due.getTime())) return false;
-    return due < today && p.status !== "完了";
-  }).length;
-});
-
-// DB からダッシュボード用データを読み込む
-const loadDashboardFromDb = async (): Promise<void> => {
-  try {
-    isDashboardLoading.value = true;
-    dashboardErrorMessage.value = "";
-    // 最新の更新履歴があるプロジェクト上位10件のみを取得
-    const result = await fetchProjectProgress(10);
-    if (result.success && result.data) {
-      projectProgressList.value = result.data;
-    } else {
-      projectProgressList.value = [];
-      dashboardErrorMessage.value = result.error || "ダッシュボードの読み込みに失敗しました。しばらくしてから再試行してください。";
-    }
-  } catch (e) {
-    console.error("ダッシュボードの読み込みに失敗", e);
-    projectProgressList.value = [];
-    dashboardErrorMessage.value = "ダッシュボードの読み込みに失敗しました。しばらくしてから再試行してください。";
-  } finally {
-    isDashboardLoading.value = false;
-  }
-};
-
-// クラス算出ロジックはユーティリティへ集約
 
 // アプリケーション初期化
 onMounted(async () => {
@@ -603,50 +490,18 @@ onMounted(() => {
             <div class="row mb-4">
               <!-- フィルタリングパネル -->
               <div class="col-lg-8 col-md-12">
-                <div class="card">
-                  <div class="card-header pb-0">
-                    <h6>フィルタリング</h6>
-                  </div>
-                  <div class="card-body">
-                    <div class="row">
-                      <div class="col-md-3 col-sm-6 mb-3">
-                        <label class="form-label text-sm">状態</label>
-                        <select class="form-control" v-model="statusFilter">
-                          <option value="all">すべての状態</option>
-                          <option value="in-progress">進行中</option>
-                          <option value="completed">完了</option>
-                          <option value="overdue">期限切れ</option>
-                        </select>
-                      </div>
-                      <div class="col-md-3 col-sm-6 mb-3">
-                        <label class="form-label text-sm">担当者</label>
-                        <select class="form-control" v-model="ownerFilter">
-                          <option value="all">すべての担当者</option>
-                          <option v-for="owner in availableOwners" :key="owner" :value="owner">
-                            {{ owner }}
-                          </option>
-                        </select>
-                      </div>
-                      <div class="col-md-3 col-sm-6 mb-3">
-                        <label class="form-label text-sm">期限</label>
-                        <select class="form-control" v-model="dateRangeFilter">
-                          <option value="all">すべての期限</option>
-                          <option value="this-week">今週</option>
-                          <option value="this-month">今月</option>
-                          <option value="overdue">期限切れ</option>
-                        </select>
-                      </div>
-                      <div class="col-md-3 col-sm-6 mb-3 d-flex align-items-end">
-                        <button 
-                          class="btn btn-sm bg-gradient-secondary mb-0 w-100"
-                          @click="clearFilters"
-                        >
-                          フィルタリセット
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <DashboardFilters 
+                  :search-query="searchQuery"
+                  :status-filter="statusFilter"
+                  :owner-filter="ownerFilter"
+                  :date-range-filter="dateRangeFilter"
+                  :available-owners="availableOwners"
+                  @update:searchQuery="(v:string)=>searchQuery=v"
+                  @update:statusFilter="(v:string)=>statusFilter=v"
+                  @update:ownerFilter="(v:string)=>ownerFilter=v"
+                  @update:dateRangeFilter="(v:string)=>dateRangeFilter=v"
+                  @clear="clearFilters"
+                />
               </div>
 
               <!-- クイックアクションパネル -->
@@ -677,96 +532,12 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- 統計カード -->
-            <div class="row mb-4">
-              <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-                <div class="card">
-                  <div class="card-header p-2 ps-3">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <p class="text-sm mb-0 text-capitalize">進行中プロジェクト</p>
-                        <h4 class="mb-0">{{ inProgressCount }}</h4>
-                      </div>
-                      <div class="icon icon-md icon-shape bg-gradient-primary shadow-dark shadow text-center border-radius-lg">
-                        <i class="material-symbols-rounded opacity-10">work</i>
-                      </div>
-                    </div>
-                  </div>
-                  <hr class="dark horizontal my-0">
-                  <div class="card-footer p-2 ps-3">
-                    <p class="mb-0 text-sm">
-                      <span class="text-success font-weight-bolder">&nbsp;</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-                <div class="card">
-                  <div class="card-header p-2 ps-3">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <p class="text-sm mb-0 text-capitalize">完了プロジェクト</p>
-                        <h4 class="mb-0">{{ completedCount }}</h4>
-                      </div>
-                      <div class="icon icon-md icon-shape bg-gradient-success shadow-dark shadow text-center border-radius-lg">
-                        <i class="material-symbols-rounded opacity-10">task</i>
-                      </div>
-                    </div>
-                  </div>
-                  <hr class="dark horizontal my-0">
-                  <div class="card-footer p-2 ps-3">
-                    <p class="mb-0 text-sm">
-                      <span class="text-success font-weight-bolder">&nbsp;</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-                <div class="card">
-                  <div class="card-header p-2 ps-3">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <p class="text-sm mb-0 text-capitalize">完了率</p>
-                        <h4 class="mb-0">{{ completionRate }}%</h4>
-                      </div>
-                      <div class="icon icon-md icon-shape bg-gradient-info shadow-dark shadow text-center border-radius-lg">
-                        <i class="material-symbols-rounded opacity-10">trending_up</i>
-                      </div>
-                    </div>
-                  </div>
-                  <hr class="dark horizontal my-0">
-                  <div class="card-footer p-2 ps-3">
-                    <p class="mb-0 text-sm">
-                      <span class="text-success font-weight-bolder">&nbsp;</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div class="col-xl-3 col-sm-6">
-                <div class="card">
-                  <div class="card-header p-2 ps-3">
-                    <div class="d-flex justify-content-between">
-                      <div>
-                        <p class="text-sm mb-0 text-capitalize">期限切れ</p>
-                        <h4 class="mb-0">{{ overdueCount }}</h4>
-                      </div>
-                      <div class="icon icon-md icon-shape bg-gradient-warning shadow-dark shadow text-center border-radius-lg">
-                        <i class="material-symbols-rounded opacity-10">warning</i>
-                      </div>
-                    </div>
-                  </div>
-                  <hr class="dark horizontal my-0">
-                  <div class="card-footer p-2 ps-3">
-                    <p class="mb-0 text-sm">
-                      <span class="text-danger font-weight-bolder">注意が必要</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <DashboardStats 
+              :in-progress-count="inProgressCount"
+              :completed-count="completedCount"
+              :completion-rate="completionRate"
+              :overdue-count="overdueCount"
+            />
 
 
           </div>
@@ -774,126 +545,17 @@ onMounted(() => {
           <!-- プロジェクト別進捗の一覧表示 -->
           <div v-if="currentPage === 'dashboard'" class="row">
             <div class="col-12">
-              <div class="card">
-                <div class="card-header pb-0">
-                  <div class="row">
-                    <div class="col-lg-6 col-8">
-                      <h6>最近更新されたプロジェクト</h6>
-                      <p class="text-sm mb-0">
-                        <i class="fa fa-chart-line text-info" aria-hidden="true"></i>
-                        <span class="font-weight-bold ms-1">最近更新履歴</span>があるプロジェクトの進捗状況
-                        <span class="badge bg-gradient-info ms-2">{{ filteredProjects.length }}件のプロジェクト</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div class="card-body px-0 pt-0 pb-2">
-                  <div class="table-responsive p-0">
-                    <table class="table align-items-center mb-0">
-                      <thead>
-                        <tr>
-                          <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">プロジェクト名</th>
-                          <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">担当者</th>
-                          <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">進捗</th>
-                          <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">状態</th>
-                          <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">期限</th>
-                          <th class="text-secondary opacity-7"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="project in filteredProjects" :key="project.id">
-                          <td>
-                            <div class="d-flex px-3 py-1">
-                              <div class="d-flex flex-column justify-content-center">
-                                <h6 class="mb-0 text-sm">{{ project.name }}</h6>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <p class="text-xs font-weight-bold mb-0">{{ project.owner }}</p>
-                          </td>
-                          <td class="align-middle text-center">
-                            <div class="d-flex flex-column align-items-center justify-content-center px-2">
-                              <span class="text-xs font-weight-bold mb-1">{{ project.progress }}%</span>
-                              <div class="progress w-100" style="max-width:160px;">
-                                <div :class="getProgressBarClass(project.progress)" :style="{ width: project.progress + '%' }" role="progressbar" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="project.progress"></div>
-                              </div>
-                            </div>
-                          </td>
-                          <td class="align-middle text-center">
-                            <span :class="getStatusBadgeClass(project.status)">{{ project.status }}</span>
-                          </td>
-                          <td class="align-middle text-center">
-                            <span class="text-secondary text-xs font-weight-normal">{{ project.dueDate }}</span>
-                          </td>
-                          <td class="align-middle">
-                            <button 
-                              class="btn btn-sm bg-gradient-primary mb-0" 
-                              @click="handleViewProjectDetail(project)"
-                            >
-                              詳細を見る
-                            </button>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
+              <ProjectProgressTable 
+                :rows="filteredProjects"
+                @viewDetail="handleViewProjectDetail"
+              />
             </div>
           </div>
 
           <!-- 最近の活動フィード -->
           <div v-if="currentPage === 'dashboard'" class="row mt-4">
             <div class="col-12">
-              <div class="card">
-                <div class="card-header pb-0">
-                  <div class="row">
-                    <div class="col-lg-6 col-8">
-                      <h6>最近の活動</h6>
-                      <p class="text-sm mb-0">
-                        <i class="fa fa-history text-info" aria-hidden="true"></i>
-                        <span class="font-weight-bold ms-1">プロジェクト</span>の最近の活動履歴
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div class="card-body px-0 pt-0 pb-2">
-                  <!-- ローディング状態表示用コメント -->
-                  <div v-if="isActivityLoading" class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                      <span class="visually-hidden">読み込み中...</span>
-                    </div>
-                    <p class="text-sm text-secondary mt-2">活動データを読み込み中...</p>
-                  </div>
-                  
-                  <!-- 活動フィード リスト -->
-                  <div v-else class="list-group list-group-flush">
-                    <div 
-                      v-for="activity in recentActivities" 
-                      :key="activity.id"
-                      class="list-group-item border-0 d-flex align-items-center px-2 mb-2"
-                    >
-                      <div class="avatar avatar-sm me-3" :class="getActivityColor(activity.type)">
-                        <i class="material-symbols-rounded text-white opacity-10">{{ getActivityIcon(activity.type) }}</i>
-                      </div>
-                      <div class="d-flex align-items-start flex-column justify-content-center">
-                        <h6 class="mb-0 text-sm">{{ activity.description }}</h6>
-                        <p class="mb-0 text-xs text-secondary">
-                          <i class="fa fa-user me-1"></i>{{ activity.user }} • 
-                          <i class="fa fa-clock me-1"></i>{{ getRelativeTime(activity.timestamp) }}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <!-- 活動がない場合 -->
-                    <div v-if="!isActivityLoading && recentActivities.length === 0" class="text-center py-4">
-                      <i class="material-symbols-rounded text-secondary opacity-50" style="font-size: 48px;">history</i>
-                      <p class="text-sm text-secondary mt-2">最近の活動がありません</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <RecentActivities :activities="recentActivities" :is-loading="isActivityLoading" />
             </div>
           </div>
 
@@ -904,71 +566,12 @@ onMounted(() => {
     </MainLayout>
 
     <!-- タスク管理モーダル -->
-    <div v-if="showTaskModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="material-symbols-rounded me-2">task</i>
-              {{ selectedProjectForTasks?.name }} - タスク管理
-            </h5>
-            <button type="button" class="btn-close" @click="closeTaskModal"></button>
-          </div>
-          <div class="modal-body">
-            <!-- タスク一覧 -->
-            <div class="table-responsive">
-              <table class="table table-hover">
-                <thead>
-                  <tr>
-                    <th>タスク名</th>
-                    <th>状態</th>
-                    <th>優先度</th>
-                    <th>進捗率</th>
-                    <th>計画終了日</th>
-                    <th>担当者</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="task in selectedProjectTasks" :key="task.id">
-                    <td>{{ task.task_name }}</td>
-                    <td>
-                      <span class="badge" :class="{
-                        'bg-success': task.status === 'DONE',
-                        'bg-warning': task.status === 'IN_PROGRESS',
-                        'bg-danger': task.status === 'BLOCKED',
-                        'bg-secondary': task.status === 'NOT_STARTED'
-                      }">
-                        {{ task.status === 'DONE' ? '完了' : 
-                           task.status === 'IN_PROGRESS' ? '進行中' : 
-                           task.status === 'BLOCKED' ? 'ブロック' : '未開始' }}
-                      </span>
-                    </td>
-                    <td>
-                      <span class="badge" :class="{
-                        'bg-danger': task.priority === 'URGENT',
-                        'bg-warning': task.priority === 'HIGH',
-                        'bg-info': task.priority === 'MEDIUM',
-                        'bg-secondary': task.priority === 'LOW'
-                      }">
-                        {{ task.priority === 'URGENT' ? '緊急' : 
-                           task.priority === 'HIGH' ? '高' : 
-                           task.priority === 'MEDIUM' ? '中' : '低' }}
-                      </span>
-                    </td>
-                    <td>{{ task.progress_percent }}%</td>
-                    <td>{{ task.planned_end ? new Date(task.planned_end).toLocaleDateString('ja-JP') : '-' }}</td>
-                    <td>{{ task.primary_assignee_id ? `ユーザー${task.primary_assignee_id}` : '-' }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="closeTaskModal">閉じる</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <ProjectTasksModal 
+      :visible="showTaskModal"
+      :project-name="selectedProjectForTasks?.name ?? null"
+      :tasks="selectedProjectTasks"
+      @close="closeTaskModal"
+    />
   </div>
 </template>
 

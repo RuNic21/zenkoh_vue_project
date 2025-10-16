@@ -2,10 +2,8 @@
 // レポートページコンポーネント
 // 目的: プロジェクト・タスク・ユーザーの統計レポートを表示・生成
 
-import { ref, computed, onMounted, reactive } from "vue";
-import { generateReport, generateTaskStatusChartData, generatePriorityChartData } from "../services/reportService";
-import { listProjects } from "../services/projectService";
-import { supabase } from "../services/supabaseClient";
+import { ref, computed } from "vue";
+import { useReportPage } from "@/composables/useReportPage";
 import type { 
   ReportData, 
   ReportOptions, 
@@ -27,6 +25,7 @@ import ActionBar from "@/components/common/ActionBar.vue";
 import ModalShell from "@/components/common/ModalShell.vue";
 import { toCsv, downloadFile } from "@/utils/exportUtils";
 import StatCards from "@/components/common/StatCards.vue";
+import ReportFilters from "@/components/report/ReportFilters.vue";
 
 // TODO: 高度な分析機能の実装
 // 1. 時間追跡・生産性分析 - 実際の作業時間 vs 計画時間の比較分析
@@ -59,163 +58,34 @@ import StatCards from "@/components/common/StatCards.vue";
 // 3. モバイル対応 - レスポンシブチャート・タッチインターフェース対応
 // 4. エクスポート機能拡張 - PDF、Excel、PowerBI連携などの多様なエクスポート形式
 
-// レポートデータ
-const reportData = ref<ReportData | null>(null);
-const isLoading = ref(false);
-const errorMessage = ref("");
+// レポート状態は composable に集約
+const {
+  reportData,
+  isLoading,
+  errorMessage,
+  filter,
+  availableProjects,
+  availableUsers,
+  includeArchived,
+  reportOptions,
+  taskStatusChartData,
+  priorityChartData,
+  projectProgressChartData,
+  userWorkloadChartData,
+  deadlineChartData,
+  generateReportData,
+} = useReportPage();
 
-// フィルター設定
-const filter = reactive<ReportFilter>({
-  dateRange: {
-    start: null,
-    end: null
-  },
-  projects: [],
-  users: [],
-  status: [],
-  priority: []
-});
-
-// 利用可能なプロジェクト・ユーザー一覧
-const availableProjects = ref<Array<{ id: number; name: string }>>([]);
-const availableUsers = ref<Array<{ id: number; display_name: string }>>([]);
-
-// アーカイブフィルター
-const includeArchived = ref(false);
+// フィルター候補は composable 初期化時に読み込み済み
 
 // プロジェクト詳細モーダル
 const showProjectDetailModal = ref(false);
 const selectedProjectDetail = ref<any>(null);
 
-// レポート生成オプション
-const reportOptions = computed((): ReportOptions => ({
-  projectIds: filter.projects.length > 0 ? filter.projects : undefined,
-  userIds: filter.users.length > 0 ? filter.users : undefined,
-  dateRange: filter.dateRange.start && filter.dateRange.end ? {
-    startDate: filter.dateRange.start.toISOString().split('T')[0],
-    endDate: filter.dateRange.end.toISOString().split('T')[0]
-  } : undefined,
-  includeArchived: includeArchived.value
-}));
 
-// チャートデータ
-const taskStatusChartData = computed(() => {
-  if (!reportData.value || !reportData.value.taskStatistics) return null;
-  return generateTaskStatusChartData(reportData.value.taskStatistics);
-});
+// チャートデータは composable から取得
 
-const priorityChartData = computed(() => {
-  if (!reportData.value || !reportData.value.priorityReport || !Array.isArray(reportData.value.priorityReport)) {
-    return null;
-  }
-  return generatePriorityChartData(reportData.value.priorityReport);
-});
-
-// プロジェクト進捗チャートデータ
-const projectProgressChartData = computed(() => {
-  if (!reportData.value || !reportData.value.projectProgress || !Array.isArray(reportData.value.projectProgress)) {
-    return null;
-  }
-  
-  return {
-    labels: reportData.value.projectProgress.map(p => p.projectName),
-    datasets: [{
-      label: "進捗率 (%)",
-      data: reportData.value.projectProgress.map(p => p.averageProgress),
-      backgroundColor: reportData.value.projectProgress.map(p => {
-        switch (p.status) {
-          case "完了": return "#28a745";
-          case "進行中": return "#007bff";
-          case "遅延": return "#dc3545";
-          default: return "#6c757d";
-        }
-      }),
-      borderColor: reportData.value.projectProgress.map(p => {
-        switch (p.status) {
-          case "完了": return "#28a745";
-          case "進行中": return "#007bff";
-          case "遅延": return "#dc3545";
-          default: return "#6c757d";
-        }
-      }),
-      borderWidth: 1
-    }]
-  };
-});
-
-// ユーザー作業量チャートデータ
-const userWorkloadChartData = computed(() => {
-  if (!reportData.value || !reportData.value.userWorkload || !Array.isArray(reportData.value.userWorkload)) {
-    return null;
-  }
-  
-  return {
-    labels: reportData.value.userWorkload.map(u => u.userName),
-    datasets: [{
-      label: "完了率 (%)",
-      data: reportData.value.userWorkload.map(u => u.completionRate),
-      backgroundColor: "#007bff",
-      borderColor: "#0056b3",
-      borderWidth: 1
-    }]
-  };
-});
-
-// 期限別レポートチャートデータ
-const deadlineChartData = computed(() => {
-  if (!reportData.value || !reportData.value.deadlineReport || !Array.isArray(reportData.value.deadlineReport)) {
-    return null;
-  }
-  
-  return {
-    labels: reportData.value.deadlineReport.map(d => d.period),
-    datasets: [{
-      label: "タスク数",
-      data: reportData.value.deadlineReport.map(d => d.taskCount),
-      backgroundColor: reportData.value.deadlineReport.map(d => {
-        switch (d.period) {
-          case "今週": return "#28a745";
-          case "来週": return "#007bff";
-          case "今月": return "#ffc107";
-          case "期限切れ": return "#dc3545";
-          default: return "#6c757d";
-        }
-      }),
-      borderColor: reportData.value.deadlineReport.map(d => {
-        switch (d.period) {
-          case "今週": return "#28a745";
-          case "来週": return "#007bff";
-          case "今月": return "#ffc107";
-          case "期限切れ": return "#dc3545";
-          default: return "#6c757d";
-        }
-      }),
-      borderWidth: 1
-    }]
-  };
-});
-
-// レポート生成
-const generateReportData = async () => {
-  try {
-    isLoading.value = true;
-    errorMessage.value = "";
-    
-    const result = await generateReport(reportOptions.value);
-    
-    if (result.success && result.data) {
-      reportData.value = result.data;
-    } else {
-      errorMessage.value = result.error || "レポート生成に失敗しました";
-      console.error("レポート生成エラー:", result.error);
-    }
-  } catch (error) {
-    console.error("レポート生成中のエラー:", error);
-    errorMessage.value = "レポート生成中にエラーが発生しました";
-  } finally {
-    isLoading.value = false;
-  }
-};
+// レポート生成は composable の generateReportData を使用
 
 // フィルターリセット
 const resetFilters = () => {
@@ -226,36 +96,6 @@ const resetFilters = () => {
   filter.status = [];
   filter.priority = [];
   includeArchived.value = false;
-};
-
-// プロジェクト・ユーザー一覧読み込み
-const loadFilterOptions = async () => {
-  try {
-    // プロジェクト一覧取得
-    const result = await listProjects();
-    if (result.success && result.data) {
-      availableProjects.value = result.data.map((p: any) => ({ id: p.id, name: p.name }));
-    } else {
-      availableProjects.value = [];
-    }
-    
-    // ユーザー一覧取得
-    const { data: users, error } = await supabase
-      .from("users")
-      .select("id, display_name")
-      .eq("is_active", true);
-    
-    if (error) {
-      console.error("ユーザー一覧取得エラー:", error);
-      availableUsers.value = [];
-    } else {
-      availableUsers.value = users || [];
-    }
-  } catch (error) {
-    console.error("フィルターオプション読み込みエラー:", error);
-    availableProjects.value = [];
-    availableUsers.value = [];
-  }
 };
 
 // レポートエクスポート（CSV）
@@ -321,14 +161,7 @@ const closeProjectDetailModal = () => {
 };
 
 // 初期化
-onMounted(async () => {
-  await loadFilterOptions();
-  
-  // データが存在する場合のみレポート生成
-  if (availableProjects.value.length > 0 || availableUsers.value.length > 0) {
-    await generateReportData();
-  }
-});
+// 初期化は composable 側で実施済み
 
 </script>
 
@@ -342,160 +175,15 @@ onMounted(async () => {
     <!-- フィルター・アクションパネル -->
     <div class="row mb-4">
       <div class="col-12">
-        <div class="card">
-          <CardHeader title="レポートフィルター" />
-          <div class="card-body">
-            <ActionBar>
-              <template #right>
-                <button 
-                  class="btn bg-gradient-primary me-2"
-                  @click="generateReportData"
-                  :disabled="isLoading"
-                >
-                  <i class="material-symbols-rounded me-1">refresh</i>
-                  {{ isLoading ? "生成中..." : "レポート生成" }}
-                </button>
-                <button 
-                  class="btn bg-gradient-success me-2"
-                  @click="exportToCSV"
-                  :disabled="!reportData"
-                >
-                  <i class="material-symbols-rounded me-1">download</i>
-                  CSV エクスポート
-                </button>
-                <button 
-                  class="btn bg-gradient-secondary"
-                  @click="resetFilters"
-                >
-                  <i class="material-symbols-rounded me-1">clear</i>
-                  フィルターリセット
-                </button>
-              </template>
-            </ActionBar>
-            <div class="row">
-              <!-- プロジェクトフィルター -->
-              <div class="col-md-3 col-sm-6 mb-3">
-                <label class="form-label text-sm">プロジェクト</label>
-                <select 
-                  class="form-control" 
-                  multiple 
-                  v-model="filter.projects"
-                  size="3"
-                >
-                  <option 
-                    v-for="project in availableProjects" 
-                    :key="project.id" 
-                    :value="project.id"
-                  >
-                    {{ project.name }}
-                  </option>
-                  <option v-if="availableProjects.length === 0" disabled>
-                    プロジェクトがありません
-                  </option>
-                </select>
-                <small class="text-muted" v-if="availableProjects.length > 0">
-                  {{ availableProjects.length }}件のプロジェクト
-                </small>
-              </div>
-
-              <!-- ユーザーフィルター -->
-              <div class="col-md-3 col-sm-6 mb-3">
-                <label class="form-label text-sm">ユーザー</label>
-                <select 
-                  class="form-control" 
-                  multiple 
-                  v-model="filter.users"
-                  size="3"
-                >
-                  <option 
-                    v-for="user in availableUsers" 
-                    :key="user.id" 
-                    :value="user.id"
-                  >
-                    {{ user.display_name }}
-                  </option>
-                  <option v-if="availableUsers.length === 0" disabled>
-                    ユーザーがありません
-                  </option>
-                </select>
-                <small class="text-muted" v-if="availableUsers.length > 0">
-                  {{ availableUsers.length }}人のユーザー
-                </small>
-              </div>
-
-              <!-- 日付範囲フィルター -->
-              <div class="col-md-3 col-sm-6 mb-3">
-                <label class="form-label text-sm">開始日</label>
-                <input 
-                  type="date" 
-                  class="form-control" 
-                  v-model="filter.dateRange.start"
-                >
-              </div>
-
-              <div class="col-md-3 col-sm-6 mb-3">
-                <label class="form-label text-sm">終了日</label>
-                <input 
-                  type="date" 
-                  class="form-control" 
-                  v-model="filter.dateRange.end"
-                >
-              </div>
-            </div>
-
-            <!-- 追加フィルター行 -->
-            <div class="row">
-              <!-- ステータスフィルター -->
-              <div class="col-md-3 col-sm-6 mb-3">
-                <label class="form-label text-sm">タスクステータス</label>
-                <select 
-                  class="form-control" 
-                  multiple 
-                  v-model="filter.status"
-                  size="3"
-                >
-                  <option value="NOT_STARTED">未開始</option>
-                  <option value="IN_PROGRESS">進行中</option>
-                  <option value="BLOCKED">ブロック</option>
-                  <option value="DONE">完了</option>
-                  <option value="CANCELLED">キャンセル</option>
-                </select>
-              </div>
-
-              <!-- 優先度フィルター -->
-              <div class="col-md-3 col-sm-6 mb-3">
-                <label class="form-label text-sm">優先度</label>
-                <select 
-                  class="form-control" 
-                  multiple 
-                  v-model="filter.priority"
-                  size="3"
-                >
-                  <option value="LOW">低</option>
-                  <option value="MEDIUM">中</option>
-                  <option value="HIGH">高</option>
-                  <option value="URGENT">緊急</option>
-                </select>
-              </div>
-
-              <!-- アーカイブフィルター -->
-              <div class="col-md-3 col-sm-6 mb-3">
-                <label class="form-label text-sm">アーカイブ</label>
-                <div class="form-check">
-                  <input 
-                    class="form-check-input" 
-                    type="checkbox" 
-                    v-model="includeArchived"
-                    id="includeArchived"
-                  >
-                  <label class="form-check-label" for="includeArchived">
-                    アーカイブされたデータを含む
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ReportFilters 
+          :filter="filter"
+          :available-projects="availableProjects"
+          :available-users="availableUsers"
+          :include-archived="includeArchived"
+          @reset="resetFilters"
+          @generate="generateReportData"
+          @update:includeArchived="(v:boolean)=> includeArchived = v"
+        />
       </div>
     </div>
 

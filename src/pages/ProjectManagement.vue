@@ -84,13 +84,8 @@
 //    - アクティビティログ（プロジェクト変更履歴）
 //    - 実装：Supabase Realtime＋ファイルストレージ活用
 
-import { ref, computed, onMounted } from "vue";
-import { listProjects, createProject, updateProject, deleteProject } from "../services/projectService";
-import type { ProjectInsert, ProjectUpdate } from "../types/project";
-import { listUsers } from "../services/dbServices";
-import { logProjectCreated } from "../services/activityService";
-import type { Project } from "../types/project";
-import type { Users } from "../types/db/users";
+// using useProjectManagement composable; no local refs required
+import { useProjectManagement } from "@/composables/useProjectManagement";
 import PerformanceOptimizedTable from "../components/table/PerformanceOptimizedTable.vue";
 import ProjectFilterPanel from "../components/project/ProjectFilterPanel.vue";
 import LoadingSpinner from "@/components/common/LoadingSpinner.vue";
@@ -101,440 +96,48 @@ import CardHeader from "@/components/common/CardHeader.vue";
 import ActionBar from "@/components/common/ActionBar.vue";
 import StatCards from "@/components/common/StatCards.vue";
 import ModalShell from "@/components/common/ModalShell.vue";
-import { 
-  getProjectStats, 
-  getProjectDetailStats, 
-  type ProjectStats,
-  type ProjectDetailStats
-} from "../services/dashboardService";
-import { formatDateJP, formatPercent, truncate } from "@/utils/formatters";
+import { formatPercent, truncate } from "@/utils/formatters";
+const {
+  projects,
+  users,
+  isLoading,
+  errorMessage,
+  projectStats,
+  projectDetailStats,
+  showCreateModal,
+  showEditModal,
+  showDeleteModal,
+  selectedProject,
+  formData,
+  searchQuery,
+  statusFilter,
+  dateFilter,
+  clearFilters,
+  filteredProjects,
+  projectCurrentPage,
+  projectPageSize,
+  projectSortColumn,
+  projectSortDirection,
+  projectTableColumns,
+  projectTableRows,
+  handleProjectSortChange,
+  handleProjectPageChange,
+  formatDate,
+  getOwnerName,
+  getProjectStatus,
+  loadProjects,
+  loadUsers,
+  handleCreateProject,
+  handleEditProject,
+  handleDeleteProject,
+  resetForm,
+  openEditModal,
+  openDeleteModal,
+  loadDashboardStats,
+  showProjectTasks,
+} = useProjectManagement();
 
-// プロジェクト一覧の状態管理
-const projects = ref<Project[]>([]);
-const users = ref<Users[]>([]);
-const isLoading = ref(false);
-const errorMessage = ref("");
-
-// ダッシュボード統計情報
-const projectStats = ref<ProjectStats>({
-  totalProjects: 0,
-  activeProjects: 0,
-  archivedProjects: 0,
-  overdueProjects: 0,
-  totalTasks: 0,
-  completedTasks: 0,
-  inProgressTasks: 0,
-  blockedTasks: 0,
-  averageProgress: 0
-});
-const projectDetailStats = ref<ProjectDetailStats[]>([]);
-
-// タスク管理（プロジェクト詳細ページ遷移に変更されたため不要）
-
-// モーダル表示状態
-const showCreateModal = ref(false);
-const showEditModal = ref(false);
-const showDeleteModal = ref(false);
-const selectedProject = ref<Project | null>(null);
-
-// フォームデータ
-const formData = ref<ProjectInsert>({
-  name: "",
-  description: "",
-  start_date: "",
-  end_date: "",
-  owner_user_id: null,
-  is_archived: false
-});
-
-// 検索・フィルタリング
-const searchQuery = ref("");
-const statusFilter = ref("all"); // 'all' | 'active' | 'archived'
-const dateFilter = ref("all"); // 'all' | 'this-month' | 'overdue'
-
-// フィルタリングされたプロジェクト一覧
-const filteredProjects = computed(() => {
-  let filtered = projects.value;
-
-  // 検索クエリでフィルタリング
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase();
-    filtered = filtered.filter(project => 
-      project.name.toLowerCase().includes(query) ||
-      (project.description && project.description.toLowerCase().includes(query))
-    );
-  }
-
-  // 状態でフィルタリング
-  if (statusFilter.value !== "all") {
-    filtered = filtered.filter(project => {
-      switch (statusFilter.value) {
-        case "active":
-          return !project.is_archived;
-        case "archived":
-          return project.is_archived;
-        default:
-          return true;
-      }
-    });
-  }
-
-  // 日付でフィルタリング
-  if (dateFilter.value !== "all") {
-    const today = new Date();
-    filtered = filtered.filter(project => {
-      if (!project.end_date) return false;
-      const endDate = new Date(project.end_date);
-      
-      switch (dateFilter.value) {
-        case "this-month":
-          const monthFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
-          return endDate >= today && endDate <= monthFromNow;
-        case "overdue":
-          return endDate < today && !project.is_archived;
-        default:
-          return true;
-      }
-    });
-  }
-
-  return filtered;
-});
-
-
-// =============================
-// テーブル用: 表示データと列定義
-// 目的: テーブル専用の平坦なデータに整形し、ソート/ページングを親で管理
-// =============================
-// プロジェクト一覧テーブル: ページングとソート状態
-const projectCurrentPage = ref(1);
-const projectPageSize = ref(10);
-const projectSortColumn = ref<string>("");
-const projectSortDirection = ref<"asc" | "desc">("asc");
-
-// 列定義（表示名とキー、必要に応じてフォーマッタ）
-const projectTableColumns = [
-  { key: "name", label: "プロジェクト名", sortable: true },
-  { key: "description", label: "説明" },
-  { key: "ownerName", label: "オーナー", sortable: true },
-  { key: "startDate", label: "開始日", sortable: true, formatter: (v: string) => v || "-" },
-  { key: "endDate", label: "終了日", sortable: true, formatter: (v: string) => v || "-" },
-  { key: "status", label: "状態", sortable: true },
-  { key: "createdAt", label: "作成日", sortable: true }
-];
-
-// テーブル用にフラットな形へ変換
-const projectTableRows = computed(() => {
-  // フィルタ済みを基準にする
-  const base = filteredProjects.value.map((p) => ({
-    id: p.id,
-    name: p.name,
-    description: p.description || "-",
-    ownerName: getOwnerName(p.owner_user_id ?? null),
-    startDate: p.start_date || "-",
-    endDate: p.end_date || "-",
-    status: getProjectStatus(p),
-    createdAt: formatDate(p.created_at)
-  }));
-
-  // ソート適用
-  if (projectSortColumn.value) {
-    const col = projectSortColumn.value as keyof (typeof base)[number];
-    base.sort((a, b) => {
-      const aVal = a[col] ?? "";
-      const bVal = b[col] ?? "";
-      if (aVal < bVal) return projectSortDirection.value === "asc" ? -1 : 1;
-      if (aVal > bVal) return projectSortDirection.value === "asc" ? 1 : -1;
-      return 0;
-    });
-  }
-
-  return base;
-});
-
-// ソートハンドラ
-const handleProjectSortChange = (column: string, direction: "asc" | "desc") => {
-  // 列が同じなら方向をトグル、異なるなら昇順から開始
-  if (projectSortColumn.value === column) {
-    projectSortDirection.value = direction;
-  } else {
-    projectSortColumn.value = column;
-    projectSortDirection.value = direction;
-  }
-};
-
-// ページ変更ハンドラ
-const handleProjectPageChange = (page: number) => {
-  // 安全のためページ境界をチェック
-  if (page < 1) return;
-  projectCurrentPage.value = page;
-};
-
-// プロジェクト一覧の読み込み
-const loadProjects = async () => {
-  try {
-    isLoading.value = true;
-    errorMessage.value = "";
-    const result = await listProjects();
-    if (result.success && result.data) {
-      projects.value = result.data;
-    } else {
-      errorMessage.value = result.error || "プロジェクト一覧の読み込みに失敗しました。";
-      projects.value = [];
-    }
-  } catch (error) {
-    console.error("プロジェクト一覧の読み込みに失敗:", error);
-    errorMessage.value = "プロジェクト一覧の読み込みに失敗しました。";
-    projects.value = [];
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-// ユーザー一覧の読み込み
-const loadUsers = async () => {
-  try {
-    // ServiceResult を展開し、data のみ Users[] として代入する
-    const result = await listUsers();
-    if (result && typeof result === "object" && "success" in result) {
-      if (result.success && result.data) {
-        users.value = result.data as Users[];
-      } else {
-        console.error("ユーザー一覧の読み込みに失敗:", result.error);
-        users.value = [];
-      }
-    } else {
-      // 後方互換（配列が直接返る場合）
-      users.value = (result as unknown as Users[]) ?? [];
-    }
-  } catch (error) {
-    console.error("ユーザー一覧の読み込みに失敗:", error);
-    users.value = [];
-  }
-};
-
-// プロジェクトのオーナー名を取得
-const getOwnerName = (ownerId: number | null): string => {
-  if (!ownerId) return "-";
-  const owner = users.value.find(user => user.id === ownerId);
-  return owner ? owner.display_name : "-";
-};
-
-// 新規プロジェクト作成
-const handleCreateProject = async () => {
-  try {
-    if (!formData.value.name.trim()) {
-      alert("プロジェクト名を入力してください。");
-      return;
-    }
-
-    const result = await createProject(formData.value);
-    if (result.success && result.data) {
-      projects.value.push(result.data);
-      showCreateModal.value = false;
-      resetForm();
-      
-      // 活動ログを生成
-      const ownerName = getOwnerName(result.data.owner_user_id ?? null);
-      await logProjectCreated(result.data.id, result.data.name, ownerName);
-      
-      // ダッシュボード統計を更新
-      await loadDashboardStats();
-      
-      alert("プロジェクトが正常に作成されました！");
-    } else {
-      alert(result.error || "プロジェクトの作成に失敗しました。");
-    }
-  } catch (error) {
-    console.error("プロジェクト作成エラー:", error);
-    alert("プロジェクト作成中にエラーが発生しました。");
-  }
-};
-
-// プロジェクト編集
-const handleEditProject = async () => {
-  try {
-    if (!selectedProject.value || !formData.value.name.trim()) {
-      alert("プロジェクト名を入力してください。");
-      return;
-    }
-
-    const updateData: ProjectUpdate = {
-      name: formData.value.name,
-      description: formData.value.description,
-      start_date: formData.value.start_date,
-      end_date: formData.value.end_date,
-      owner_user_id: formData.value.owner_user_id,
-      is_archived: formData.value.is_archived
-    };
-
-    const result = await updateProject(selectedProject.value.id, updateData);
-    if (result.success && result.data) {
-      const index = projects.value.findIndex(p => p.id === selectedProject.value!.id);
-      if (index !== -1) {
-        projects.value[index] = result.data;
-      }
-      showEditModal.value = false;
-      selectedProject.value = null;
-      resetForm();
-      
-      // ダッシュボード統計を更新
-      await loadDashboardStats();
-      
-      alert("プロジェクトが正常に更新されました！");
-    } else {
-      alert(result.error || "プロジェクトの更新に失敗しました。");
-    }
-  } catch (error) {
-    console.error("プロジェクト更新エラー:", error);
-    alert("プロジェクト更新中にエラーが発生しました。");
-  }
-};
-
-// プロジェクト削除
-const handleDeleteProject = async () => {
-  try {
-    if (!selectedProject.value) return;
-
-    const result = await deleteProject(selectedProject.value.id);
-    if (result.success && result.data) {
-      projects.value = projects.value.filter(p => p.id !== selectedProject.value!.id);
-      showDeleteModal.value = false;
-      selectedProject.value = null;
-      
-      // ダッシュボード統計を更新
-      await loadDashboardStats();
-      
-      alert("プロジェクトが正常に削除されました。");
-    } else {
-      alert(result.error || "プロジェクトの削除に失敗しました。");
-    }
-  } catch (error) {
-    console.error("プロジェクト削除エラー:", error);
-    alert("プロジェクト削除中にエラーが発生しました。");
-  }
-};
-
-// フォームリセット
-const resetForm = () => {
-  formData.value = {
-    name: "",
-    description: "",
-    start_date: "",
-    end_date: "",
-    owner_user_id: null,
-    is_archived: false
-  };
-};
-
-// 編集モーダルを開く
-const openEditModal = (project: Project) => {
-  selectedProject.value = project;
-  formData.value = {
-    name: project.name,
-    description: project.description || "",
-    start_date: project.start_date || "",
-    end_date: project.end_date || "",
-    owner_user_id: project.owner_user_id,
-    is_archived: project.is_archived
-  };
-  showEditModal.value = true;
-};
-
-// 削除モーダルを開く
-const openDeleteModal = (project: Project) => {
-  selectedProject.value = project;
-  showDeleteModal.value = true;
-};
-
-// フィルタリセット
-const clearFilters = () => {
-  searchQuery.value = "";
-  statusFilter.value = "all";
-  dateFilter.value = "all";
-};
-
-// 日付フォーマット（共通フォーマッター使用）
-const formatDate = (dateString: string | null): string => formatDateJP(dateString ?? null);
-
-// プロジェクト状態の表示
-const getProjectStatus = (project: Project): string => {
-  if (project.is_archived) return "アーカイブ";
-  
-  if (!project.end_date) return "進行中";
-  
-  const today = new Date();
-  const endDate = new Date(project.end_date);
-  
-  if (endDate < today) return "期限切れ";
-  return "進行中";
-};
-
-
-// ダッシュボード統計情報の読み込み
-const loadDashboardStats = async () => {
-  try {
-    const [statsResult, detailStatsResult] = await Promise.all([
-      getProjectStats(),
-      getProjectDetailStats()
-    ]);
-    
-    if (statsResult.success && statsResult.data) {
-      projectStats.value = statsResult.data;
-    } else {
-      console.error("プロジェクト統計の読み込みに失敗:", statsResult.error);
-    }
-    
-    if (detailStatsResult.success && detailStatsResult.data) {
-      projectDetailStats.value = detailStatsResult.data;
-    } else {
-      console.error("プロジェクト詳細統計の読み込みに失敗:", detailStatsResult.error);
-    }
-  } catch (error) {
-    console.error("ダッシュボード統計の読み込みに失敗:", error);
-  }
-};
-
-// プロジェクトの詳細ページに遷移
-const showProjectTasks = async (project: Project) => {
-  try {
-    // プロジェクト詳細ページに遷移（URLパラメータでプロジェクトIDを渡す）
-    const projectId = project.id;
-    
-    // URLパラメータを設定（ProjectDetail.vueで使用）
-    const url = new URL(window.location.href);
-    url.searchParams.set('id', projectId.toString());
-    window.history.pushState({}, '', url.toString());
-    
-    // プロジェクト詳細ページに遷移
-    // App.vueのcurrentPageを変更するためにイベントを発火させる
-    window.dispatchEvent(new CustomEvent('navigate-to-project-detail', { 
-      detail: { projectId } 
-    }));
-    
-    // URL変更イベントも発火してProjectDetail.vueが反応するようにする
-    window.dispatchEvent(new PopStateEvent('popstate'));
-    
-    // ProjectDetail.vueがURLの変更を強制的に検知できるようにトリガーを送る
-    setTimeout(() => {
-      window.dispatchEvent(new Event('hashchange'));
-    }, 100);
-  } catch (error) {
-    console.error("プロジェクト詳細への遷移に失敗:", error);
-    alert("プロジェクト詳細ページへの遷移に失敗しました。");
-  }
-};
-
-// タスクモーダル関連（プロジェクト詳細ページ遷移に変更されたため不要）
-
-// コンポーネントマウント時にデータを読み込み
-onMounted(async () => {
-  await Promise.all([
-    loadProjects(),
-    loadUsers(),
-    loadDashboardStats()
-  ]);
-});
+// composable を利用するため、以降のローカル定義は不要です
 </script>
 
 <template>

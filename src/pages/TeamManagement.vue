@@ -3,6 +3,15 @@
 // 目的: ユーザー管理、チームメンバー管理、権限管理を提供
 
 import { ref, computed, onMounted } from "vue";
+import { useTeamMembersManagement } from "@/composables/useTeamMembersManagement";
+import { useProjectTeamsManagement } from "@/composables/useProjectTeamsManagement";
+import NotificationTable from "@/components/notification/NotificationTable.vue";
+import AlertRuleTable from "@/components/notification/AlertRuleTable.vue";
+import NotificationModal from "@/components/notification/NotificationModal.vue";
+import AlertRuleModal from "@/components/notification/AlertRuleModal.vue";
+import { useNotificationsManagement } from "@/composables/useNotificationsManagement";
+import TeamMemberTable from "@/components/team/TeamMemberTable.vue";
+import { useTeamManagement } from "@/composables/useTeamManagement";
 import type { 
   User, 
   TeamMemberWithUser, 
@@ -152,54 +161,57 @@ import {
 
 // ===== リアクティブデータ =====
 
-// ユーザー管理
-const users = ref<User[]>([]);
-const isUsersLoading = ref(false);
-const usersErrorMessage = ref("");
+// composable から主要状態を取得（重複を避けるため users/stats/notifications のみ）
+const {
+  users,
+  isUsersLoading,
+  usersErrorMessage,
+  teamStats,
+  isStatsLoading,
+  notifications,
+  notificationStats,
+  alertRules,
+  isNotificationsLoading,
+  isAlertRulesLoading,
+  loadUsers,
+  loadTeamStats,
+  loadNotificationsSummary,
+} = useTeamManagement();
 
-// チームメンバー管理
-const teamMembers = ref<TeamMemberWithUser[]>([]);
-const isTeamMembersLoading = ref(false);
-const teamMembersErrorMessage = ref("");
+// チームメンバー管理（新 composable）
+const {
+  members: teamMemberRows,
+  isLoading: isTeamMembersLoading,
+  errorMessage: teamMembersErrorMessage,
+  addMember: addTeamMemberAction,
+  changeRole: changeTeamMemberRoleAction,
+  removeMember: removeTeamMemberAction,
+  loadMembers,
+} = useTeamMembersManagement();
 
-// プロジェクトチーム情報
-const projectTeams = ref<ProjectTeam[]>([]);
-const isProjectTeamsLoading = ref(false);
-const projectTeamsErrorMessage = ref("");
+// 以下のセクション（teamMembers, projectTeams, ...）は既存のローカル状態を維持
 
-// 統計情報
-const teamStats = ref<TeamStats>({
-  total_users: 0,
-  active_users: 0,
-  total_projects: 0,
-  total_tasks: 0,
-  average_tasks_per_user: 0
-});
-const isStatsLoading = ref(false);
+// チームメンバー管理（composable 提供を利用）
+
+// プロジェクトチーム情報（composable 提供を利用）
+const {
+  projectTeams,
+  isProjectTeamsLoading,
+  projectTeamsErrorMessage,
+  loadProjectTeams: tmLoadProjectTeams,
+} = useProjectTeamsManagement();
 
 // ユーザー活動統計
 const userActivities = ref<UserActivity[]>([]);
 const isUserActivitiesLoading = ref(false);
 
 // 通知管理
-const notifications = ref<Notification[]>([]);
-const isNotificationsLoading = ref(false);
 const notificationsErrorMessage = ref("");
 
 // アラートルール管理
-const alertRules = ref<AlertRule[]>([]);
-const isAlertRulesLoading = ref(false);
 const alertRulesErrorMessage = ref("");
 
 // 通知統計情報
-const notificationStats = ref<NotificationStats>({
-  total_notifications: 0,
-  queued_notifications: 0,
-  sent_notifications: 0,
-  failed_notifications: 0,
-  cancelled_notifications: 0,
-  success_rate: 0
-});
 const isNotificationStatsLoading = ref(false);
 
 // フィルタリング・検索
@@ -377,20 +389,17 @@ const filteredUsers = computed(() => {
 
 // フィルタリングされたチームメンバー一覧
 const filteredTeamMembers = computed(() => {
-  let filtered = teamMembers.value;
+  let filtered = (teamMemberRows.value as any[]);
 
-  // 検索クエリでフィルタリング
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase();
-    filtered = filtered.filter(member => 
-      member.user?.display_name.toLowerCase().includes(query) ||
-      member.user?.email.toLowerCase().includes(query)
+    filtered = filtered.filter((member) =>
+      (member.user?.display_name || '').toLowerCase().includes(query)
     );
   }
 
-  // 役割でフィルタリング
   if (roleFilter.value !== "all") {
-    filtered = filtered.filter(member => member.role === roleFilter.value);
+    filtered = filtered.filter((member) => member.role === roleFilter.value);
   }
 
   return filtered;
@@ -437,46 +446,7 @@ const filteredAlertRules = computed(() => {
 
 // ===== メソッド =====
 
-// データ読み込み
-const loadUsers = async () => {
-  try {
-    isUsersLoading.value = true;
-    usersErrorMessage.value = "";
-    const result = await listUsers();
-    if (result.success && result.data) {
-      users.value = result.data;
-    } else {
-      usersErrorMessage.value = result.error || "ユーザーの読み込みに失敗しました";
-      users.value = [];
-    }
-  } catch (error) {
-    console.error("ユーザー読み込みエラー:", error);
-    usersErrorMessage.value = "ユーザーの読み込みに失敗しました";
-    users.value = [];
-  } finally {
-    isUsersLoading.value = false;
-  }
-};
-
-const loadTeamMembers = async () => {
-  try {
-    isTeamMembersLoading.value = true;
-    teamMembersErrorMessage.value = "";
-    const result = await listTeamMembersWithUsers();
-    if (result.success && result.data) {
-      teamMembers.value = result.data;
-    } else {
-      teamMembersErrorMessage.value = result.error || "チームメンバーの読み込みに失敗しました";
-      teamMembers.value = [];
-    }
-  } catch (error) {
-    console.error("チームメンバー読み込みエラー:", error);
-    teamMembersErrorMessage.value = "チームメンバーの読み込みに失敗しました";
-    teamMembers.value = [];
-  } finally {
-    isTeamMembersLoading.value = false;
-  }
-};
+// データ読み込みは composable の loadMembers に委譲
 
 const loadProjectTeams = async () => {
   try {
@@ -495,17 +465,6 @@ const loadProjectTeams = async () => {
     projectTeams.value = [];
   } finally {
     isProjectTeamsLoading.value = false;
-  }
-};
-
-const loadTeamStats = async () => {
-  try {
-    isStatsLoading.value = true;
-    teamStats.value = await getTeamStats();
-  } catch (error) {
-    console.error("チーム統計読み込みエラー:", error);
-  } finally {
-    isStatsLoading.value = false;
   }
 };
 
@@ -542,7 +501,6 @@ const loadNotifications = async () => {
 
 const loadAlertRules = async () => {
   try {
-    isAlertRulesLoading.value = true;
     alertRulesErrorMessage.value = "";
     alertRules.value = await listAlertRules();
   } catch (error) {
@@ -622,8 +580,8 @@ const handleAddTeamMember = async () => {
   try {
     const newMember = await addTeamMember(memberForm.value);
     if (newMember) {
-      await loadTeamMembers();
-      await loadProjectTeams();
+      await loadMembers();
+      await tmLoadProjectTeams();
       closeMemberModal();
       alert("チームメンバーが正常に追加されました");
     } else {
@@ -639,8 +597,8 @@ const handleUpdateMemberRole = async (userId: number, taskId: number, newRole: T
   try {
     const updatedMember = await updateTeamMemberRole(userId, taskId, { role: newRole });
     if (updatedMember) {
-      await loadTeamMembers();
-      await loadProjectTeams();
+      await loadMembers();
+      await tmLoadProjectTeams();
       alert("チームメンバーの役割が正常に更新されました");
     } else {
       alert("チームメンバーの役割更新に失敗しました");
@@ -657,8 +615,8 @@ const handleRemoveTeamMember = async (userId: number, taskId: number) => {
   try {
     const success = await removeTeamMember(userId, taskId);
     if (success) {
-      await loadTeamMembers();
-      await loadProjectTeams();
+      await loadMembers();
+      await tmLoadProjectTeams();
       alert("チームメンバーが正常に削除されました");
     } else {
       alert("チームメンバーの削除に失敗しました");
@@ -689,7 +647,7 @@ const handleCreateNotification = async () => {
 
 const handleResendNotification = async (id: number) => {
   try {
-    const success = await resendNotification(id);
+    const success = await resendNotificationAction(id);
     if (success) {
       await loadNotifications();
       await loadNotificationStats();
@@ -707,7 +665,7 @@ const handleDeleteNotification = async (id: number) => {
   if (!confirm("この通知を削除しますか？")) return;
   
   try {
-    const success = await deleteNotification(id);
+    const success = await deleteNotificationAction(id);
     if (success) {
       await loadNotifications();
       await loadNotificationStats();
@@ -767,7 +725,7 @@ const handleDeleteAlertRule = async (id: number) => {
   if (!confirm("このアラートルールを削除しますか？")) return;
   
   try {
-    const success = await deleteAlertRule(id);
+    const success = await deleteAlertRuleAction(id);
     if (success) {
       await loadAlertRules();
       alert("アラートルールが正常に削除されました");
@@ -778,6 +736,18 @@ const handleDeleteAlertRule = async (id: number) => {
     console.error("アラートルール削除エラー:", error);
     alert("アラートルール削除中にエラーが発生しました");
   }
+};
+
+const openEditNotificationModalById = (id: number) => {
+  const target = filteredNotifications.value.find(n => n.id === id);
+  if (!target) return;
+  openEditNotificationModal(target);
+};
+
+const openEditAlertRuleModalById = (id: number) => {
+  const target = filteredAlertRules.value.find(r => r.id === id);
+  if (!target) return;
+  handleEditAlertRule(target);
 };
 
 const handleEditAlertRule = (alertRule: AlertRule) => {
@@ -1266,9 +1236,61 @@ const openNotificationModal = () => {
   showNotificationModal.value = true;
 };
 
+const openEditNotificationModal = (n: Notification) => {
+  editingNotification.value = n;
+  notificationForm.value = {
+    project_id: (n as any).project_id ?? 0,
+    task_id: (n as any).task_id ?? 0,
+    to_email: n.to_email,
+    subject: n.subject,
+    body_text: n.body_text,
+    send_after: (n as any).send_after ?? new Date().toISOString(),
+  };
+  showNotificationModal.value = true;
+};
+
 const closeNotificationModal = () => {
   showNotificationModal.value = false;
   editingNotification.value = null;
+};
+
+// 通知モーダル保存処理（作成/更新の分岐）
+const onSaveNotification = async (f: { subject: string; to_email: string; body_text: string }) => {
+  try {
+    // フォームデータを更新
+    notificationForm.value.subject = f.subject;
+    notificationForm.value.to_email = f.to_email;
+    notificationForm.value.body_text = f.body_text;
+    
+    if (editingNotification.value) {
+      // 編集モード：更新処理
+      const updatePayload = {
+        subject: f.subject,
+        to_email: f.to_email,
+        body_text: f.body_text,
+      };
+      
+      const success = await updateNotificationAction(editingNotification.value.id, updatePayload);
+      
+      if (success) {
+        // 成功時：データ再読み込みとモーダル閉じる
+        await Promise.all([
+          loadNotifications(),
+          loadNotificationStats()
+        ]);
+        closeNotificationModal();
+        alert("通知が正常に更新されました");
+      } else {
+        alert("通知の更新に失敗しました。もう一度お試しください。");
+      }
+    } else {
+      // 作成モード：新規作成処理
+      await handleCreateNotification();
+    }
+  } catch (error) {
+    console.error("通知保存エラー:", error);
+    alert("通知の保存中にエラーが発生しました。もう一度お試しください。");
+  }
 };
 
 const openAlertRuleModal = () => {
@@ -1287,6 +1309,44 @@ const openAlertRuleModal = () => {
 const closeAlertRuleModal = () => {
   showAlertRuleModal.value = false;
   editingAlertRule.value = null;
+};
+
+// アラートルールモーダル保存処理（作成/更新の分岐）
+const onSaveAlertRule = async (f: { name: string; channel: string; enabled: boolean }) => {
+  try {
+    // フォームデータを更新
+    alertRuleForm.value.name = f.name;
+    alertRuleForm.value.rule_type = f.channel as any;
+    alertRuleForm.value.is_enabled = f.enabled;
+    
+    if (editingAlertRule.value) {
+      // 編集モード：更新処理
+      const updatePayload = {
+        name: f.name,
+        rule_type: f.channel as any,
+        is_enabled: f.enabled,
+        notify_email: alertRuleForm.value.notify_email,
+        params_json: alertRuleForm.value.params_json,
+      };
+      
+      const success = await updateAlertRuleAction(editingAlertRule.value.id, updatePayload);
+      
+      if (success) {
+        // 成功時：データ再読み込みとモーダル閉じる
+        await loadAlertRules();
+        closeAlertRuleModal();
+        alert("アラートルールが正常に更新されました");
+      } else {
+        alert("アラートルールの更新に失敗しました。もう一度お試しください。");
+      }
+    } else {
+      // 作成モード：新規作成処理
+      await handleCreateAlertRule();
+    }
+  } catch (error) {
+    console.error("アラートルール保存エラー:", error);
+    alert("アラートルールの保存中にエラーが発生しました。もう一度お試しください。");
+  }
 };
 
 const openUserProfileModal = (user: User) => {
@@ -1432,8 +1492,8 @@ onMounted(async () => {
   console.log("チーム管理ページが初期化されました");
   await Promise.all([
     loadUsers(),
-    loadTeamMembers(),
-    loadProjectTeams(),
+    loadMembers(),
+    tmLoadProjectTeams(),
     loadTeamStats(),
     loadUserActivities(),
     loadNotifications(),
@@ -1441,6 +1501,16 @@ onMounted(async () => {
     loadNotificationStats()
   ]);
 });
+
+const {
+  createNotificationAction,
+  updateNotificationAction,
+  deleteNotificationAction,
+  resendNotificationAction,
+  createAlertRuleAction,
+  updateAlertRuleAction,
+  deleteAlertRuleAction,
+} = useNotificationsManagement();
 </script>
 
 <template>
@@ -2008,92 +2078,12 @@ onMounted(async () => {
     <!-- チームメンバー一覧 -->
     <div class="row mb-4">
       <div class="col-12">
-        <div class="card">
-          <div class="card-header pb-0">
-            <div class="row">
-              <div class="col-lg-6 col-8">
-                <h6>チームメンバー一覧</h6>
-                <p class="text-sm mb-0">
-                  <i class="fa fa-user-friends text-info" aria-hidden="true"></i>
-                  <span class="font-weight-bold ms-1">タスクメンバー</span>の管理
-                  <span class="badge bg-gradient-info ms-2">{{ filteredTeamMembers.length }}名</span>
-                </p>
-              </div>
-            </div>
-          </div>
-          <div class="card-body px-0 pt-0 pb-2">
-            <!-- ローディング状態 -->
-            <div v-if="isTeamMembersLoading" class="text-center py-4">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">読み込み中...</span>
-              </div>
-              <p class="text-sm text-secondary mt-2">チームメンバーデータを読み込み中...</p>
-            </div>
-            
-            <!-- エラー表示 -->
-            <div v-else-if="teamMembersErrorMessage" class="alert alert-danger mx-3" role="alert">
-              {{ teamMembersErrorMessage }}
-            </div>
-            
-            <!-- チームメンバー一覧テーブル -->
-            <div v-else class="table-responsive p-0">
-              <table class="table align-items-center mb-0">
-                <thead>
-                  <tr>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">メンバー</th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">タスクID</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">役割</th>
-                    <th class="text-secondary opacity-7"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="member in filteredTeamMembers" :key="`${member.user_id}-${member.task_id}`">
-                    <td>
-                      <div class="d-flex px-3 py-1">
-                        <div class="d-flex flex-column justify-content-center">
-                          <h6 class="mb-0 text-sm">{{ member.user?.display_name || '未設定' }}</h6>
-                          <p class="text-xs text-secondary mb-0">{{ member.user?.email || '' }}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <p class="text-xs font-weight-bold mb-0">{{ member.task_id }}</p>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span :class="`badge ${TEAM_ROLE_COLORS[member.role]}`">
-                        {{ TEAM_ROLE_LABELS[member.role] }}
-                      </span>
-                    </td>
-                    <td class="align-middle">
-                      <div class="btn-group" role="group">
-                        <button 
-                          class="btn btn-sm bg-gradient-info mb-0" 
-                          @click="handleUpdateMemberRole(member.user_id, member.task_id, 'OWNER')"
-                          :disabled="member.role === 'OWNER'"
-                        >
-                          オーナー
-                        </button>
-                        <button 
-                          class="btn btn-sm bg-gradient-primary mb-0" 
-                          @click="handleUpdateMemberRole(member.user_id, member.task_id, 'CONTRIBUTOR')"
-                          :disabled="member.role === 'CONTRIBUTOR'"
-                        >
-                          貢献者
-                        </button>
-                        <button 
-                          class="btn btn-sm bg-gradient-warning mb-0" 
-                          @click="handleRemoveTeamMember(member.user_id, member.task_id)"
-                        >
-                          削除
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <TeamMemberTable 
+          :rows="teamMemberRows as any"
+          :loading="isTeamMembersLoading"
+          @changeRole="(id:string, role:string) => changeTeamMemberRoleAction(id, role as any)"
+          @remove="(id:string) => removeTeamMemberAction(id)"
+        />
       </div>
     </div>
 
@@ -2286,80 +2276,20 @@ onMounted(async () => {
               {{ notificationsErrorMessage }}
             </div>
             
-            <!-- 通知一覧テーブル -->
-            <div v-else class="table-responsive p-0">
-              <table class="table align-items-center mb-0">
-                <thead>
-                  <tr>
-                    <th class="text-center">
-                      <input 
-                        type="checkbox" 
-                        class="form-check-input"
-                        @change="handleSelectAllNotifications(($event.target as HTMLInputElement).checked)"
-                        :checked="selectedNotifications.size === filteredNotifications.length && filteredNotifications.length > 0"
-                        :indeterminate="selectedNotifications.size > 0 && selectedNotifications.size < filteredNotifications.length"
-                      >
-                    </th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">件名</th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">送信先</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">ステータス</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">作成日時</th>
-                    <th class="text-secondary opacity-7"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="notification in filteredNotifications" :key="notification.id">
-                    <td class="text-center">
-                      <input 
-                        type="checkbox" 
-                        class="form-check-input"
-                        :checked="selectedNotifications.has(notification.id)"
-                        @change="handleSelectNotification(notification.id, ($event.target as HTMLInputElement).checked)"
-                      >
-                    </td>
-                    <td>
-                      <div class="d-flex px-3 py-1">
-                        <div class="d-flex flex-column justify-content-center">
-                          <h6 class="mb-0 text-sm">{{ notification.subject }}</h6>
-                          <p class="text-xs text-secondary mb-0">{{ notification.body_text.substring(0, 50) }}...</p>
+            <!-- 通知一覧テーブル（コンポーネント） -->
+            <div v-else class="px-3">
+      <NotificationTable 
+        :rows="filteredNotifications" 
+        :loading="isNotificationsLoading" 
+        :selected-ids="Array.from(selectedNotifications)"
+        @select="(id, checked) => handleSelectNotification(id, checked)"
+        @selectAll="(checked) => handleSelectAllNotifications(checked)"
+        @edit="(id) => openEditNotificationModalById(id)"
+        @resend="handleResendNotification" 
+        @delete="handleDeleteNotification" 
+      />
                         </div>
                       </div>
-                    </td>
-                    <td>
-                      <p class="text-xs font-weight-bold mb-0">{{ notification.to_email }}</p>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span :class="`badge ${NOTIFICATION_STATUS_COLORS[notification.status]}`">
-                        {{ NOTIFICATION_STATUS_LABELS[notification.status] }}
-                      </span>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span class="text-secondary text-xs font-weight-normal">
-                        {{ new Date(notification.created_at).toLocaleString('ja-JP') }}
-                      </span>
-                    </td>
-                    <td class="align-middle">
-                      <div class="btn-group" role="group">
-                        <button 
-                          v-if="notification.status === 'FAILED'"
-                          class="btn btn-sm bg-gradient-warning mb-0" 
-                          @click="handleResendNotification(notification.id)"
-                        >
-                          再送信
-                        </button>
-                        <button 
-                          class="btn btn-sm bg-gradient-danger mb-0" 
-                          @click="handleDeleteNotification(notification.id)"
-                        >
-                          削除
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -2394,79 +2324,19 @@ onMounted(async () => {
               {{ alertRulesErrorMessage }}
             </div>
             
-            <!-- アラートルール一覧テーブル -->
-            <div v-else class="table-responsive p-0">
-              <table class="table align-items-center mb-0">
-                <thead>
-                  <tr>
-                    <th class="text-center">
-                      <input 
-                        type="checkbox" 
-                        class="form-check-input"
-                        @change="handleSelectAllAlertRules(($event.target as HTMLInputElement).checked)"
-                        :checked="selectedAlertRules.size === filteredAlertRules.length && filteredAlertRules.length > 0"
-                        :indeterminate="selectedAlertRules.size > 0 && selectedAlertRules.size < filteredAlertRules.length"
-                      >
-                    </th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">ルール名</th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">タイプ</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">ステータス</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">通知先</th>
-                    <th class="text-secondary opacity-7"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="rule in filteredAlertRules" :key="rule.id">
-                    <td class="text-center">
-                      <input 
-                        type="checkbox" 
-                        class="form-check-input"
-                        :checked="selectedAlertRules.has(rule.id)"
-                        @change="handleSelectAlertRule(rule.id, ($event.target as HTMLInputElement).checked)"
-                      >
-                    </td>
-                    <td>
-                      <div class="d-flex px-3 py-1">
-                        <div class="d-flex flex-column justify-content-center">
-                          <h6 class="mb-0 text-sm">{{ rule.name }}</h6>
-                          <p class="text-xs text-secondary mb-0">プロジェクトID: {{ rule.project_id }}</p>
+            <!-- アラートルール一覧テーブル（コンポーネント） -->
+            <div v-else class="px-3">
+      <AlertRuleTable 
+        :rows="filteredAlertRules" 
+        :loading="isAlertRulesLoading" 
+        :selected-ids="Array.from(selectedAlertRules)"
+        @select="(id, checked) => handleSelectAlertRule(id, checked)"
+        @selectAll="(checked) => handleSelectAllAlertRules(checked)"
+        @edit="openEditAlertRuleModalById" 
+        @delete="handleDeleteAlertRule" 
+      />
                         </div>
                       </div>
-                    </td>
-                    <td>
-                      <span :class="`badge ${ALERT_RULE_TYPE_COLORS[rule.rule_type]}`">
-                        {{ ALERT_RULE_TYPE_LABELS[rule.rule_type] }}
-                      </span>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span :class="rule.is_enabled ? 'badge bg-gradient-success' : 'badge bg-gradient-secondary'">
-                        {{ rule.is_enabled ? '有効' : '無効' }}
-                      </span>
-                    </td>
-                    <td class="align-middle text-center">
-                      <span class="text-xs font-weight-bold mb-0">{{ rule.notify_email || '未設定' }}</span>
-                    </td>
-                    <td class="align-middle">
-                      <div class="btn-group" role="group">
-                        <button 
-                          class="btn btn-sm bg-gradient-primary mb-0" 
-                          @click="handleEditAlertRule(rule)"
-                        >
-                          編集
-                        </button>
-                        <button 
-                          class="btn btn-sm bg-gradient-danger mb-0" 
-                          @click="handleDeleteAlertRule(rule.id)"
-                        >
-                          削除
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -2581,164 +2451,31 @@ onMounted(async () => {
       </form>
     </ModalShell>
 
-    <!-- 通知作成・編集モーダル -->
-    <div v-if="showNotificationModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              {{ editingNotification ? '通知編集' : '通知作成' }}
-            </h5>
-            <button type="button" class="btn-close" @click="closeNotificationModal"></button>
-          </div>
-          <div class="modal-body">
-            <form>
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">プロジェクトID</label>
-                  <input 
-                    type="number" 
-                    class="form-control" 
-                    v-model="notificationForm.project_id"
-                    required
-                  >
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">タスクID（任意）</label>
-                  <input 
-                    type="number" 
-                    class="form-control" 
-                    v-model="notificationForm.task_id"
-                  >
-                </div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">送信先メールアドレス</label>
-                <input 
-                  type="email" 
-                  class="form-control" 
-                  v-model="notificationForm.to_email"
-                  required
-                >
-              </div>
-              <div class="mb-3">
-                <label class="form-label">件名</label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  v-model="notificationForm.subject"
-                  required
-                >
-              </div>
-              <div class="mb-3">
-                <label class="form-label">本文</label>
-                <textarea 
-                  class="form-control" 
-                  rows="5"
-                  v-model="notificationForm.body_text"
-                  required
-                ></textarea>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">送信予定日時</label>
-                <input 
-                  type="datetime-local" 
-                  class="form-control" 
-                  v-model="notificationForm.send_after"
-                  required
-                >
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="closeNotificationModal">キャンセル</button>
-            <button 
-              type="button" 
-              class="btn btn-primary" 
-              @click="handleCreateNotification"
-            >
-              作成
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- 通知作成・編集モーダル（コンポーネント） -->
+    <NotificationModal 
+      v-if="showNotificationModal"
+      :show="showNotificationModal"
+      :initial="editingNotification ? {
+        subject: notificationForm.subject,
+        to_email: notificationForm.to_email,
+        body_text: notificationForm.body_text,
+      } : null"
+      @close="closeNotificationModal"
+      @save="onSaveNotification"
+    />
 
-    <!-- アラートルール作成・編集モーダル -->
-    <div v-if="showAlertRuleModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              {{ editingAlertRule ? 'アラートルール編集' : 'アラートルール作成' }}
-            </h5>
-            <button type="button" class="btn-close" @click="closeAlertRuleModal"></button>
-          </div>
-          <div class="modal-body">
-            <form>
-              <div class="mb-3">
-                <label class="form-label">プロジェクトID</label>
-                <input 
-                  type="number" 
-                  class="form-control" 
-                  v-model="alertRuleForm.project_id"
-                  required
-                >
-              </div>
-              <div class="mb-3">
-                <label class="form-label">ルール名</label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  v-model="alertRuleForm.name"
-                  required
-                >
-              </div>
-              <div class="mb-3">
-                <label class="form-label">ルールタイプ</label>
-                <select class="form-control" v-model="alertRuleForm.rule_type">
-                  <option value="DUE_SOON">期限間近</option>
-                  <option value="OVERDUE">期限超過</option>
-                  <option value="NO_PROGRESS">進捗なし</option>
-                  <option value="CUSTOM">カスタム</option>
-                </select>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">通知先メールアドレス</label>
-                <input 
-                  type="email" 
-                  class="form-control" 
-                  v-model="alertRuleForm.notify_email"
-                >
-              </div>
-              <div class="mb-3">
-                <div class="form-check">
-                  <input 
-                    class="form-check-input" 
-                    type="checkbox" 
-                    v-model="alertRuleForm.is_enabled"
-                    id="isEnabled"
-                  >
-                  <label class="form-check-label" for="isEnabled">
-                    有効
-                  </label>
-                </div>
-              </div>
-            </form>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="closeAlertRuleModal">キャンセル</button>
-            <button 
-              type="button" 
-              class="btn btn-primary" 
-              @click="editingAlertRule ? handleUpdateAlertRule() : handleCreateAlertRule()"
-            >
-              {{ editingAlertRule ? '更新' : '作成' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- アラートルール作成・編集モーダル（コンポーネント） -->
+    <AlertRuleModal 
+      v-if="showAlertRuleModal"
+      :show="showAlertRuleModal"
+      :initial="editingAlertRule ? {
+        name: alertRuleForm.name,
+        channel: alertRuleForm.rule_type,
+        enabled: alertRuleForm.is_enabled,
+      } : null"
+      @close="closeAlertRuleModal"
+      @save="onSaveAlertRule"
+    />
 
     <!-- ユーザープロフィールモーダル -->
     <div v-if="showUserProfileModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">

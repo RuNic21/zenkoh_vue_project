@@ -738,6 +738,12 @@ const handleDeleteAlertRule = async (id: number) => {
   }
 };
 
+const openEditNotificationModalById = (id: number) => {
+  const target = filteredNotifications.value.find(n => n.id === id);
+  if (!target) return;
+  openEditNotificationModal(target);
+};
+
 const openEditAlertRuleModalById = (id: number) => {
   const target = filteredAlertRules.value.find(r => r.id === id);
   if (!target) return;
@@ -1250,30 +1256,40 @@ const closeNotificationModal = () => {
 
 // 通知モーダル保存処理（作成/更新の分岐）
 const onSaveNotification = async (f: { subject: string; to_email: string; body_text: string }) => {
-  notificationForm.value.subject = f.subject;
-  notificationForm.value.to_email = f.to_email;
-  notificationForm.value.body_text = f.body_text;
-  if (editingNotification.value) {
-    try {
-      const ok = await updateNotificationAction(editingNotification.value.id, {
+  try {
+    // フォームデータを更新
+    notificationForm.value.subject = f.subject;
+    notificationForm.value.to_email = f.to_email;
+    notificationForm.value.body_text = f.body_text;
+    
+    if (editingNotification.value) {
+      // 編集モード：更新処理
+      const updatePayload = {
         subject: f.subject,
         to_email: f.to_email,
         body_text: f.body_text,
-      });
-      if (ok) {
-        await loadNotifications();
-        await loadNotificationStats();
+      };
+      
+      const success = await updateNotificationAction(editingNotification.value.id, updatePayload);
+      
+      if (success) {
+        // 成功時：データ再読み込みとモーダル閉じる
+        await Promise.all([
+          loadNotifications(),
+          loadNotificationStats()
+        ]);
         closeNotificationModal();
         alert("通知が正常に更新されました");
       } else {
-        alert("通知の更新に失敗しました");
+        alert("通知の更新に失敗しました。もう一度お試しください。");
       }
-    } catch (e) {
-      console.error(e);
-      alert("通知更新中にエラーが発生しました");
+    } else {
+      // 作成モード：新規作成処理
+      await handleCreateNotification();
     }
-  } else {
-    await handleCreateNotification();
+  } catch (error) {
+    console.error("通知保存エラー:", error);
+    alert("通知の保存中にエラーが発生しました。もう一度お試しください。");
   }
 };
 
@@ -1293,6 +1309,44 @@ const openAlertRuleModal = () => {
 const closeAlertRuleModal = () => {
   showAlertRuleModal.value = false;
   editingAlertRule.value = null;
+};
+
+// アラートルールモーダル保存処理（作成/更新の分岐）
+const onSaveAlertRule = async (f: { name: string; channel: string; enabled: boolean }) => {
+  try {
+    // フォームデータを更新
+    alertRuleForm.value.name = f.name;
+    alertRuleForm.value.rule_type = f.channel as any;
+    alertRuleForm.value.is_enabled = f.enabled;
+    
+    if (editingAlertRule.value) {
+      // 編集モード：更新処理
+      const updatePayload = {
+        name: f.name,
+        rule_type: f.channel as any,
+        is_enabled: f.enabled,
+        notify_email: alertRuleForm.value.notify_email,
+        params_json: alertRuleForm.value.params_json,
+      };
+      
+      const success = await updateAlertRuleAction(editingAlertRule.value.id, updatePayload);
+      
+      if (success) {
+        // 成功時：データ再読み込みとモーダル閉じる
+        await loadAlertRules();
+        closeAlertRuleModal();
+        alert("アラートルールが正常に更新されました");
+      } else {
+        alert("アラートルールの更新に失敗しました。もう一度お試しください。");
+      }
+    } else {
+      // 作成モード：新規作成処理
+      await handleCreateAlertRule();
+    }
+  } catch (error) {
+    console.error("アラートルール保存エラー:", error);
+    alert("アラートルールの保存中にエラーが発生しました。もう一度お試しください。");
+  }
 };
 
 const openUserProfileModal = (user: User) => {
@@ -2230,6 +2284,7 @@ const {
         :selected-ids="Array.from(selectedNotifications)"
         @select="(id, checked) => handleSelectNotification(id, checked)"
         @selectAll="(checked) => handleSelectAllNotifications(checked)"
+        @edit="(id) => openEditNotificationModalById(id)"
         @resend="handleResendNotification" 
         @delete="handleDeleteNotification" 
       />
@@ -2274,6 +2329,9 @@ const {
       <AlertRuleTable 
         :rows="filteredAlertRules" 
         :loading="isAlertRulesLoading" 
+        :selected-ids="Array.from(selectedAlertRules)"
+        @select="(id, checked) => handleSelectAlertRule(id, checked)"
+        @selectAll="(checked) => handleSelectAllAlertRules(checked)"
         @edit="openEditAlertRuleModalById" 
         @delete="handleDeleteAlertRule" 
       />
@@ -2416,7 +2474,7 @@ const {
         enabled: alertRuleForm.is_enabled,
       } : null"
       @close="closeAlertRuleModal"
-      @save="(f) => { alertRuleForm.name = f.name; alertRuleForm.rule_type = f.channel as any; alertRuleForm.is_enabled = f.enabled; editingAlertRule ? handleUpdateAlertRule() : handleCreateAlertRule(); }"
+      @save="onSaveAlertRule"
     />
 
     <!-- ユーザープロフィールモーダル -->

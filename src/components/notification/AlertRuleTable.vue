@@ -13,15 +13,21 @@ type RuleRow = {
 const props = defineProps<{
   rows: RuleRow[];
   loading: boolean;
+  selectedIds?: number[];
+  showSelect?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: 'edit', id: number): void;
   (e: 'delete', id: number): void;
+  (e: 'select', id: number, checked: boolean): void;
+  (e: 'selectAll', checked: boolean): void;
 }>();
 
 const onEdit = (id: number) => emit('edit', id);
 const onDelete = (id: number) => emit('delete', id);
+const onSelect = (id: number, checked: boolean) => emit('select', id, checked);
+const onSelectAll = (checked: boolean) => emit('selectAll', checked);
 </script>
 
 <template>
@@ -35,6 +41,14 @@ const onDelete = (id: number) => emit('delete', id);
         <table class="table align-items-center mb-0">
           <thead>
             <tr>
+              <th v-if="showSelect !== false" class="text-center">
+                <input 
+                  type="checkbox" 
+                  class="form-check-input"
+                  @change="onSelectAll(($event.target as HTMLInputElement).checked)"
+                  :checked="(selectedIds?.length ?? 0) > 0 && (selectedIds?.length ?? 0) === rows.length"
+                >
+              </th>
               <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">ルール名</th>
               <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">タイプ</th>
               <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">ステータス</th>
@@ -45,6 +59,14 @@ const onDelete = (id: number) => emit('delete', id);
           </thead>
           <tbody>
             <tr v-for="r in props.rows" :key="r.id">
+              <td v-if="showSelect !== false" class="text-center">
+                <input 
+                  type="checkbox" 
+                  class="form-check-input"
+                  :checked="selectedIds?.includes(r.id)"
+                  @change="onSelect(r.id, ($event.target as HTMLInputElement).checked)"
+                >
+              </td>
               <td><h6 class="mb-0 text-sm">{{ r.name }}</h6></td>
               <td><p class="text-xs font-weight-bold mb-0">{{ r.rule_type }}</p></td>
               <td class="align-middle text-center">

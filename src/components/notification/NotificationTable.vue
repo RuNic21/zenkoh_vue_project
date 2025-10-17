@@ -22,12 +22,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'resend', id: number): void;
   (e: 'delete', id: number): void;
+  (e: 'edit', id: number): void;
   (e: 'select', id: number, checked: boolean): void;
   (e: 'selectAll', checked: boolean): void;
 }>();
 
 const onResend = (id: number) => emit('resend', id);
 const onDelete = (id: number) => emit('delete', id);
+const onEdit = (id: number) => emit('edit', id);
 const onSelect = (id: number, checked: boolean) => emit('select', id, checked);
 const onSelectAll = (checked: boolean) => emit('selectAll', checked);
 
@@ -92,6 +94,7 @@ const statusLabel = (s: NotificationStatus) => NOTIFICATION_STATUS_LABELS[s];
               </td>
               <td class="align-middle">
                 <div class="btn-group" role="group">
+                  <button class="btn btn-sm bg-gradient-info mb-0" @click="onEdit(n.id)">編集</button>
                   <button v-if="n.status === 'FAILED'" class="btn btn-sm bg-gradient-warning mb-0" @click="onResend(n.id)">再送信</button>
                   <button class="btn btn-sm bg-gradient-danger mb-0" @click="onDelete(n.id)">削除</button>
                 </div>

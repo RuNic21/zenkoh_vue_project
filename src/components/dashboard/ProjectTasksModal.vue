@@ -1,5 +1,7 @@
 <script setup lang="ts">
-// プロジェクトのタスクを管理するモーダル
+// プロジェクトのタスクを管理するモーダル（最近更新された10件を表示）
+import { computed } from "vue";
+
 type TaskRow = {
   id: number;
   task_name: string;
@@ -8,6 +10,7 @@ type TaskRow = {
   progress_percent: number;
   planned_end: string | null;
   primary_assignee_id: number | null;
+  updated_at: string; // 更新日時
 };
 
 const props = defineProps<{
@@ -18,9 +21,23 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void;
+  (e: 'view-detail', taskId: number): void; // タスク詳細表示イベント
 }>();
 
+// 最近更新されたタスクを10件まで表示（更新日時降順）
+const recentTasks = computed(() => {
+  return [...props.tasks]
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, 10);
+});
+
 const onClose = () => emit('close');
+
+// タスク詳細画面へ遷移
+const onViewDetail = (taskId: number) => {
+  emit('view-detail', taskId);
+  emit('close'); // モーダルを閉じる
+};
 </script>
 
 <template>
@@ -30,12 +47,12 @@ const onClose = () => emit('close');
         <div class="modal-header">
           <h5 class="modal-title">
             <i class="material-symbols-rounded me-2">task</i>
-            {{ props.projectName }} - タスク管理
+            {{ props.projectName }} - 最近更新されたタスク（10件）
           </h5>
           <button type="button" class="btn-close" @click="onClose"></button>
         </div>
         <div class="modal-body">
-          <!-- タスク一覧 -->
+          <!-- タスク一覧（最近更新順） -->
           <div class="table-responsive">
             <table class="table table-hover">
               <thead>
@@ -44,12 +61,14 @@ const onClose = () => emit('close');
                   <th>状態</th>
                   <th>優先度</th>
                   <th>進捗率</th>
+                  <th>更新日時</th>
                   <th>計画終了日</th>
                   <th>担当者</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="task in props.tasks" :key="task.id">
+                <tr v-for="task in recentTasks" :key="task.id">
                   <td>{{ task.task_name }}</td>
                   <td>
                     <span class="badge" :class="{
@@ -76,8 +95,25 @@ const onClose = () => emit('close');
                     </span>
                   </td>
                   <td>{{ task.progress_percent }}%</td>
+                  <td>
+                    <small class="text-muted">
+                      {{ new Date(task.updated_at).toLocaleDateString('ja-JP') }}
+                      {{ new Date(task.updated_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) }}
+                    </small>
+                  </td>
                   <td>{{ task.planned_end ? new Date(task.planned_end).toLocaleDateString('ja-JP') : '-' }}</td>
                   <td>{{ task.primary_assignee_id ? `ユーザー${task.primary_assignee_id}` : '-' }}</td>
+                  <td>
+                    <button 
+                      type="button" 
+                      class="btn btn-sm btn-primary"
+                      @click="onViewDetail(task.id)"
+                      title="タスク詳細を表示"
+                    >
+                      <i class="material-symbols-rounded" style="font-size: 16px; vertical-align: middle;">visibility</i>
+                      詳細
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>

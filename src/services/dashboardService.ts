@@ -325,17 +325,13 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
   return handleServiceCall(
     async () => {
       // プロジェクト一覧を取得（ユーザー情報も含む）
+      // 最初は全プロジェクトを取得してから、タスクの更新時間でソート
       let query = supabase
         .from("projects")
         .select(`
           id, name, description, start_date, end_date, owner_user_id, is_archived, created_at, updated_at,
           users!projects_owner_user_id_fkey(display_name)
-        `)
-        .order("updated_at", { ascending: false });
-      
-      if (limit) {
-        query = query.limit(limit);
-      }
+        `);
       
       const { data: projects, error: projectsError } = await query;
 
@@ -350,10 +346,10 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
       const projectProgressRows: ProjectProgressRow[] = [];
 
       for (const project of projects) {
-        // 各プロジェクトのタスク統計を取得
+        // 各プロジェクトのタスク統計を取得（updated_atも取得して最新更新時間を把握）
         const { data: tasks, error: tasksError } = await supabase
           .from("tasks")
-          .select("status, progress_percent, planned_end, is_archived")
+          .select("status, progress_percent, planned_end, is_archived, updated_at")
           .eq("project_id", project.id)
           .eq("is_archived", false);
 
@@ -390,7 +386,16 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
           status = "未開始";
         }
 
-        projectProgressRows.push({
+        // 最新のタスク更新時間を取得（プロジェクトとタスクの両方から最新を選択）
+        const taskUpdateTimes = activeTasks
+          .map(t => t.updated_at)
+          .filter(Boolean)
+          .map(t => new Date(t as string).getTime());
+        const latestTaskUpdate = taskUpdateTimes.length > 0 ? Math.max(...taskUpdateTimes) : 0;
+        const projectUpdateTime = new Date(project.updated_at).getTime();
+        const latestUpdateTime = Math.max(latestTaskUpdate, projectUpdateTime);
+
+        const row: any = {
           id: project.id,
           name: project.name,
           description: project.description,
@@ -410,12 +415,122 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
           owner: (project as any).users?.display_name || "-",
           status: status,
           progress: averageProgress,
-          dueDate: project.end_date
-        });
+          dueDate: project.end_date,
+          // ソート用の最新更新時間を保持（一時的）
+          _latestUpdateTime: latestUpdateTime
+        };
+        projectProgressRows.push(row);
       }
 
-      return projectProgressRows;
+      // プロジェクト＋タスクの最新更新時間でソート（降順）
+      projectProgressRows.sort((a, b) => {
+        const aTime = (a as any)._latestUpdateTime || 0;
+        const bTime = (b as any)._latestUpdateTime || 0;
+        return bTime - aTime;
+      });
+
+      // ソート用フィールドを削除
+      projectProgressRows.forEach(row => delete (row as any)._latestUpdateTime);
+
+      // limit が指定されている場合は先頭N件のみ返す
+      return limit ? projectProgressRows.slice(0, limit) : projectProgressRows;
     },
     "プロジェクト進捗取得に失敗しました"
+  );
+}
+
+// タスク進捗情報の型定義（App.vue用）
+export interface TaskProgressRow {
+  id: number;
+  name: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  progress_percent: number;
+  planned_start: string | null;
+  planned_end: string | null;
+  project_id: number | null;
+  primary_assignee_id: number | null;
+  created_at: string;
+  updated_at: string;
+  // App.vueで使用する追加プロパティ
+  projectName: string;
+  assigneeName: string;
+  statusLabel: string;
+  priorityLabel: string;
+  isOverdue: boolean;
+  daysUntilDue: number | null;
+}
+
+// 最近のタスク進捗情報を取得（App.vue用）
+export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResult<TaskProgressRow[]>> {
+  return handleServiceCall(
+    async () => {
+      // タスク一覧を取得（プロジェクト情報、担当者情報も含む）
+      const { data: tasks, error: tasksError } = await supabase
+        .from("tasks")
+        .select(`
+          id, task_name, description, status, priority, progress_percent, 
+          planned_start, planned_end, project_id, primary_assignee_id, 
+          created_at, updated_at, is_archived,
+          projects!tasks_project_id_fkey(id, name),
+          users!tasks_primary_assignee_id_fkey(display_name)
+        `)
+        .eq("is_archived", false)
+        .order("updated_at", { ascending: false })
+        .limit(limit);
+
+      if (tasksError) {
+        throw new Error(translateSupabaseError(tasksError));
+      }
+
+      if (!tasks || tasks.length === 0) {
+        return [];
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // 時間をリセットして日付のみで比較
+
+      const taskProgressRows: TaskProgressRow[] = tasks.map((task: any) => {
+        // 期限切れ判定
+        const isOverdue = task.planned_end 
+          ? new Date(task.planned_end) < today && task.status !== "DONE"
+          : false;
+
+        // 残り日数計算
+        let daysUntilDue: number | null = null;
+        if (task.planned_end && task.status !== "DONE") {
+          const dueDate = new Date(task.planned_end);
+          dueDate.setHours(0, 0, 0, 0);
+          const diffTime = dueDate.getTime() - today.getTime();
+          daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        return {
+          id: task.id,
+          name: task.task_name,  // task_name を name にマッピング
+          description: task.description,
+          status: task.status,
+          priority: task.priority,
+          progress_percent: task.progress_percent,
+          planned_start: task.planned_start,
+          planned_end: task.planned_end,
+          project_id: task.project_id,
+          primary_assignee_id: task.primary_assignee_id,
+          created_at: task.created_at,
+          updated_at: task.updated_at,
+          // App.vueで使用する追加プロパティ
+          projectName: task.projects?.name || "-",
+          assigneeName: task.users?.display_name || "未割当",
+          statusLabel: getTaskStatusLabel(task.status),
+          priorityLabel: getTaskPriorityLabel(task.priority),
+          isOverdue: isOverdue,
+          daysUntilDue: daysUntilDue
+        };
+      });
+
+      return taskProgressRows;
+    },
+    "最近のタスク取得に失敗しました"
   );
 }

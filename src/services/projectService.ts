@@ -61,9 +61,15 @@ export async function createProject(payload: ProjectInsert): Promise<ServiceResu
 export async function updateProject(id: number, payload: ProjectUpdate): Promise<ServiceResult<Project | null>> {
   return handleServiceCall(
     async () => {
+      // updated_at を現在時刻に自動設定（DB の trigger がない場合のため）
+      const updatePayload = {
+        ...payload,
+        updated_at: new Date().toISOString()
+      };
+      
       const { data, error } = await supabase
         .from(TABLE_NAME)
-        .update({ ...payload })
+        .update(updatePayload)
         .eq("id", id)
         .select("*")
         .single();

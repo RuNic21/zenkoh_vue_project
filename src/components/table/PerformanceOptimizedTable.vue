@@ -2,7 +2,7 @@
 // パフォーマンス最適化されたテーブルコンポーネント
 // 目的: 大量データの効率的な表示とメモ化による最適化
 
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import TablePagination from "./TablePagination.vue";
 
 // Props定義
@@ -34,6 +34,10 @@ const emit = defineEmits<{
   'row-click': [item: any];
 }>();
 
+// ソート状態管理
+const sortColumn = ref<string>("");
+const sortDirection = ref<"asc" | "desc">("asc");
+
 // ページネーション計算（メモ化）
 const paginatedData = computed(() => {
   const start = (props.currentPage - 1) * props.pageSize;
@@ -58,10 +62,17 @@ const handlePageChange = (page: number) => {
   emit('page-change', page);
 };
 
-// ソート変更ハンドラー
+// ソート変更ハンドラー（トグル機能付き）
 const handleSort = (column: string) => {
-  // ソートロジックは親コンポーネントで実装
-  emit('sort-change', column, 'asc');
+  if (sortColumn.value === column) {
+    // 同じ列をクリック → 昇順/降順をトグル
+    sortDirection.value = sortDirection.value === "asc" ? "desc" : "asc";
+  } else {
+    // 別の列をクリック → 新しい列で昇順から開始
+    sortColumn.value = column;
+    sortDirection.value = "asc";
+  }
+  emit('sort-change', column, sortDirection.value);
 };
 </script>
 
@@ -88,14 +99,27 @@ const handleSort = (column: string) => {
               @click="column.sortable ? handleSort(column.key) : null"
             >
               {{ column.label }}
-              <i v-if="column.sortable" class="material-symbols-rounded ms-1 opacity-50">sort</i>
+              <!-- ソートアイコン: 現在のソート状態を表示 -->
+              <i 
+                v-if="column.sortable" 
+                class="material-symbols-rounded ms-1"
+                :class="{
+                  'opacity-50': sortColumn !== column.key,
+                  'opacity-100 text-primary': sortColumn === column.key
+                }"
+              >
+                {{ sortColumn === column.key 
+                    ? (sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward') 
+                    : 'sort' 
+                }}
+              </i>
             </th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(item, index) in paginatedData" :key="index" @click="emit('row-click', item)" class="row-clickable">
             <td v-for="column in columns" :key="column.key">
-              <slot :name="`cell-${column.key}`" :item="item" :value="item[column.key]">
+              <slot :name="`cell-${column.key}`" :item="item" :row="item" :value="item[column.key]">
                 <span v-if="column.formatter">
                   {{ column.formatter(item[column.key]) }}
                 </span>
@@ -151,6 +175,15 @@ const handleSort = (column: string) => {
 
 .table td {
   vertical-align: middle;
+}
+
+.row-clickable {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.row-clickable:hover {
+  background-color: rgba(0, 123, 255, 0.1) !important;
 }
 
 .pagination .page-link {

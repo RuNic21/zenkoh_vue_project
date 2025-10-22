@@ -14,11 +14,15 @@ import ReportPage from "./pages/ReportPage.vue";
 import DashboardFilters from "./components/dashboard/DashboardFilters.vue";
 import DashboardStats from "./components/dashboard/DashboardStats.vue";
 import ProjectProgressTable from "./components/dashboard/ProjectProgressTable.vue";
+import TaskProgressTable from "./components/dashboard/TaskProgressTable.vue";
 import RecentActivities from "./components/dashboard/RecentActivities.vue";
 import ProjectTasksModal from "./components/dashboard/ProjectTasksModal.vue";
+// 共通コンポーネント
+import NavigationBar from "./components/common/NavigationBar.vue";
 // ダッシュボード用 composable と型
 import { useDashboard } from "./composables/useDashboard";
 import type { ProjectProgressRow } from "./services/dashboardService";
+import type { ScheduleItem } from "./types/schedule";
 
 // ========================================
 // Phase 1: 基本分析機能の実装 TODO
@@ -80,6 +84,7 @@ const selectedProjectTasks = ref<any[]>([]);
 const showTaskModal = ref(false);
 const selectedProjectForTasks = ref<any>(null);
 
+// プロジェクト詳細ページへ遷移
 const handleViewProjectDetail = async (project: ProjectProgressRow) => {
   try {
     // プロジェクトのタスク一覧を モーダルに表示
@@ -93,11 +98,66 @@ const handleViewProjectDetail = async (project: ProjectProgressRow) => {
   }
 };
 
+// タスク詳細表示（モーダル or ページ遷移）
+const handleViewTaskDetail = (task: any) => {
+  try {
+    // スケジュール詳細ページへ遷移してタスク情報を表示
+    console.log("タスク詳細を表示:", task);
+    
+    // TaskProgressRow を ScheduleItem に変換
+    const scheduleItem: ScheduleItem = {
+      id: task.id,
+      title: task.name || "",
+      description: task.description || "",
+      startDate: task.planned_start || "",
+      endDate: task.planned_end || "",
+      status: task.status || "NOT_STARTED",
+      priority: task.priority || "MEDIUM",
+      assignee: task.assigneeName || "",
+      progress: task.progress_percent || 0,
+      category: task.projectName || "",
+      tags: [],
+      notes: "",
+      attachments: [],
+      comments: [],
+    };
+    
+    // store に既存のスケジュールがあれば更新、なければ追加
+    const existingIndex = store.schedules.value.findIndex(s => s.id === task.id);
+    if (existingIndex >= 0) {
+      store.schedules.value[existingIndex] = scheduleItem;
+    } else {
+      store.schedules.value.push(scheduleItem);
+    }
+    
+    // store に選択タスクIDをセットしてスケジュール詳細ページへ
+    store.selectSchedule(task.id);
+    currentPage.value = "schedule-detail";
+  } catch (error) {
+    console.error("タスク詳細表示に失敗:", error);
+    alert("タスク詳細の表示に失敗しました。");
+  }
+};
+
 // タスクモーダルを閉じる
 const closeTaskModal = () => {
   showTaskModal.value = false;
   selectedProjectForTasks.value = null;
   selectedProjectTasks.value = [];
+};
+
+// タスクIDからタスク詳細ページへ遷移（モーダルから呼ばれる）
+const handleViewTaskDetailFromModal = (taskId: number) => {
+  try {
+    console.log("タスク詳細ページへ遷移:", taskId);
+    
+    // store に選択タスクIDをセットしてスケジュール詳細ページへ
+    store.selectSchedule(taskId);
+    currentPage.value = "schedule-detail";
+  } catch (error) {
+    console.error("タスク詳細表示に失敗:", error);
+    alert("タスク詳細の表示に失敗しました。");
+  }
 };
 
 // 現在のページコンポーネントを計算
@@ -122,21 +182,26 @@ const currentComponent = computed(() => {
 
 // ダッシュボード用状態とロジックは composable へ集約
 const {
-  projectProgressList,
-  isDashboardLoading,
-  dashboardErrorMessage,
-  searchQuery,
-  statusFilter,
-  ownerFilter,
-  dateRangeFilter,
-  clearFilters,
-  filteredProjects,
-  availableOwners,
-  inProgressCount,
-  completedCount,
-  completionRate,
-  overdueCount,
-  loadDashboardFromDb,
+  projectProgressList,             // プロジェクト進捗一覧（全件・フィルタ前）※各プロジェクトごとの集計値含む
+  taskProgressList,                // タスク進捗一覧（最近更新分）
+  isDashboardLoading,              // ダッシュボード統計/リストのロード中フラグ
+  isTaskLoading,                   // タスク読み込み中フラグ
+  dashboardErrorMessage,           // ダッシュボード用エラーメッセージ文字列
+  taskErrorMessage,                // タスク用エラーメッセージ文字列
+  searchQuery,                     // キーワード検索用のクエリ文字列
+  priorityFilter,                  // 優先度フィルタ：'all', 'urgent', 'high-up'
+  deadlineFilter,                  // 期限フィルタ：'all', 'within-3days', 'within-7days', 'overdue'
+  projectFilter,                   // プロジェクトフィルタ：'all' or プロジェクト名
+  clearFilters,                    // フィルタリセット用メソッド（全フィルタ初期化）
+  filteredProjects,                // 各種フィルタ後のプロジェクトリスト
+  filteredTasks,                   // 各種フィルタ後のタスクリスト
+  availableProjects,               // 選択可能なプロジェクトリスト
+  inProgressCount,                 // 進行中プロジェクト数
+  completedCount,                  // 完了プロジェクト数
+  completionRate,                  // 全体の完了率（%）
+  overdueCount,                    // 期限超過プロジェクト数
+  loadDashboardFromDb,             // ダッシュボード情報（統計/リスト）再読込メソッド
+  loadRecentTasks,                 // 最近のタスク進捗読み込みメソッド
 } = useDashboard();
 
 // クイックアクションパネル
@@ -147,18 +212,19 @@ const quickActions = [
     color: "bg-gradient-primary",
     action: () => handleCreateProject()
   },
-  {
-    label: "タスク追加",
-    icon: "task_alt", 
-    color: "bg-gradient-success",
-    action: () => handleAddTask()
-  },
-  {
-    label: "チームメンバー招待",
-    icon: "person_add",
-    color: "bg-gradient-info", 
-    action: () => handleInviteTeamMember()
-  },
+  // TODO: タスク追加，チームメンバー招待機能はスケジュール管理リストで実装予定
+  // {
+  //   label: "タスク追加",
+  //   icon: "task_alt", 
+  //   color: "bg-gradient-success",
+  //   action: () => handleAddTask()
+  // },
+  // {
+  //   label: "チームメンバー招待",
+  //   icon: "person_add",
+  //   color: "bg-gradient-info", 
+  //   action: () => handleInviteTeamMember()
+  // },
   {
     label: "レポート生成",
     icon: "assessment",
@@ -205,56 +271,81 @@ const handleCreateProject = async () => {
   }
 };
 
-const handleAddTask = async () => {
-  try {
-    const taskName = prompt("新しいタスク名を入力してください:");
-    if (!taskName || taskName.trim() === "") {
-      return;
-    }
+// TODO: タスク追加，チームメンバー招待機能はスケジュール管理リストで実装予定
+// const handleAddTask = async () => {
+//   try {
+//     const taskName = prompt("新しいタスク名を入力してください:");
+//     if (!taskName || taskName.trim() === "") {
+//       return;
+//     }
 
-    // プロジェクト選択（最初のプロジェクトを使用）
-    const firstProject = projectProgressList.value[0];
-    if (!firstProject) {
-      alert("まずプロジェクトを作成してください。");
-      return;
-    }
+//     // プロジェクト選択（最初のプロジェクトを使用）
+//     const firstProject = projectProgressList.value[0];
+//     if (!firstProject) {
+//       alert("まずプロジェクトを作成してください。");
+//       return;
+//     }
 
-    // 実際の DB にタスクを作成
-    const { createTask } = await import("./services/taskService");
-    const result = await createTask({
-      project_id: firstProject.id,
-      task_name: taskName.trim(),
-      description: "",
-      status: "NOT_STARTED",
-      priority: "MEDIUM",
-      progress_percent: 0,
-      primary_assignee_id: null,
-      is_archived: false
-    });
+//     // 実際の DB にタスクを作成
+//     const { createTask } = await import("./services/taskService");
+//     const result = await createTask({
+//       project_id: firstProject.id,
+//       task_name: taskName.trim(),
+//       description: "",
+//       status: "NOT_STARTED",
+//       priority: "MEDIUM",
+//       progress_percent: 0,
+//       primary_assignee_id: null,
+//       is_archived: false
+//     });
 
-    if (result.success && result.data) {
-      // 活動ログ生成
-      const { logTaskCreated } = await import("./services/activityService");
-      await logTaskCreated(firstProject.id, result.data.id, firstProject.name, taskName);
+//     if (result.success && result.data) {
+//       // 活動ログ生成
+//       const { logTaskCreated } = await import("./services/activityService");
+//       await logTaskCreated(firstProject.id, result.data.id, firstProject.name, taskName);
       
-      alert(`タスク "${taskName}"が正常に作成されました！`);
-      // ダッシュボードデータの更新
-      await loadDashboardFromDb();
-      // 活動フィードの更新
-      await loadActivityFeed();
-    } else {
-      alert(result.error || "タスクの作成に失敗しました。再試行してください。");
-    }
-  } catch (error) {
-    console.error("タスク作成中のエラー:", error);
-    alert("タスク作成中にエラーが発生しました。");
-  }
-};
+//       alert(`タスク "${taskName}"が正常に作成されました！`);
+//       // ダッシュボードデータの更新
+//       await loadDashboardFromDb();
+//       // 活動フィードの更新
+//       await loadActivityFeed();
+//     } else {
+//       alert(result.error || "タスクの作成に失敗しました。再試行してください。");
+//     }
+//   } catch (error) {
+//     console.error("タスク作成中のエラー:", error);
+//     alert("タスク作成中にエラーが発生しました。");
+//   }
+// };
 
-const handleInviteTeamMember = () => {
-  console.log("チームメンバー招待");
-  // TODO: チームメンバー招待 モーダル または ページへ移動
-  alert("チームメンバー招待機能を実装中です。");
+// TODO: チームメンバー招待機能はスケジュール管理リストで実装予定
+// const handleInviteTeamMember = () => {
+//   console.log("チームメンバー招待");
+//   // TODO: チームメンバー招待 モーダル または ページへ移動
+//   alert("チームメンバー招待機能を実装中です。");
+// };
+
+// ダッシュボードデータを再読み込み
+const handleRefreshDashboard = async () => {
+  try {
+    console.log("ダッシュボードデータを更新中...");
+    
+    // プロジェクト進捗、タスク進捗、活動履歴を並行して読み込み
+    await Promise.all([
+      loadDashboardFromDb(),
+      loadRecentTasks(),
+      (async () => {
+        isActivityLoading.value = true;
+        recentActivities.value = await loadRecentActivities();
+        isActivityLoading.value = false;
+      })()
+    ]);
+    
+    console.log("ダッシュボードデータの更新が完了しました");
+  } catch (error) {
+    console.error("ダッシュボードデータの更新に失敗:", error);
+    alert("データの更新に失敗しました。もう一度お試しください。");
+  }
 };
 
 const handleGenerateReport = () => {
@@ -283,7 +374,7 @@ const loadRecentActivities = async (): Promise<ActivityLog[]> => {
   try {
     // 実際の notifications テーブルから活動データを取得
     const { fetchRecentActivities } = await import('./services/activityService');
-    const result = await fetchRecentActivities(10);
+    const result = await fetchRecentActivities(5);
     
     // DBから取得したデータのみを返す（Mockデータは削除）
     return result.success && result.data ? result.data : [];
@@ -293,6 +384,7 @@ const loadRecentActivities = async (): Promise<ActivityLog[]> => {
   }
 };
 
+// 最近の活動フィード
 const recentActivities = ref<ActivityLog[]>([]);
 
 // 活動の相対時間表示
@@ -342,6 +434,8 @@ onMounted(async () => {
   store.loadAll().catch((e) => console.error("初期データの読み込みに失敗", e));
   // ダッシュボードを DB から取得
   await loadDashboardFromDb();
+  // 最近のタスク進捗を読み込み
+  await loadRecentTasks();
   // 活動フィードを 読み込み
   await loadActivityFeed();
 });
@@ -386,82 +480,12 @@ onMounted(() => {
     >
       <!-- 動的コンテンツエリア -->
       <div class="main-content position-relative max-height-vh-100 h-100 border-radius-lg">
+        
         <!-- ナビゲーションバー -->
-        <nav class="navbar navbar-main navbar-expand-lg px-0 mx-3 shadow-none border-radius-xl" id="navbarBlur" data-scroll="true">
-          <div class="container-fluid py-1 px-3">
-            <nav aria-label="breadcrumb">
-              <ol class="breadcrumb bg-transparent mb-0 pb-0 pt-1 px-0 me-sm-6 me-5">
-                <li class="breadcrumb-item text-sm">
-                  <a class="opacity-5 text-dark" href="javascript:;">ページ</a>
-                </li>
-                <li class="breadcrumb-item text-sm text-dark active" aria-current="page">
-                  {{ 
-                    currentPage === 'dashboard' ? 'ダッシュボード' : 
-                    currentPage === 'project-management' ? 'プロジェクト管理' : 
-                    currentPage === 'project-detail' ? 'プロジェクト詳細' :
-                    currentPage === 'team' ? 'チーム管理' :
-                    currentPage === 'report' ? 'レポート' :
-                    'スケジュール管理' 
-                  }}
-                </li>
-              </ol>
-            </nav>
-            <div class="collapse navbar-collapse mt-sm-0 mt-2 me-md-0 me-sm-4" id="navbar">
-              <div class="ms-md-auto pe-md-3 d-flex align-items-center">
-                <div class="input-group input-group-outline">
-                  <label class="form-label"></label>
-                  <input 
-                    type="text" 
-                    class="form-control" 
-                    placeholder="プロジェクトや担当者を検索してください"
-                    v-model="searchQuery"
-                  >
-                </div>
-              </div>
-              <ul class="navbar-nav d-flex align-items-center justify-content-end">
-                <li class="nav-item px-3 d-flex align-items-center">
-                  <a href="javascript:;" class="nav-link text-body p-0">
-                    <i class="material-symbols-rounded fixed-plugin-button-nav">settings</i>
-                  </a>
-                </li>
-                <li class="nav-item dropdown pe-3 d-flex align-items-center">
-                  <a href="javascript:;" class="nav-link text-body p-0" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="material-symbols-rounded">notifications</i>
-                  </a>
-                  <ul class="dropdown-menu dropdown-menu-end px-2 py-3 me-sm-n4" aria-labelledby="dropdownMenuButton">
-                    <li class="mb-2">
-                      <a class="dropdown-item border-radius-md" href="javascript:;">
-                        <div class="d-flex py-1">
-                          <div class="my-auto">
-                            <div class="avatar avatar-sm bg-gradient-primary me-3">
-                              <i class="material-symbols-rounded text-white">schedule</i>
-                            </div>
-                          </div>
-                          <!-- ダミーデータ -->
-                          <div class="d-flex flex-column justify-content-center">
-                            <h6 class="text-sm font-weight-normal mb-1">
-                              <span class="font-weight-bold">新しいスケジュール</span>が追加されました
-                            </h6>
-                            <p class="text-xs text-secondary mb-0">
-                              <i class="fa fa-clock me-1"></i>
-                              5分前
-                            </p>
-                          </div>
-                        </div>
-                      </a>
-                    </li>
-                  </ul>
-                </li>
-                <li class="nav-item d-flex align-items-center">
-                  <a href="javascript:;" class="nav-link text-body font-weight-bold px-0">
-                    <i class="material-symbols-rounded">account_circle</i>
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </nav>
-        <!-- ナビゲーションバー終了 -->
+        <NavigationBar 
+          :current-page="currentPage"
+          v-model:search-query="searchQuery"
+        />
 
         <!-- メインコンテンツエリア -->
         <div class="container-fluid py-4">
@@ -492,20 +516,22 @@ onMounted(() => {
               <div class="col-lg-8 col-md-12">
                 <DashboardFilters 
                   :search-query="searchQuery"
-                  :status-filter="statusFilter"
-                  :owner-filter="ownerFilter"
-                  :date-range-filter="dateRangeFilter"
-                  :available-owners="availableOwners"
+                  :priority-filter="priorityFilter"
+                  :deadline-filter="deadlineFilter"
+                  :project-filter="projectFilter"
+                  :available-projects="availableProjects"
                   @update:searchQuery="(v:string)=>searchQuery=v"
-                  @update:statusFilter="(v:string)=>statusFilter=v"
-                  @update:ownerFilter="(v:string)=>ownerFilter=v"
-                  @update:dateRangeFilter="(v:string)=>dateRangeFilter=v"
+                  @update:priorityFilter="(v:string)=>priorityFilter=v"
+                  @update:deadlineFilter="(v:string)=>deadlineFilter=v"
+                  @update:projectFilter="(v:string)=>projectFilter=v"
                   @clear="clearFilters"
+                  @refresh="handleRefreshDashboard"
                 />
               </div>
 
+              <!-- 保留：クイックアクションパネル  -->
               <!-- クイックアクションパネル -->
-              <div class="col-lg-4 col-md-12">
+              <!-- <div class="col-lg-4 col-md-12">
                 <div class="card">
                   <div class="card-header pb-0">
                     <h6>クイックアクション</h6>
@@ -529,16 +555,16 @@ onMounted(() => {
                     </div>
                   </div>
                 </div>
-              </div>
+              </div> -->
             </div>
 
-            <DashboardStats 
+            <!-- TODO: 統計カードはプロジェクト分析追加未定 -->
+            <!-- <DashboardStats 
               :in-progress-count="inProgressCount"
               :completed-count="completedCount"
               :completion-rate="completionRate"
               :overdue-count="overdueCount"
-            />
-
+            /> -->
 
           </div>
 
@@ -548,6 +574,16 @@ onMounted(() => {
               <ProjectProgressTable 
                 :rows="filteredProjects"
                 @viewDetail="handleViewProjectDetail"
+              />
+            </div>
+          </div>
+
+          <!-- タスク別進捗の一覧表示 -->
+          <div v-if="currentPage === 'dashboard'" class="row mt-4">
+            <div class="col-12">
+              <TaskProgressTable 
+                :rows="filteredTasks"
+                @viewDetail="handleViewTaskDetail"
               />
             </div>
           </div>
@@ -571,6 +607,7 @@ onMounted(() => {
       :project-name="selectedProjectForTasks?.name ?? null"
       :tasks="selectedProjectTasks"
       @close="closeTaskModal"
+      @view-detail="handleViewTaskDetailFromModal"
     />
   </div>
 </template>

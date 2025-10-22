@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // プロジェクト詳細ページ: 個別プロジェクトの詳細表示・編集機能
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useScheduleStore } from "../store/schedule";
 import { useProjectDetail } from "@/composables/useProjectDetail";
 
@@ -10,39 +10,128 @@ import ActionBar from "../components/common/ActionBar.vue";
 import StatusBadge from "../components/common/StatusBadge.vue";
 import PriorityBadge from "../components/common/PriorityBadge.vue";
 import LoadingSpinner from "../components/common/LoadingSpinner.vue";
-import EmptyState from "../components/common/EmptyState.vue";
 import CardHeader from "../components/common/CardHeader.vue";
 import StatCards from "../components/common/StatCards.vue";
-import ModalShell from "../components/common/ModalShell.vue";
 import ProjectSummary from "@/components/project/ProjectSummary.vue";
+import TaskDetailModal from "@/components/task/TaskDetailModal.vue";
+import PerformanceOptimizedTable from "@/components/table/PerformanceOptimizedTable.vue";
 
 // プロジェクト詳細の状態・ロジックは composable から取得
+// useProjectDetail から状態や操作関数を取得
+// 用途: プロジェクトの詳細データ・進捗値・タスクリスト・ユーザー・統計情報・編集/削除/保存操作・タスク詳細表示などUI・操作に必要な状態やロジックを一括管理
 const {
-  isLoading,
-  errorMessage,
-  projectDetail,
-  projectTasks,
-  projectStats,
-  users,
-  isEditMode,
-  editForm,
-  showTaskModal,
-  selectedTask,
-  getOwnerName,
-  toggleEditMode,
-  saveProject,
-  cancelEdit,
-  deleteProject,
-  showTaskDetail,
-  closeTaskModal,
-  projectProgress,
-  completedTasksCount,
-  inProgressTasksCount,
-  notStartedTasksCount,
+  isLoading,                // ローディング状態（通信中 or データ取得中）
+  errorMessage,             // エラーメッセージ（通信・取得エラー時に利用）
+  projectDetail,            // 表示中のプロジェクト詳細データ
+  projectTasks,             // プロジェクトに紐づくタスク一覧
+  projectStats,             // プロジェクトに関する統計情報（追加メトリクス等）
+  users,                    // プロジェクト関連ユーザー一覧
+  isEditMode,               // 編集モード判定（true: 編集中, false: 閲覧モード）
+  editForm,                 // プロジェクト編集用フォームデータ
+  showTaskModal,            // タスク詳細モーダル表示可否
+  selectedTask,             // 選択中のタスクデータ
+  getOwnerName,             // ユーザーIDからユーザー名を取得する関数
+  toggleEditMode,           // 編集モード切り替え関数
+  saveProject,              // プロジェクト編集内容保存関数
+  cancelEdit,               // 編集キャンセル関数
+  deleteProject,            // プロジェクト削除関数
+  showTaskDetail,           // タスク詳細モーダル表示トリガー関数
+  closeTaskModal,           // タスク詳細モーダルを閉じる関数
+  projectProgress,          // プロジェクト進捗率（％数値）
+  completedTasksCount,      // 完了済みタスク数
+  inProgressTasksCount,     // 進行中タスク数
+  notStartedTasksCount,     // 未開始タスク数
 } = useProjectDetail();
 
 // 共有ストアから選択中プロジェクトを取得
 const store = useScheduleStore();
+
+// タスクテーブルのページネーション・ソート状態
+const taskCurrentPage = ref(1);
+const taskPageSize = ref(10);
+const taskSortColumn = ref<string>("");
+const taskSortDirection = ref<"asc" | "desc">("asc");
+
+// タスクテーブルのカラム定義
+const taskTableColumns = [
+  { key: "task_name", label: "タスク名", sortable: true },
+  { key: "assignee", label: "担当者", sortable: true },
+  { key: "status", label: "ステータス", sortable: true },
+  { key: "priority", label: "優先度", sortable: true },
+  { key: "progress_percent", label: "進捗", sortable: true },
+  { key: "actions", label: "操作", sortable: false },
+];
+
+// ソートされたタスクリスト（computed）
+const sortedProjectTasks = computed(() => {
+  if (!taskSortColumn.value) {
+    return projectTasks.value;
+  }
+
+  const sorted = [...projectTasks.value];
+  const column = taskSortColumn.value;
+  const direction = taskSortDirection.value;
+
+  sorted.sort((a: any, b: any) => {
+    let aVal: any;
+    let bVal: any;
+
+    // カラムに応じた値の取得
+    if (column === "assignee") {
+      // 担当者名で比較
+      aVal = users.value.find(u => u.id === a.primary_assignee_id)?.display_name || "";
+      bVal = users.value.find(u => u.id === b.primary_assignee_id)?.display_name || "";
+    } else if (column === "progress_percent") {
+      // 数値として比較
+      aVal = a.progress_percent || 0;
+      bVal = b.progress_percent || 0;
+    } else if (column === "priority") {
+      // 優先度を数値化して比較（URGENT > HIGH > MEDIUM > LOW）
+      const priorityMap: Record<string, number> = {
+        "URGENT": 4,
+        "HIGH": 3,
+        "MEDIUM": 2,
+        "LOW": 1
+      };
+      aVal = priorityMap[a.priority] || 0;
+      bVal = priorityMap[b.priority] || 0;
+    } else if (column === "status") {
+      // ステータスを数値化して比較（DONE > IN_PROGRESS > NOT_STARTED > BLOCKED）
+      const statusMap: Record<string, number> = {
+        "DONE": 4,
+        "IN_PROGRESS": 3,
+        "NOT_STARTED": 2,
+        "BLOCKED": 1
+      };
+      aVal = statusMap[a.status] || 0;
+      bVal = statusMap[b.status] || 0;
+    } else {
+      // その他のカラムは文字列として比較
+      aVal = a[column] ?? "";
+      bVal = b[column] ?? "";
+    }
+
+    // 比較処理
+    if (aVal < bVal) return direction === "asc" ? -1 : 1;
+    if (aVal > bVal) return direction === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  return sorted;
+});
+
+// タスクテーブル用のページ変更ハンドラー
+const handleTaskPageChange = (page: number) => {
+  taskCurrentPage.value = page;
+};
+
+// タスクテーブル用のソート変更ハンドラー
+const handleTaskSortChange = (column: string, direction: "asc" | "desc") => {
+  taskSortColumn.value = column;
+  taskSortDirection.value = direction;
+  // ソート後は最初のページに戻る
+  taskCurrentPage.value = 1;
+};
 
 // ヘッダーアクションを生成
 const getHeaderActions = () => {
@@ -193,66 +282,66 @@ console.log("プロジェクト詳細ページが読み込まれました");
           <div class="card">
             <CardHeader title="タスク一覧" subtitle="このプロジェクトに関連するタスクを管理できます" />
             <div class="card-body">
-              <div v-if="projectTasks.length > 0" class="table-responsive">
-                <table class="table table-hover">
-                  <thead>
-                    <tr>
-                      <th>タスク名</th>
-                      <th>担当者</th>
-                      <th>ステータス</th>
-                      <th>優先度</th>
-                      <th>進捗</th>
-                      <th>操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="task in projectTasks" :key="task.id">
-                      <td>
-                        <div class="d-flex align-items-center">
-                          <i class="material-symbols-rounded me-2">task</i>
-                          <span class="text-sm font-weight-bold">{{ task.task_name }}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span class="text-sm">
-                          {{ users.find(u => u.id === task.primary_assignee_id)?.display_name || '未設定' }}
-                        </span>
-                      </td>
-                      <td>
-                        <StatusBadge :status="task.status" />
-                      </td>
-                      <td>
-                        <PriorityBadge :priority="task.priority" />
-                      </td>
-                      <td>
-                        <div class="d-flex align-items-center">
-                          <div class="progress me-2" style="width: 60px; height: 8px;">
-                            <div 
-                              class="progress-bar bg-gradient-primary" 
-                              :style="{ width: (task.progress_percent || 0) + '%' }"
-                            ></div>
-                          </div>
-                          <span class="text-xs">{{ task.progress_percent || 0 }}%</span>
-                        </div>
-                      </td>
-                      <td>
-                        <button 
-                          class="btn btn-sm btn-outline-primary"
-                          @click="showTaskDetail(task)"
-                        >
-                          詳細
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <EmptyState 
-                v-else
-                icon="task" 
-                title="タスクがありません" 
-                subtitle="このプロジェクトにタスクを追加してください"
-              />
+              <PerformanceOptimizedTable
+                :data="sortedProjectTasks"
+                :columns="taskTableColumns"
+                :current-page="taskCurrentPage"
+                :page-size="taskPageSize"
+                :loading="isLoading"
+                empty-message="このプロジェクトにタスクを追加してください"
+                @page-change="handleTaskPageChange"
+                @sort-change="handleTaskSortChange"
+                @row-click="showTaskDetail"
+              >
+                <!-- タスク名セル: アイコン付き -->
+                <template #cell-task_name="{ item }">
+                  <div class="d-flex align-items-center">
+                    <i class="material-symbols-rounded me-2 text-primary">task</i>
+                    <span class="text-sm font-weight-bold">{{ item.task_name }}</span>
+                  </div>
+                </template>
+
+                <!-- 担当者セル -->
+                <template #cell-assignee="{ item }">
+                  <span class="text-sm">
+                    {{ users.find(u => u.id === item.primary_assignee_id)?.display_name || '未設定' }}
+                  </span>
+                </template>
+
+                <!-- ステータスセル: バッジ表示 -->
+                <template #cell-status="{ item }">
+                  <StatusBadge :status="item.status" />
+                </template>
+
+                <!-- 優先度セル: バッジ表示 -->
+                <template #cell-priority="{ item }">
+                  <PriorityBadge :priority="item.priority" />
+                </template>
+
+                <!-- 進捗セル: プログレスバー + パーセンテージ -->
+                <template #cell-progress_percent="{ item }">
+                  <div class="d-flex align-items-center">
+                    <div class="progress me-2" style="width: 60px; height: 8px;">
+                      <div 
+                        class="progress-bar bg-gradient-primary" 
+                        :style="{ width: (item.progress_percent || 0) + '%' }"
+                      ></div>
+                    </div>
+                    <span class="text-xs font-weight-bold">{{ item.progress_percent || 0 }}%</span>
+                  </div>
+                </template>
+
+                <!-- 操作セル: 詳細ボタン -->
+                <template #cell-actions="{ item }">
+                  <button 
+                    class="btn btn-sm btn-outline-primary"
+                    @click.stop="showTaskDetail(item)"
+                  >
+                    <i class="material-symbols-rounded me-1" style="font-size: 14px;">visibility</i>
+                    詳細
+                  </button>
+                </template>
+              </PerformanceOptimizedTable>
             </div>
           </div>
         </div>
@@ -320,63 +409,12 @@ console.log("プロジェクト詳細ページが読み込まれました");
     </div>
 
     <!-- タスク詳細モーダル -->
-    <ModalShell 
+    <TaskDetailModal 
       :show="showTaskModal" 
-      title="タスク詳細" 
-      size="lg" 
+      :selected-task="selectedTask"
+      :get-owner-name="getOwnerName"
       @close="closeTaskModal"
-    >
-      <template #default>
-        <div v-if="selectedTask">
-          <div class="row mb-3">
-            <div class="col-md-6">
-              <h6>タスク名</h6>
-              <p class="text-sm">{{ selectedTask.task_name }}</p>
-            </div>
-            <div class="col-md-6">
-              <h6>担当者</h6>
-              <p class="text-sm">
-                {{ getOwnerName(selectedTask?.primary_assignee_id) }}
-              </p>
-            </div>
-          </div>
-          
-          <div class="row mb-3">
-            <div class="col-md-4">
-              <h6>ステータス</h6>
-              <StatusBadge :status="selectedTask.status" />
-            </div>
-            <div class="col-md-4">
-              <h6>優先度</h6>
-              <PriorityBadge :priority="selectedTask.priority" />
-            </div>
-            <div class="col-md-4">
-              <h6>進捗率</h6>
-              <p class="text-sm font-weight-bold">{{ selectedTask.progress_percent || 0 }}%</p>
-            </div>
-          </div>
-          
-          <div class="row mb-3">
-            <div class="col-md-6">
-              <h6>開始予定日</h6>
-              <p class="text-sm">{{ selectedTask.planned_start || '未設定' }}</p>
-            </div>
-            <div class="col-md-6">
-              <h6>終了予定日</h6>
-              <p class="text-sm">{{ selectedTask.planned_end || '未設定' }}</p>
-            </div>
-          </div>
-          
-          <div v-if="selectedTask.description">
-            <h6>説明</h6>
-            <p class="text-sm">{{ selectedTask.description }}</p>
-          </div>
-        </div>
-      </template>
-      <template #footer>
-        <button type="button" class="btn btn-secondary" @click="closeTaskModal">閉じる</button>
-      </template>
-    </ModalShell>
+    />
   </div>
 </template>
 
@@ -435,6 +473,49 @@ console.log("プロジェクト詳細ページが読み込まれました");
   padding: 0.375rem 0;
 }
 
+/* タスク詳細モーダルのスタイリング */
+.task-detail-modal .card.card-plain {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef !important;
+  box-shadow: none;
+}
+
+.task-detail-modal .card.card-plain:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.task-detail-modal .icon-shape {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.task-detail-modal .text-gradient {
+  background: linear-gradient(195deg, #42424a 0%, #191919 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.task-detail-modal .text-gradient.text-primary {
+  background: linear-gradient(195deg, #7928ca 0%, #ff0080 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.task-detail-modal .progress {
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.task-detail-modal .row.g-3 {
+  --bs-gutter-x: 1rem;
+  --bs-gutter-y: 1rem;
+}
+
 /* レスポンシブデザイン */
 @media (max-width: 768px) {
   .project-detail-page {
@@ -447,6 +528,15 @@ console.log("プロジェクト詳細ページが読み込まれました");
   
   .table-responsive {
     font-size: 0.875rem;
+  }
+
+  .task-detail-modal .icon-shape {
+    width: 32px;
+    height: 32px;
+  }
+
+  .task-detail-modal .material-symbols-rounded {
+    font-size: 20px !important;
   }
 }
 </style>

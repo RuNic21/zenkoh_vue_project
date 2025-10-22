@@ -137,6 +137,7 @@ watch(() => props.currentPage, (newPage) => {
       </div>
       
       <!-- サイドバーフッター -->
+      <!-- TODO: 設定とヘルプのボタンを追加 -->
       <div class="sidenav-footer position-absolute w-100 bottom-0">
         <div class="mx-3">
           <button 

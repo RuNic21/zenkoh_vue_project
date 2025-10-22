@@ -38,7 +38,7 @@ import type { ScheduleItem } from "../types/schedule";
 import { listTasksWithProject, createTask, updateTask, deleteTask } from "../services/taskService";
 import { listUsers } from "../services/dbServices";
 import { listProjects } from "../services/projectService";
-import { tasksToScheduleItems, scheduleItemToTaskInsert, scheduleItemToTaskUpdate } from "../utils/taskAdapter";
+import { tasksToScheduleItems, scheduleItemToTaskInsert, scheduleItemToTaskUpdate, findUserIdByName } from "../utils/taskAdapter";
 import type { TaskWithProject } from "../types/task";
 import type { Users } from "../types/db/users";
 import type { Project } from "../types/project";
@@ -141,14 +141,41 @@ export const useScheduleStore = () => ({
       isLoading.value = true;
       errorMessage.value = "";
       // ScheduleItem を TaskUpdate に変換
-      const taskUpdate = scheduleItemToTaskUpdate(item);
+      let taskUpdate = scheduleItemToTaskUpdate(item);
+
+      // 主担当（表示名 → ユーザーID）に変換して保存
+      // 注意: users 取得に失敗した場合はスキップ（他フィールドのみ保存）
+      try {
+        const usersRes = await listUsers();
+        if (usersRes.success && usersRes.data) {
+          const assigneeUserId = findUserIdByName(item.assignee || "", usersRes.data);
+          if (assigneeUserId) {
+            taskUpdate = { ...taskUpdate, primary_assignee_id: assigneeUserId };
+          }
+        }
+      } catch (e) {
+        // サイレントに継続（担当者以外の更新は反映させる）
+        console.warn("担当者ID変換に失敗しましたが、他の項目は保存を続行します", e);
+      }
       
       // DB を更新
       const result = await updateTask(item.id, taskUpdate);
       
       if (result.success && result.data) {
-        // ストアも更新
-        updateSchedule(item);
+        // サーバーで確定した値から ScheduleItem を再構築し、ストアを正とする
+        try {
+          const usersRes = await listUsers();
+          const users = usersRes.success && usersRes.data ? usersRes.data : [];
+          const updatedItems = tasksToScheduleItems([result.data as unknown as TaskWithProject], users);
+          if (updatedItems.length) {
+            updateSchedule(updatedItems[0]);
+          } else {
+            updateSchedule(item); // フォールバック
+          }
+        } catch (e) {
+          // ユーザー取得に失敗した場合は、入力値で更新（限定的）
+          updateSchedule(item);
+        }
         console.log("スケジュールを保存しました:", item.id);
       } else {
         throw new Error(result.error || "タスクの更新に失敗しました");

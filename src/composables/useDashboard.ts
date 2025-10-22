@@ -1,29 +1,43 @@
 import { ref, computed } from "vue";
-import { fetchProjectProgress, type ProjectProgressRow } from "@/services/dashboardService";
+import { 
+  fetchProjectProgress, 
+  fetchRecentTasks,
+  type ProjectProgressRow,
+  type TaskProgressRow 
+} from "@/services/dashboardService";
 
 // ダッシュボード機能の状態とロジックを集約する composable
 export function useDashboard() {
   // プロジェクト進捗リスト
   const projectProgressList = ref<ProjectProgressRow[]>([]);
+  // タスク進捗リスト
+  const taskProgressList = ref<TaskProgressRow[]>([]);
   // ローディング/エラー状態
   const isDashboardLoading = ref(false);
+  const isTaskLoading = ref(false);
   const dashboardErrorMessage = ref("");
+  const taskErrorMessage = ref("");
 
   // 検索/フィルタ
   const searchQuery = ref("");
-  const statusFilter = ref("all");
-  const ownerFilter = ref("all");
-  const dateRangeFilter = ref("all");
+  const priorityFilter = ref("all");     // 'all' | 'urgent' | 'high-up'
+  const deadlineFilter = ref("all");     // 'all' | 'within-3days' | 'within-7days' | 'overdue'
+  const projectFilter = ref("all");      // 'all' | project name
 
   // 日付基準（メモ化）
-  const today = computed(() => new Date());
-  const weekFromNow = computed(() => new Date(today.value.getTime() + 7 * 24 * 60 * 60 * 1000));
-  const monthFromNow = computed(() => new Date(today.value.getTime() + 30 * 24 * 60 * 60 * 1000));
+  const today = computed(() => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  });
+  const threeDaysFromNow = computed(() => new Date(today.value.getTime() + 3 * 24 * 60 * 60 * 1000));
+  const sevenDaysFromNow = computed(() => new Date(today.value.getTime() + 7 * 24 * 60 * 60 * 1000));
 
-  // フィルタ適用後の一覧
+  // フィルタ適用後のプロジェクト一覧
   const filteredProjects = computed(() => {
     let filtered = projectProgressList.value;
 
+    // 検索フィルタ
     if (searchQuery.value.trim()) {
       const q = searchQuery.value.toLowerCase();
       filtered = filtered.filter((p) =>
@@ -31,37 +45,16 @@ export function useDashboard() {
       );
     }
 
-    if (statusFilter.value !== "all") {
-      filtered = filtered.filter((project) => {
-        switch (statusFilter.value) {
-          case "in-progress":
-            return project.status === "進行中";
-          case "completed":
-            return project.status === "完了";
-          case "overdue": {
-            if (!project.dueDate || project.dueDate === "-") return false;
-            const due = new Date(project.dueDate);
-            return due < today.value && project.status !== "完了";
-          }
-          default:
-            return true;
-        }
-      });
-    }
-
-    if (ownerFilter.value !== "all") {
-      filtered = filtered.filter((p) => p.owner === ownerFilter.value);
-    }
-
-    if (dateRangeFilter.value !== "all") {
+    // 期限フィルタ（プロジェクトに適用）
+    if (deadlineFilter.value !== "all") {
       filtered = filtered.filter((project) => {
         if (!project.dueDate || project.dueDate === "-") return false;
         const due = new Date(project.dueDate);
-        switch (dateRangeFilter.value) {
-          case "this-week":
-            return due >= today.value && due <= weekFromNow.value;
-          case "this-month":
-            return due >= today.value && due <= monthFromNow.value;
+        switch (deadlineFilter.value) {
+          case "within-3days":
+            return due >= today.value && due <= threeDaysFromNow.value;
+          case "within-7days":
+            return due >= today.value && due <= sevenDaysFromNow.value;
           case "overdue":
             return due < today.value && project.status !== "完了";
           default:
@@ -73,10 +66,72 @@ export function useDashboard() {
     return filtered;
   });
 
-  // 担当者一覧
-  const availableOwners = computed(() => {
-    const owners = new Set(projectProgressList.value.map((p) => p.owner));
-    return Array.from(owners).filter((o) => o !== "-");
+  // フィルタ適用後のタスク一覧
+  const filteredTasks = computed(() => {
+    let filtered = taskProgressList.value;
+
+    // 検索クエリでフィルタ（タスク名、プロジェクト名、担当者名）
+    if (searchQuery.value.trim()) {
+      const q = searchQuery.value.toLowerCase();
+      filtered = filtered.filter((t) =>
+        t.name.toLowerCase().includes(q) || 
+        t.projectName.toLowerCase().includes(q) || 
+        t.assigneeName.toLowerCase().includes(q)
+      );
+    }
+
+    // 優先度フィルタ
+    if (priorityFilter.value !== "all") {
+      filtered = filtered.filter((task) => {
+        switch (priorityFilter.value) {
+          case "urgent":
+            return task.priority === "URGENT";
+          case "high-up":
+            return task.priority === "URGENT" || task.priority === "HIGH";
+          default:
+            return true;
+        }
+      });
+    }
+
+    // 期限フィルタ
+    if (deadlineFilter.value !== "all") {
+      filtered = filtered.filter((task) => {
+        if (!task.planned_end) return false;
+        const due = new Date(task.planned_end);
+        due.setHours(0, 0, 0, 0);
+        switch (deadlineFilter.value) {
+          case "within-3days":
+            return due >= today.value && due <= threeDaysFromNow.value;
+          case "within-7days":
+            return due >= today.value && due <= sevenDaysFromNow.value;
+          case "overdue":
+            return task.isOverdue;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // プロジェクトフィルタ
+    if (projectFilter.value !== "all") {
+      filtered = filtered.filter((t) => t.projectName === projectFilter.value);
+    }
+
+    return filtered;
+  });
+
+  // プロジェクト一覧（フィルタ用）
+  const availableProjects = computed(() => {
+    const projects = new Set<string>();
+    
+    taskProgressList.value.forEach((t) => {
+      if (t.projectName && t.projectName !== "-") {
+        projects.add(t.projectName);
+      }
+    });
+    
+    return Array.from(projects).sort();
   });
 
   // 統計
@@ -118,28 +173,53 @@ export function useDashboard() {
     }
   };
 
+  // タスク進捗データ読み込み
+  const loadRecentTasks = async (): Promise<void> => {
+    try {
+      isTaskLoading.value = true;
+      taskErrorMessage.value = "";
+      const result = await fetchRecentTasks(10);
+      if (result.success && result.data) {
+        taskProgressList.value = result.data;
+      } else {
+        taskProgressList.value = [];
+        taskErrorMessage.value = result.error || "タスクの読み込みに失敗しました。";
+      }
+    } catch (e) {
+      console.error("タスクの読み込みに失敗", e);
+      taskProgressList.value = [];
+      taskErrorMessage.value = "タスクの読み込みに失敗しました。";
+    } finally {
+      isTaskLoading.value = false;
+    }
+  };
+
   // フィルタリセット
   const clearFilters = () => {
     searchQuery.value = "";
-    statusFilter.value = "all";
-    ownerFilter.value = "all";
-    dateRangeFilter.value = "all";
+    priorityFilter.value = "all";
+    deadlineFilter.value = "all";
+    projectFilter.value = "all";
   };
 
   return {
     // state
     projectProgressList,
+    taskProgressList,
     isDashboardLoading,
+    isTaskLoading,
     dashboardErrorMessage,
+    taskErrorMessage,
     // filters
     searchQuery,
-    statusFilter,
-    ownerFilter,
-    dateRangeFilter,
+    priorityFilter,
+    deadlineFilter,
+    projectFilter,
     clearFilters,
     // computed lists
     filteredProjects,
-    availableOwners,
+    filteredTasks,
+    availableProjects,
     // stats
     inProgressCount,
     completedCount,
@@ -147,6 +227,7 @@ export function useDashboard() {
     overdueCount,
     // actions
     loadDashboardFromDb,
+    loadRecentTasks,
   };
 }
 

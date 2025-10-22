@@ -88,6 +88,9 @@
 import { useProjectManagement } from "@/composables/useProjectManagement";
 import PerformanceOptimizedTable from "../components/table/PerformanceOptimizedTable.vue";
 import ProjectFilterPanel from "../components/project/ProjectFilterPanel.vue";
+import ProjectCreateModal from "../components/project/ProjectCreateModal.vue";
+import ProjectEditModal from "../components/project/ProjectEditModal.vue";
+import ProjectDeleteModal from "../components/project/ProjectDeleteModal.vue";
 import LoadingSpinner from "@/components/common/LoadingSpinner.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import StatusBadge from "@/components/common/StatusBadge.vue";
@@ -95,47 +98,49 @@ import PageHeader from "@/components/common/PageHeader.vue";
 import CardHeader from "@/components/common/CardHeader.vue";
 import ActionBar from "@/components/common/ActionBar.vue";
 import StatCards from "@/components/common/StatCards.vue";
-import ModalShell from "@/components/common/ModalShell.vue";
 import { formatPercent, truncate } from "@/utils/formatters";
+
+// プロジェクト管理の状態・ロジックは composable から取得
+// useProjectManagement コンポーザブルから状態・アクションを分割代入する
 const {
-  projects,
-  users,
-  isLoading,
-  errorMessage,
-  projectStats,
-  projectDetailStats,
-  showCreateModal,
-  showEditModal,
-  showDeleteModal,
-  selectedProject,
-  formData,
-  searchQuery,
-  statusFilter,
-  dateFilter,
-  clearFilters,
-  filteredProjects,
-  projectCurrentPage,
-  projectPageSize,
-  projectSortColumn,
-  projectSortDirection,
-  projectTableColumns,
-  projectTableRows,
-  handleProjectSortChange,
-  handleProjectPageChange,
-  formatDate,
-  getOwnerName,
-  getProjectStatus,
-  loadProjects,
-  loadUsers,
-  handleCreateProject,
-  handleEditProject,
-  handleDeleteProject,
-  resetForm,
-  openEditModal,
-  openDeleteModal,
-  loadDashboardStats,
-  showProjectTasks,
-} = useProjectManagement();
+  projects,                // プロジェクト一覧（配列）
+  users,                   // 全ユーザー一覧（割り当て候補にも利用）
+  isLoading,               // ローディング中かどうかの状態
+  errorMessage,            // エラーメッセージ文字列
+  projectStats,            // プロジェクト全体統計情報
+  projectDetailStats,      // 選択プロジェクトごとの詳細統計
+  showCreateModal,         // プロジェクト作成モーダル表示状態
+  showEditModal,           // プロジェクト編集モーダル表示状態
+  showDeleteModal,         // プロジェクト削除モーダル表示状態
+  selectedProject,         // 選択中プロジェクト情報
+  formData,                // プロジェクト作成・編集フォームの双方向データ
+  searchQuery,             // 検索クエリ文字列
+  statusFilter,            // ステータスによるフィルタ値
+  dateFilter,              // 日付範囲フィルタ値
+  clearFilters,            // フィルター解除用メソッド
+  filteredProjects,        // 現在フィルタ適用後のプロジェクト一覧
+  projectCurrentPage,      // 現在のページ番号（ページネーション用）
+  projectPageSize,         // ページごとの表示件数
+  projectSortColumn,       // 現在のソート列
+  projectSortDirection,    // ソート方向（昇順/降順）
+  projectTableColumns,     // テーブル列定義
+  projectTableRows,        // テーブル表示用の行データ
+  handleProjectSortChange, // テーブルのソート変更ハンドラ
+  handleProjectPageChange, // テーブルのページ変更ハンドラ
+  formatDate,              // 日付フォーマット関数
+  getOwnerName,            // プロジェクトオーナー名取得関数
+  getProjectStatus,        // プロジェクト状態取得関数
+  loadProjects,            // プロジェクト一覧再取得アクション
+  loadUsers,               // ユーザー一覧再取得アクション
+  handleCreateProject,     // プロジェクト新規作成処理
+  handleEditProject,       // プロジェクト編集処理
+  handleDeleteProject,     // プロジェクト削除処理
+  resetForm,               // 新規/編集フォームのリセット処理
+  openEditModal,           // 編集モーダルオープン用アクション
+  openDeleteModal,         // 削除モーダルオープン用アクション
+  loadDashboardStats,      // ダッシュボード用統計取得アクション
+  showProjectTasks,        // プロジェクトのタスク一覧表示アクション
+} = useProjectManagement(); // 各プロジェクト管理画面で必須な状態管理・操作を提供
 
 // composable を利用するため、以降のローカル定義は不要です
 </script>
@@ -152,6 +157,44 @@ const {
       {{ errorMessage }}
     </div>
 
+    <!-- フィルタリング・アクションパネル -->
+    <div class="row mb-4">
+      <!-- フィルタリングパネル -->
+      <div class="col-lg-8 col-md-12">
+        <ProjectFilterPanel
+          :search="searchQuery"
+          :status="statusFilter"
+          :date="dateFilter"
+          @update:search="(v: string) => searchQuery = v"
+          @update:status="(v: string) => statusFilter = v"
+          @update:date="(v: string) => dateFilter = v"
+          @reset="clearFilters"
+        />
+      </div>
+
+
+      <!-- アクションパネル -->
+      <div class="col-lg-4 col-md-12">
+        <div class="card">
+          <CardHeader title="アクション" />
+          <div class="card-body">
+            <ActionBar>
+              <template #left>
+                <button 
+                      class="btn bg-gradient-primary"
+                  @click="showCreateModal = true"
+                >
+                  <i class="material-symbols-rounded me-2">add</i>
+                  新しいプロジェクト作成
+                </button>
+              </template>
+            </ActionBar>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    
     <!-- プロジェクト分析ダッシュボード -->
     <div class="row mb-4">
       <div class="col-12">
@@ -171,41 +214,6 @@ const {
       </div>
     </div>
 
-    <!-- フィルタリング・アクションパネル -->
-    <div class="row mb-4">
-      <!-- フィルタリングパネル -->
-      <div class="col-lg-8 col-md-12">
-        <ProjectFilterPanel
-          :search="searchQuery"
-          :status="statusFilter"
-          :date="dateFilter"
-          @update:search="(v: string) => searchQuery = v"
-          @update:status="(v: string) => statusFilter = v"
-          @update:date="(v: string) => dateFilter = v"
-          @reset="clearFilters"
-        />
-      </div>
-
-      <!-- アクションパネル -->
-      <div class="col-lg-4 col-md-12">
-        <div class="card">
-          <CardHeader title="アクション" />
-          <div class="card-body">
-            <ActionBar>
-              <template #right>
-            <button 
-                  class="btn bg-gradient-primary"
-              @click="showCreateModal = true"
-            >
-              <i class="material-symbols-rounded me-2">add</i>
-              新しいプロジェクト作成
-            </button>
-              </template>
-            </ActionBar>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- プロジェクト一覧 -->
     <div class="row">
@@ -248,6 +256,58 @@ const {
                   }
                 }"
               >
+                <!-- 進行率セル: プログレスバーで表示 -->
+                <template #cell-progress="{ value }">
+                  <div class="d-flex align-items-center">
+                    <div class="progress" style="flex: 1; height: 8px; min-width: 60px;">
+                      <div 
+                        class="progress-bar" 
+                        :class="{
+                          'bg-success': value >= 75,
+                          'bg-info': value >= 50 && value < 75,
+                          'bg-warning': value >= 25 && value < 50,
+                          'bg-danger': value < 25
+                        }"
+                        :style="{ width: value + '%' }"
+                        role="progressbar"
+                        :aria-valuenow="value"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                      ></div>
+                    </div>
+                    <span class="ms-2 text-xs font-weight-bold">{{ value }}%</span>
+                  </div>
+                </template>
+
+                <!-- タスク要約セル: バッジで表示 -->
+                <template #cell-taskSummary="{ value, row }">
+                  <div class="d-flex align-items-center gap-1">
+                    <span class="badge badge-sm" :class="{
+                      'bg-gradient-success': row.completedTasks === row.totalTasks && row.totalTasks > 0,
+                      'bg-gradient-info': row.completedTasks < row.totalTasks && row.totalTasks > 0,
+                      'bg-gradient-secondary': row.totalTasks === 0
+                    }">
+                      {{ value }}
+                    </span>
+                  </div>
+                </template>
+
+                <!-- 残り日数セル: 緊急度に応じた色分け -->
+                <template #cell-daysRemaining="{ value, row }">
+                  <span class="badge badge-sm" :class="{
+                    'bg-gradient-danger': row.daysRemainingStatus === 'overdue',
+                    'bg-gradient-warning': row.daysRemainingStatus === 'warning',
+                    'bg-gradient-success': row.daysRemainingStatus === 'normal',
+                    'bg-gradient-secondary': row.daysRemainingStatus === 'none'
+                  }">
+                    <i class="material-symbols-rounded text-xs me-1" style="font-size: 14px;">
+                      {{ row.daysRemainingStatus === 'overdue' ? 'warning' : 'schedule' }}
+                    </i>
+                    {{ value }}
+                  </span>
+                </template>
+
+                <!-- 状態セル -->
                 <template #cell-status="{ value }">
                   <StatusBadge :status="value" />
                 </template>
@@ -275,185 +335,36 @@ const {
     </div>
 
     <!-- 新規作成モーダル -->
-    <ModalShell :show="showCreateModal" title="新しいプロジェクト作成" size="md" @close="showCreateModal = false">
-      <template #default>
-        <form>
-              <div class="mb-3">
-                <label class="form-label">プロジェクト名 <span class="text-danger">*</span></label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  v-model="formData.name"
-                  placeholder="プロジェクト名を入力してください"
-                  required
-                >
-              </div>
-              <div class="mb-3">
-                <label class="form-label">説明</label>
-                <textarea 
-                  class="form-control" 
-                  v-model="formData.description"
-                  placeholder="プロジェクトの説明を入力してください"
-                  rows="3"
-                ></textarea>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">プロジェクトオーナー</label>
-                <select class="form-control" v-model="formData.owner_user_id">
-                  <option :value="null">オーナーを選択してください</option>
-                  <option 
-                    v-for="user in users" 
-                    :key="user.id" 
-                    :value="user.id"
-                  >
-                    {{ user.display_name }}
-                  </option>
-                </select>
-              </div>
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">開始日</label>
-                  <input 
-                    type="date" 
-                    class="form-control" 
-                    v-model="formData.start_date"
-                  >
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">終了日</label>
-                  <input 
-                    type="date" 
-                    class="form-control" 
-                    v-model="formData.end_date"
-                  >
-                </div>
-              </div>
-              <div class="mb-3">
-                <div class="form-check">
-                  <input 
-                    class="form-check-input" 
-                    type="checkbox" 
-                    v-model="formData.is_archived"
-                    id="isArchived"
-                  >
-                  <label class="form-check-label" for="isArchived">
-                    アーカイブ状態で作成
-                  </label>
-                </div>
-              </div>
-        </form>
-      </template>
-      <template #footer>
-        <button type="button" class="btn btn-secondary" @click="showCreateModal = false">キャンセル</button>
-        <button type="button" class="btn bg-gradient-primary" @click="handleCreateProject">作成</button>
-      </template>
-    </ModalShell>
+    <ProjectCreateModal
+      :show="showCreateModal"
+      :form-data="formData"
+      :users="users"
+      @close="showCreateModal = false"
+      @submit="handleCreateProject"
+    />
 
     <!-- 編集モーダル -->
-    <ModalShell :show="showEditModal" title="プロジェクト編集" size="md" @close="showEditModal = false">
-      <template #default>
-        <form>
-              <div class="mb-3">
-                <label class="form-label">プロジェクト名 <span class="text-danger">*</span></label>
-                <input 
-                  type="text" 
-                  class="form-control" 
-                  v-model="formData.name"
-                  placeholder="プロジェクト名を入力してください"
-                  required
-                >
-              </div>
-              <div class="mb-3">
-                <label class="form-label">説明</label>
-                <textarea 
-                  class="form-control" 
-                  v-model="formData.description"
-                  placeholder="プロジェクトの説明を入力してください"
-                  rows="3"
-                ></textarea>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">プロジェクトオーナー</label>
-                <select class="form-control" v-model="formData.owner_user_id">
-                  <option :value="null">オーナーを選択してください</option>
-                  <option 
-                    v-for="user in users" 
-                    :key="user.id" 
-                    :value="user.id"
-                  >
-                    {{ user.display_name }}
-                  </option>
-                </select>
-              </div>
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">開始日</label>
-                  <input 
-                    type="date" 
-                    class="form-control" 
-                    v-model="formData.start_date"
-                  >
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">終了日</label>
-                  <input 
-                    type="date" 
-                    class="form-control" 
-                    v-model="formData.end_date"
-                  >
-                </div>
-              </div>
-              <div class="mb-3">
-                <div class="form-check">
-                  <input 
-                    class="form-check-input" 
-                    type="checkbox" 
-                    v-model="formData.is_archived"
-                    id="isArchivedEdit"
-                  >
-                  <label class="form-check-label" for="isArchivedEdit">
-                    アーカイブ状態
-                  </label>
-                </div>
-              </div>
-        </form>
-      </template>
-      <template #footer>
-        <button type="button" class="btn btn-secondary" @click="showEditModal = false">キャンセル</button>
-        <button type="button" class="btn bg-gradient-primary" @click="handleEditProject">更新</button>
-      </template>
-    </ModalShell>
+    <ProjectEditModal
+      :show="showEditModal"
+      :form-data="formData"
+      :users="users"
+      @close="showEditModal = false"
+      @submit="handleEditProject"
+    />
 
     <!-- 削除確認モーダル -->
-    <ModalShell :show="showDeleteModal" title="プロジェクト削除確認" size="md" @close="showDeleteModal = false">
-      <template #default>
-        <p>以下のプロジェクトを削除してもよろしいですか？</p>
-        <div class="alert alert-warning">
-          <strong>{{ selectedProject?.name }}</strong>
-          <br>
-          <small>この操作は取り消すことができません。</small>
-        </div>
-      </template>
-      <template #footer>
-        <button type="button" class="btn btn-secondary" @click="showDeleteModal = false">キャンセル</button>
-        <button type="button" class="btn bg-gradient-danger" @click="handleDeleteProject">削除</button>
-      </template>
-    </ModalShell>
+    <ProjectDeleteModal
+      :show="showDeleteModal"
+      :project="selectedProject"
+      @close="showDeleteModal = false"
+      @confirm="handleDeleteProject"
+    />
 
     <!-- タスク管理モーダル（プロジェクト詳細ページ遷移に変更されたため削除） -->
   </div>
 </template>
 
 <style scoped>
-/* モーダルスタイリング */
-.modal {
-  z-index: 1050;
-}
-
-.modal-dialog {
-  margin-top: 5rem;
-}
-
 /* テーブルホバーエフェクト */
 .table tbody tr:hover {
   background-color: rgba(0, 0, 0, 0.02);
@@ -466,6 +377,13 @@ const {
 
 .btn-group .btn:not(:last-child) {
   margin-right: 0.25rem;
+}
+
+/* ボタンアイコンスタイリング */
+.btn i.material-symbols-rounded {
+  font-size: 1.125rem;
+  vertical-align: middle;
+  line-height: 1;
 }
 
 /* レスポンシブデザイン */

@@ -1,68 +1,80 @@
 <script setup lang="ts">
-// プロジェクトフィルターパネル
-// 目的: 検索/状態/期限フィルターUIを分離して再利用性を高める
+// タスクフィルターパネル
+// 目的: 検索/状態/プロジェクト/担当者フィルターUIを統一スタイルで提供
 
 import { computed } from "vue";
+import type { Project } from "@/types/project";
 
-// Props 定義
+// フィルター値の型定義
+interface FilterValues {
+  searchQuery: string; // タイトル等のキーワード検索（プロジェクト名は対象外）
+  filterStatus: string; // ステータス
+  selectedProjectId: number | null; // プロジェクト選択
+  assigneeQuery: string; // 担当者名での検索
+}
+
+// Propsの型定義
 interface Props {
-  // 検索クエリ
-  search: string;
-  // 状態フィルター（all | active | archived）
-  status: string;
-  // 期限フィルター（all | this-month | overdue）
-  date: string;
-  // 組み込みフィールドの表示可否
-  useBuiltinFields?: boolean;
-  // 見出しタイトル
+  modelValue: FilterValues;
+  projects: Project[];
+  searchPlaceholder?: string;
+  showProjectFilter?: boolean;
+  showStatusFilter?: boolean;
   title?: string;
 }
 
+// Propsの受け取り（デフォルト値含む）
 const props = withDefaults(defineProps<Props>(), {
-  useBuiltinFields: true,
+  searchPlaceholder: "キーワードで検索（部分一致、複数単語OK）",
+  showProjectFilter: true,
+  showStatusFilter: true,
   title: "フィルタリング・検索"
 });
 
-// Emits 定義
+// Emitイベントの定義（v-model用 と リセット操作）
 const emit = defineEmits<{
-  'update:search': [value: string];
-  'update:status': [value: string];
-  'update:date': [value: string];
-  'reset': [];
+  "update:modelValue": [value: FilterValues];
+  reset: [];
 }>();
 
-// v-model 風のゲッター/セッター
-const modelSearch = computed({
-  get: () => props.search,
-  set: (v: string) => emit('update:search', v)
+// 検索クエリのcomputed（双方向バインディング）
+const searchQuery = computed({
+  get: () => props.modelValue.searchQuery,
+  set: (value) => emit("update:modelValue", { ...props.modelValue, searchQuery: value })
 });
 
-const modelStatus = computed({
-  get: () => props.status,
-  set: (v: string) => emit('update:status', v)
+// ステータスフィルターのcomputed（双方向バインディング）
+const filterStatus = computed({
+  get: () => props.modelValue.filterStatus,
+  set: (value) => emit("update:modelValue", { ...props.modelValue, filterStatus: value })
 });
 
-const modelDate = computed({
-  get: () => props.date,
-  set: (v: string) => emit('update:date', v)
+// プロジェクトIDフィルターのcomputed（双方向バインディング）
+const selectedProjectId = computed({
+  get: () => props.modelValue.selectedProjectId,
+  set: (value) => emit("update:modelValue", { ...props.modelValue, selectedProjectId: value })
 });
 
-// リセットハンドラー
-const handleReset = () => emit('reset');
+// 担当者検索のcomputed（双方向バインディング）
+const assigneeQuery = computed({
+  get: () => props.modelValue.assigneeQuery,
+  set: (value) => emit("update:modelValue", { ...props.modelValue, assigneeQuery: value })
+});
 
 // アクティブなフィルタ数を計算
 const activeFiltersCount = computed(() => {
   let count = 0;
-  if (props.search) count++;
-  if (props.status !== "all") count++;
-  if (props.date !== "all") count++;
+  if (props.modelValue.searchQuery) count++;
+  if (props.modelValue.filterStatus !== "all") count++;
+  if (props.modelValue.selectedProjectId !== null) count++;
+  if (props.modelValue.assigneeQuery) count++;
   return count;
 });
 </script>
 
 <template>
   <!-- フィルタリング・検索カード - Material Design スタイル -->
-  <div class="card shadow-sm">
+  <div class="card shadow-sm mb-4">
     <!-- カードヘッダー: タイトルとリセットボタン -->
     <div class="card-header pb-0 d-flex justify-content-between align-items-center">
       <div class="d-flex align-items-center">
@@ -77,7 +89,7 @@ const activeFiltersCount = computed(() => {
       </div>
       <button 
         class="btn btn-sm btn-outline-secondary mb-0" 
-        @click="handleReset"
+        @click="emit('reset')"
         title="すべてのフィルタをリセット"
       >
         <i class="fas fa-redo me-1"></i>
@@ -87,46 +99,67 @@ const activeFiltersCount = computed(() => {
 
     <!-- カードボディ: フィルタ入力欄 -->
     <div class="card-body pt-3">
-      <div v-if="useBuiltinFields" class="row g-3">
+      <div class="row g-3">
         <!-- 検索フィルタ -->
-        <div class="col-lg-4 col-md-6">
+        <div class="col-lg-3 col-md-6">
           <label class="form-label text-sm text-dark fw-bold ms-1 mb-1">
             <i class="fas fa-search text-sm me-1"></i>検索
           </label>
           <input 
             type="text" 
             class="form-control" 
-            placeholder="プロジェクト名で検索..."
-            v-model="modelSearch"
+            :placeholder="searchPlaceholder"
+            v-model="searchQuery"
           />
         </div>
 
         <!-- 状態フィルタ -->
-        <div class="col-lg-3 col-md-6">
+        <div v-if="showStatusFilter" class="col-lg-3 col-md-6">
           <label class="form-label text-sm text-dark fw-bold ms-1 mb-1">
             <i class="fas fa-tasks text-sm me-1"></i>状態
           </label>
-          <select class="form-select" v-model="modelStatus">
-            <option value="all">すべての状態</option>
-            <option value="active">アクティブ</option>
-            <option value="archived">アーカイブ</option>
+          <select class="form-select" v-model="filterStatus">
+            <option value="all">すべてのステータス</option>
+            <option value="NOT_STARTED">未開始</option>
+            <option value="IN_PROGRESS">進行中</option>
+            <option value="DONE">完了</option>
+            <option value="BLOCKED">ブロック</option>
+            <option value="CANCELLED">キャンセル</option>
           </select>
         </div>
 
-        <!-- 期限フィルタ -->
-        <div class="col-lg-3 col-md-6">
+        <!-- プロジェクトフィルタ -->
+        <div v-if="showProjectFilter" class="col-lg-3 col-md-6">
           <label class="form-label text-sm text-dark fw-bold ms-1 mb-1">
-            <i class="fas fa-calendar text-sm me-1"></i>期限
+            <i class="fas fa-project-diagram text-sm me-1"></i>プロジェクト
           </label>
-          <select class="form-select" v-model="modelDate">
-            <option value="all">すべての期限</option>
-            <option value="this-month">今月</option>
-            <option value="overdue">期限切れ</option>
+          <select class="form-select" v-model="selectedProjectId">
+            <option :value="null">すべてのプロジェクト</option>
+            <option 
+              v-for="project in projects" 
+              :key="project.id" 
+              :value="project.id"
+            >
+              {{ project.name }}
+            </option>
           </select>
         </div>
 
-        <!-- 統計情報表示エリア（オプション） -->
-        <div class="col-lg-2 col-md-12">
+        <!-- 担当者検索 -->
+        <div class="col-lg-2 col-md-6">
+          <label class="form-label text-sm text-dark fw-bold ms-1 mb-1">
+            <i class="fas fa-user text-sm me-1"></i>担当者
+          </label>
+          <input 
+            type="text" 
+            class="form-control" 
+            placeholder="担当者名で検索..."
+            v-model="assigneeQuery"
+          />
+        </div>
+
+        <!-- 統計情報表示エリア -->
+        <div class="col-lg-1 col-md-12">
           <div class="filter-stats-compact text-center">
             <small class="text-muted d-block text-xs mb-1">フィルタ数</small>
             <div 
@@ -138,9 +171,6 @@ const activeFiltersCount = computed(() => {
           </div>
         </div>
       </div>
-
-      <!-- 追加要素のためのスロット -->
-      <slot />
     </div>
   </div>
   <!-- /フィルタリング・検索カード -->
@@ -291,7 +321,7 @@ const activeFiltersCount = computed(() => {
     margin-top: 0;
   }
   
-  .col-lg-2.col-md-12 {
+  .col-lg-1.col-md-12 {
     margin-top: 0.5rem;
   }
 }
@@ -325,3 +355,4 @@ const activeFiltersCount = computed(() => {
   padding: 1.5rem;
 }
 </style>
+

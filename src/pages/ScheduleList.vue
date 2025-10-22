@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useScheduleList } from "@/composables/useScheduleList";
 import { getProgressBarClass } from "../utils/uiHelpers";
 import type { ScheduleItem } from "../types/schedule";
@@ -7,7 +7,7 @@ import type { Project } from "../types/project";
 
 // 共通コンポーネントのインポート
 import PageHeader from "../components/common/PageHeader.vue";
-import ActionBar from "../components/common/ActionBar.vue";
+import SearchFilterBar from "../components/task/SearchFilterBar.vue";
 import StatusBadge from "../components/common/StatusBadge.vue";
 import PriorityBadge from "../components/common/PriorityBadge.vue";
 import LoadingSpinner from "../components/common/LoadingSpinner.vue";
@@ -15,6 +15,10 @@ import EmptyState from "../components/common/EmptyState.vue";
 import CardHeader from "../components/common/CardHeader.vue";
 import StatCards from "../components/common/StatCards.vue";
 import ModalShell from "../components/common/ModalShell.vue";
+import TaskCreateModal from "../components/task/TaskCreateModal.vue";
+import ProjectListGrid from "../components/project/ProjectListGrid.vue";
+import ProjectDetailHeader from "../components/project/ProjectDetailHeader.vue";
+import ProjectTasksGrid from "../components/task/ProjectTasksGrid.vue";
 
 // TODO: 即座に実装可能な機能（既存スキーマ活用）
 // 1. カードビュー改善（進捗率可視化）
@@ -58,21 +62,57 @@ import ModalShell from "../components/common/ModalShell.vue";
 
 // composable から状態・ロジックを取得
 const {
-  schedules,
-  isLoading,
-  errorMessage,
-  projects,
-  filterStatus,
-  searchQuery,
-  selectedProjectId,
-  handleFilterUpdate,
-  groupedSchedules,
-  projectStats,
-  addNewSchedule,
-  editSchedule,
-  deleteSchedule,
-  viewDetails,
+  schedules,            // スケジュール（タスク）データ一覧
+  isLoading,            // ローディング状態フラグ
+  errorMessage,         // エラーメッセージ（取得失敗時の表示用）
+  projects,             // プロジェクト一覧（ドロップダウン等で使用）
+  showCreateModal,      // タスク作成モーダルの表示状態
+  isSubmittingTask,     // タスク作成中フラグ
+  filterStatus,         // タスク状態フィルター
+  searchQuery,          // 検索クエリ（名称など）
+  selectedProjectId,    // 選択中のプロジェクトID
+  assigneeQuery,        // 担当者名の検索クエリ
+  handleFilterUpdate,   // フィルタ変更ハンドラ
+  groupedSchedules,     // プロジェクト別のスケジュールグループ
+  projectStats,         // プロジェクト別の統計情報
+  filteredSchedules,    // フィルター適用済みのタスク一覧（統計表示用）
+  selectedProjectView,  // 選択中のプロジェクトビュー（null: プロジェクト一覧、文字列: 選択されたプロジェクト名）
+  selectProjectView,    // プロジェクトを選択してタスク一覧を表示
+  backToProjectList,    // プロジェクト一覧に戻る
+  addNewSchedule,       // 新規タスク追加のハンドラ（モーダルを開く）
+  closeCreateModal,     // モーダルを閉じるハンドラ
+  createTask,           // タスク作成処理
+  editSchedule,         // タスク編集のハンドラ
+  deleteSchedule,       // タスク削除のハンドラ
+  viewDetails,          // タスク詳細画面への遷移ハンドラ
+  // new: filter ops
+  resetFilters,
 } = useScheduleList();
+
+// フィルター値を一つのオブジェクトとして管理（SearchFilterBar用）
+const filterValues = computed({
+  get: () => ({
+    searchQuery: searchQuery.value,
+    filterStatus: filterStatus.value,
+    selectedProjectId: selectedProjectId.value,
+    assigneeQuery: assigneeQuery.value
+  }),
+  set: (newValues) => {
+    // 部分更新にも対応: 定義されたキーのみ更新し、他は維持
+    if (Object.prototype.hasOwnProperty.call(newValues, "searchQuery") && newValues.searchQuery !== undefined) {
+      searchQuery.value = newValues.searchQuery;
+    }
+    if (Object.prototype.hasOwnProperty.call(newValues, "filterStatus") && newValues.filterStatus !== undefined) {
+      filterStatus.value = newValues.filterStatus;
+    }
+    if (Object.prototype.hasOwnProperty.call(newValues, "selectedProjectId") && newValues.selectedProjectId !== undefined) {
+      selectedProjectId.value = newValues.selectedProjectId;
+    }
+    if (Object.prototype.hasOwnProperty.call(newValues, "assigneeQuery") && newValues.assigneeQuery !== undefined) {
+      assigneeQuery.value = newValues.assigneeQuery;
+    }
+  }
+});
 </script>
 
 <template>
@@ -85,6 +125,7 @@ const {
     <div v-if="!isLoading && errorMessage" class="alert alert-danger" role="alert">
       {{ errorMessage }}
     </div>
+    
     <!-- ページヘッダー -->
     <PageHeader
       title="タスク一覧"
@@ -99,6 +140,15 @@ const {
       ]"
     />
 
+
+    <!-- フィルターと検索 -->
+    <SearchFilterBar
+      v-model="filterValues"
+      :projects="projects"
+      @reset="resetFilters()"
+    />
+    
+    
     <!-- プロジェクト統計サマリー -->
     <div v-if="!isLoading && Object.keys(groupedSchedules).length > 0" class="row mb-4">
       <div class="col-12">
@@ -116,21 +166,21 @@ const {
                 },
                 { 
                   label: '総タスク数', 
-                  value: schedules.length, 
+                  value: filteredSchedules.length, 
                   icon: 'task', 
                   color: 'success',
                   footer: '全タスク'
                 },
                 { 
                   label: '完了タスク', 
-                  value: schedules.filter(s => s.status === 'DONE').length, 
+                  value: filteredSchedules.filter(s => s.status === 'DONE').length, 
                   icon: 'check_circle', 
                   color: 'info',
                   footer: '完了済み'
                 },
                 { 
                   label: '進行中タスク', 
-                  value: schedules.filter(s => s.status === 'IN_PROGRESS').length, 
+                  value: filteredSchedules.filter(s => s.status === 'IN_PROGRESS').length, 
                   icon: 'trending_up', 
                   color: 'warning',
                   footer: '作業中'
@@ -142,205 +192,31 @@ const {
       </div>
     </div>
 
-    <!-- フィルターと検索 -->
-    <ActionBar
-      :search-query="searchQuery"
-      :search-placeholder="'タスク名、説明、担当者、プロジェクトで検索'"
-      @update:search-query="searchQuery = $event"
-      :filters="[
-        {
-          key: 'status',
-          label: 'ステータス',
-          type: 'select',
-          value: filterStatus,
-          options: [
-            { value: 'all', label: 'すべてのステータス' },
-            { value: 'NOT_STARTED', label: '未開始' },
-            { value: 'IN_PROGRESS', label: '進行中' },
-            { value: 'DONE', label: '完了' },
-            { value: 'BLOCKED', label: 'ブロック' },
-            { value: 'CANCELLED', label: 'キャンセル' }
-          ]
-        },
-        {
-          key: 'project',
-          label: 'プロジェクト',
-          type: 'select',
-          value: selectedProjectId,
-          options: [
-            { value: null, label: 'すべてのプロジェクト' },
-            ...projects.map(p => ({ value: p.id, label: p.name }))
-          ]
-        }
-      ]"
-      @update:filter="handleFilterUpdate"
-      :actions="[
-        {
-          label: '詳細フィルター',
-          icon: 'filter_list',
-          variant: 'outline-secondary'
-        }
-      ]"
-    />
 
-    <!-- プロジェクト別タスク一覧 -->
-    <div class="project-groups">
-      <div 
-        v-for="(tasks, projectName) in groupedSchedules" 
-        :key="projectName"
-        class="project-group mb-5"
-      >
-        <!-- プロジェクトヘッダー -->
-        <div class="project-header mb-4">
-          <div class="card">
-            <div class="card-header pb-0">
-              <div class="d-flex justify-content-between align-items-center">
-                <div class="flex-grow-1">
-                  <h5 class="mb-1 font-weight-bold text-primary">
-                    <i class="material-symbols-rounded me-2">folder</i>
-                    {{ projectName }}
-                  </h5>
-                  <p class="text-sm text-muted mb-0">
-                    {{ tasks.length }}個のタスク
-                  </p>
-                </div>
-                <div class="project-stats">
-                  <div class="d-flex gap-3">
-                    <div class="text-center">
-                      <div class="text-sm font-weight-bold text-success">{{ projectStats[projectName]?.completed || 0 }}</div>
-                      <div class="text-xs text-muted">完了</div>
-                    </div>
-                    <div class="text-center">
-                      <div class="text-sm font-weight-bold text-warning">{{ projectStats[projectName]?.inProgress || 0 }}</div>
-                      <div class="text-xs text-muted">進行中</div>
-                    </div>
-                    <div class="text-center">
-                      <div class="text-sm font-weight-bold text-info">{{ projectStats[projectName]?.pending || 0 }}</div>
-                      <div class="text-xs text-muted">予定</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+    <!-- プロジェクト一覧表示（初期画面） -->
+    <div v-if="selectedProjectView === null" class="project-list-view">
+      <ProjectListGrid
+        :grouped-schedules="groupedSchedules"
+        :project-stats="projectStats"
+        @select="selectProjectView"
+      />
+    </div>
 
-        <!-- タスクカード一覧 -->
-        <div class="row">
-          <div 
-            v-for="schedule in tasks" 
-            :key="schedule.id"
-            class="col-lg-6 col-xl-4 mb-4"
-          >
-            <div class="card h-100 task-card">
-              <!-- カードヘッダー -->
-              <div class="card-header pb-0">
-                <div class="d-flex justify-content-between align-items-start">
-                  <div class="flex-grow-1">
-                    <h6 class="mb-1 font-weight-bold">{{ schedule.title }}</h6>
-                    <p class="text-sm text-muted mb-0">{{ schedule.description }}</p>
-                  </div>
-                  <div class="dropdown">
-                    <button 
-                      class="btn btn-link text-muted p-0"
-                      data-bs-toggle="dropdown"
-                      aria-expanded="false"
-                    >
-                      <i class="material-symbols-rounded">more_vert</i>
-                    </button>
-                    <ul class="dropdown-menu">
-                      <li>
-                        <a 
-                          class="dropdown-item" 
-                          href="javascript:;"
-                          @click="editSchedule(schedule.id)"
-                        >
-                          <i class="material-symbols-rounded me-2">edit</i>
-                          編集
-                        </a>
-                      </li>
-                      <li>
-                        <a 
-                          class="dropdown-item text-danger" 
-                          href="javascript:;"
-                          @click="deleteSchedule(schedule.id)"
-                        >
-                          <i class="material-symbols-rounded me-2">delete</i>
-                          削除
-                        </a>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
+    <!-- 選択されたプロジェクトのタスク一覧 -->
+    <div v-else class="project-detail-view">
+      <ProjectDetailHeader
+        :project-name="selectedProjectView"
+        :stats="projectStats[selectedProjectView]"
+        @back="backToProjectList"
+      />
 
-              <!-- カードボディ -->
-              <div class="card-body pt-0">
-                <!-- ステータスと優先度 -->
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                  <StatusBadge :status="schedule.status" />
-                  <PriorityBadge :priority="schedule.priority" />
-                </div>
-
-                <!-- 担当者 -->
-                <div class="d-flex align-items-center mb-3">
-                  <div class="avatar avatar-sm bg-gradient-secondary me-2">
-                    <i class="material-symbols-rounded text-white">person</i>
-                  </div>
-                  <div>
-                    <p class="text-sm mb-0 font-weight-bold">担当者</p>
-                    <p class="text-xs text-muted mb-0">{{ schedule.assignee }}</p>
-                  </div>
-                </div>
-
-                <!-- 進捗バー -->
-                <div class="mb-3">
-                  <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="text-sm font-weight-bold">進捗</span>
-                    <span class="text-sm text-muted">{{ schedule.progress }}%</span>
-                  </div>
-                  <div class="progress">
-                    <div 
-                      :class="getProgressBarClass(schedule.progress)" 
-                      :style="{ width: schedule.progress + '%' }"
-                      role="progressbar"
-                    ></div>
-                  </div>
-                </div>
-
-                <!-- 日付情報 -->
-                <div class="row text-center">
-                  <div class="col-6">
-                    <p class="text-xs text-muted mb-0">開始日</p>
-                    <p class="text-sm font-weight-bold mb-0">{{ schedule.startDate }}</p>
-                  </div>
-                  <div class="col-6">
-                    <p class="text-xs text-muted mb-0">終了日</p>
-                    <p class="text-sm font-weight-bold mb-0">{{ schedule.endDate }}</p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- カードフッター -->
-              <div class="card-footer pt-0">
-                <div class="d-flex justify-content-between">
-                  <button 
-                    class="btn btn-outline-primary btn-sm"
-                    @click="editSchedule(schedule.id)"
-                  >
-                    <i class="material-symbols-rounded me-1">edit</i>
-                    編集
-                  </button>
-                  <button class="btn btn-outline-info btn-sm" @click="viewDetails(schedule.id)">
-                    <i class="material-symbols-rounded me-1">visibility</i>
-                    詳細
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- タスクカード一覧 -->
+      <ProjectTasksGrid
+        :tasks="groupedSchedules[selectedProjectView]"
+        @edit="editSchedule"
+        @delete="deleteSchedule"
+        @view="viewDetails"
+      />
     </div>
 
     <!-- タスクが存在しない場合 -->
@@ -370,6 +246,15 @@ const {
         </EmptyState>
       </div>
     </div>
+
+    <!-- タスク作成モーダル -->
+    <TaskCreateModal
+      :show="showCreateModal"
+      :projects="projects"
+      :is-submitting="isSubmittingTask"
+      @close="closeCreateModal"
+      @submit="createTask"
+    />
   </div>
 </template>
 
@@ -379,7 +264,47 @@ const {
   padding: 1rem;
 }
 
-/* プロジェクトグループのスタイリング */
+/* プロジェクト一覧ビューのスタイリング */
+.project-list-view {
+  margin-top: 2rem;
+}
+
+.project-card {
+  transition: all 0.3s ease-in-out;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.project-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+  border-color: rgba(0, 123, 255, 0.3);
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+/* アイコンシェイプのスタイリング */
+.icon-shape {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.border-radius-md {
+  border-radius: 0.5rem;
+}
+
+/* プロジェクト詳細ビューのスタイリング */
+.project-detail-view {
+  margin-top: 2rem;
+}
+
 .project-groups {
   margin-top: 2rem;
 }
@@ -496,6 +421,11 @@ const {
 @media (max-width: 768px) {
   .schedule-list-page {
     padding: 0.5rem;
+  }
+  
+  .project-card .icon-shape {
+    width: 40px;
+    height: 40px;
   }
   
   .project-group {

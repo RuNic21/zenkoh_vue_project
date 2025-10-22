@@ -16,6 +16,9 @@ import EmptyState from "../components/common/EmptyState.vue";
 import CardHeader from "../components/common/CardHeader.vue";
 import StatCards from "../components/common/StatCards.vue";
 import ModalShell from "../components/common/ModalShell.vue";
+import AttachmentManager from "../components/common/AttachmentManager.vue";
+import TagManagerModal from "../components/common/TagManagerModal.vue";
+import CommentsSection from "../components/common/CommentsSection.vue";
 
 // スケジュール詳細ページ: 個別スケジュールの詳細表示・編集
 
@@ -133,26 +136,29 @@ import ModalShell from "../components/common/ModalShell.vue";
 //    - JSONBフィールドの型安全な変換実装が必要
 //    - デフォルト値処理の統一実装が必要
 
+// スケジュール詳細画面のデータ/操作群をcomposable(useScheduleDetail)から取得
 const {
-  isLoading,
-  errorMessage,
-  scheduleDetail,
-  isEditMode,
-  editForm,
-  newComment,
-  newTag,
-  availableTags,
-  showTagModal,
-  showFileModal,
-  statusHistory,
-  availableUsers,
-  changeStatus,
-  changePriority,
-  changeProgress,
-  addTag,
-  removeTag,
-  addComment,
+  isLoading,          // ローディング中フラグ
+  errorMessage,       // エラーメッセージ（表示用）
+  scheduleDetail,     // スケジュール詳細データ
+  isEditMode,         // 編集モードかどうか
+  editForm,           // 編集用フォームデータ
+  newComment,         // 新規コメント内容
+  newTag,             // 追加しようとしている新規タグ
+  availableTags,      // 利用可能なタグ一覧
+  showTagModal,       // タグ追加モーダル表示フラグ
+  showFileModal,      // ファイル添付モーダル表示フラグ
+  statusHistory,      // ステータス変更履歴
+  availableUsers,     // 選択可能ユーザー一覧
+  changeStatus,       // ステータス変更関数
+  changePriority,     // 優先度変更関数
+  changeProgress,     // 進捗率変更関数
+  addTag,             // タグ追加関数
+  removeTag,          // タグ削除関数
+  addComment,         // コメント追加関数
 } = useScheduleDetail();
+
+// スケジュールストアを取得
 const store = useScheduleStore();
 
 // コメント追加（composable 関数に入力値を渡すラッパー）
@@ -185,6 +191,26 @@ const saveChanges = async () => {
 const cancelEdit = () => {
   editForm.value = { ...scheduleDetail.value };
   isEditMode.value = false;
+};
+
+// 削除処理
+const deleteSchedule = async () => {
+  // 削除確認ダイアログを表示
+  if (!confirm(`"${scheduleDetail.value.title}" を削除してもよろしいですか？\nこの操作は取り消せません。`)) {
+    return;
+  }
+  
+  try {
+    await store.delete(scheduleDetail.value.id);
+    console.log("スケジュールが削除されました");
+    // 削除後は一覧画面に戻る（Appコンポーネントの currentPage を変更）
+    // または emit でページ変更をリクエスト
+    alert("スケジュールを削除しました");
+  } catch (e) {
+    console.error("削除に失敗", e);
+    const message = e instanceof Error ? e.message : "削除に失敗しました";
+    errorMessage.value = message;
+  }
 };
 
 // クイックアクション
@@ -258,31 +284,23 @@ const executeQuickAction = async (action: any) => {
   }
 };
 
-// ヘッダーアクションを生成する関数
+// ヘッダーアクションを生成する関数（編集/削除/保存/キャンセルのみ）
 const getHeaderActions = () => {
   const actions = [];
   
-  // クイックアクションボタン（編集モードでない場合のみ）
-  if (!isEditMode.value) {
-    quickActions.value.forEach(action => {
-      actions.push({
-        label: action.label,
-        icon: action.icon,
-        variant: `outline-${action.color}`,
-        size: 'sm',
-        onClick: () => executeQuickAction(action),
-        title: `${action.label}に変更`
-      });
-    });
-  }
-  
-  // 編集/保存/キャンセルボタン
+  // 編集/保存/キャンセル/削除ボタン
   if (!isEditMode.value) {
     actions.push({
       label: '編集',
       icon: 'edit',
       variant: 'outline-primary',
       onClick: toggleEditMode
+    });
+    actions.push({
+      label: '削除',
+      icon: 'delete',
+      variant: 'outline-danger',
+      onClick: deleteSchedule
     });
   } else {
     actions.push({
@@ -486,58 +504,12 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- コメントセクション -->
-        <div class="card">
-          <CardHeader title="コメント" subtitle="タスクに関するコメントを管理できます" />
-          <div class="card-body">
-            <!-- コメント一覧 -->
-            <div v-if="(scheduleDetail.comments?.length || 0) > 0" class="timeline timeline-one-side">
-              <div 
-                v-for="comment in scheduleDetail.comments" 
-                :key="comment.id"
-                class="timeline-block mb-3"
-              >
-                <span class="timeline-step">
-                  <div class="avatar avatar-sm bg-gradient-secondary">
-                    <span class="text-white text-xs">{{ comment.avatar }}</span>
-                  </div>
-                </span>
-                <div class="timeline-content">
-                  <h6 class="text-dark text-sm font-weight-bold mb-0">{{ comment.author }}</h6>
-                  <p class="text-secondary font-weight-bold text-xs mt-1 mb-0">{{ comment.timestamp }}</p>
-                  <p class="text-sm mt-2 mb-0">{{ comment.content }}</p>
-                </div>
-              </div>
-            </div>
-            
-            <!-- コメントなしの場合 -->
-            <EmptyState 
-              v-else
-              icon="comment" 
-              title="コメントがありません" 
-              subtitle="このタスクに関するコメントを追加してください"
-            />
-
-            <!-- 新しいコメント入力 -->
-            <div class="mt-4">
-              <div class="input-group">
-                <input 
-                  type="text" 
-                  class="form-control"
-                  v-model="newComment"
-                  placeholder="コメントを入力..."
-                  @keyup.enter="onAddComment"
-                >
-                <button 
-                  class="btn bg-gradient-primary"
-                  @click="onAddComment"
-                >
-                  <i class="material-symbols-rounded">send</i>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- コメントセクション（共通コンポーネントに分離） -->
+        <CommentsSection
+          :comments="scheduleDetail.comments"
+          v-model="newComment"
+          @add="onAddComment"
+        />
       </div>
 
       <!-- サイドバー -->
@@ -548,13 +520,44 @@ onMounted(() => {
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
               <span class="text-sm">ステータス</span>
-              <StatusBadge :status="scheduleDetail.status" />
+              <!-- 編集モードではセレクトで変更可能にする -->
+              <template v-if="isEditMode">
+                <select
+                  class="form-select form-select-sm"
+                  style="width: auto; min-width: 160px;"
+                  v-model="editForm.status"
+                >
+                  <option value="NOT_STARTED">未着手</option>
+                  <option value="IN_PROGRESS">進行中</option>
+                  <option value="BLOCKED">ブロック</option>
+                  <option value="DONE">完了</option>
+                  <option value="CANCELLED">キャンセル</option>
+                </select>
+              </template>
+              <template v-else>
+                <StatusBadge :status="scheduleDetail.status" />
+              </template>
             </div>
             <div class="d-flex justify-content-between align-items-center mb-3">
               <span class="text-sm">優先度</span>
-              <PriorityBadge :priority="scheduleDetail.priority" />
+              <!-- 編集モードではセレクトで変更可能にする -->
+              <template v-if="isEditMode">
+                <select
+                  class="form-select form-select-sm"
+                  style="width: auto; min-width: 160px;"
+                  v-model="editForm.priority"
+                >
+                  <option value="LOW">低</option>
+                  <option value="MEDIUM">中</option>
+                  <option value="HIGH">高</option>
+                  <option value="URGENT">緊急</option>
+                </select>
+              </template>
+              <template v-else>
+                <PriorityBadge :priority="scheduleDetail.priority" />
+              </template>
             </div>
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center mb-3">
               <span class="text-sm">担当者</span>
               <div class="d-flex align-items-center">
                 <span class="text-sm font-weight-bold me-2">{{ scheduleDetail.assignee }}</span>
@@ -574,6 +577,23 @@ onMounted(() => {
                     {{ user.name }}
                   </option>
                 </select>
+              </div>
+            </div>
+
+            <!-- ステータス変更クイックアクション -->
+            <div v-if="!isEditMode" class="mt-4 pt-3 border-top">
+              <label class="form-label text-xs font-weight-bold mb-2">ステータス変更</label>
+              <div class="d-grid gap-2 status-action-buttons">
+                <button
+                  v-for="action in quickActions"
+                  :key="action.status"
+                  :class="`btn btn-${action.color} btn-xs`"
+                  @click="executeQuickAction(action)"
+                  :title="`${action.label}に変更`"
+                >
+                  <i class="material-symbols-rounded me-1" style="font-size: 0.875rem;">{{ action.icon }}</i>
+                  <span style="font-size: 0.75rem;">{{ action.label }}</span>
+                </button>
               </div>
             </div>
           </div>
@@ -641,91 +661,23 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 添付ファイル -->
-        <div class="card">
-          <CardHeader title="添付ファイル" subtitle="タスクに関連するファイルを管理できます" />
-          <div class="card-body">
-            <div v-if="(scheduleDetail.attachments?.length || 0) > 0">
-              <div 
-                v-for="file in (scheduleDetail.attachments || [])" 
-                :key="file.name"
-                class="d-flex align-items-center mb-2"
-              >
-                <i class="material-symbols-rounded me-2">attach_file</i>
-                <div class="flex-grow-1">
-                  <p class="text-sm mb-0">{{ file.name }}</p>
-                  <p class="text-xs text-muted mb-0">{{ file.size }}</p>
-                </div>
-              </div>
-            </div>
-            <EmptyState 
-              v-else
-              icon="attach_file" 
-              title="添付ファイルがありません" 
-              subtitle="このタスクに関連するファイルを添付してください"
-            />
-            <div v-if="isEditMode" class="mt-3">
-              <input 
-                type="file" 
-                class="form-control"
-                multiple
-                @change="handleFileUpload"
-              >
-            </div>
-          </div>
-        </div>
+        <!-- 添付ファイル（共通コンポーネントに分離） -->
+        <AttachmentManager
+          :attachments="scheduleDetail.attachments"
+          :isEditMode="isEditMode"
+          @upload="handleFileUpload"
+        />
       </div>
     </div>
 
-    <!-- タグ管理モーダル -->
-    <ModalShell 
-      :show="showTagModal" 
-      title="タグ管理" 
-      size="md" 
+    <!-- タグ管理モーダル（共通コンポーネントに分離） -->
+    <TagManagerModal
+      :show="showTagModal"
+      :availableTags="availableTags"
+      :selectedTags="scheduleDetail.tags || []"
       @close="showTagModal = false"
-    >
-      <template #default>
-        <div>
-          <div class="mb-3">
-            <label class="form-label">新しいタグを追加</label>
-            <div class="input-group">
-              <input 
-                type="text" 
-                class="form-control"
-                v-model="newTag"
-                placeholder="タグを入力..."
-                @keyup.enter="addTag(newTag)"
-              >
-              <button 
-                class="btn btn-outline-primary"
-                @click="addTag(newTag)"
-                :disabled="!newTag.trim()"
-              >
-                <i class="material-symbols-rounded">add</i>
-              </button>
-            </div>
-          </div>
-          
-          <div class="mb-3">
-            <label class="form-label">人気タグ</label>
-            <div class="d-flex flex-wrap gap-1">
-              <button 
-                v-for="tag in availableTags.slice(0, 8)" 
-                :key="tag"
-                class="btn btn-sm btn-outline-secondary"
-                @click="addTag(tag)"
-                :disabled="(scheduleDetail.tags || []).includes(tag)"
-              >
-                {{ tag }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </template>
-      <template #footer>
-        <button type="button" class="btn btn-secondary" @click="showTagModal = false">閉じる</button>
-      </template>
-    </ModalShell>
+      @add="(tag: string) => addTag(tag)"
+    />
   </div>
 </template>
 
@@ -848,6 +800,72 @@ onMounted(() => {
   background-color: #6c757d;
   border-color: #6c757d;
   color: white;
+}
+
+/* ステータス変更ボタンのスタイリング */
+.d-grid {
+  display: grid;
+}
+
+.d-grid.gap-2 {
+  gap: 0.375rem;
+}
+
+/* ステータスアクションボタンのサイズ調整 */
+.status-action-buttons .btn-xs {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  border-radius: 0.375rem;
+}
+
+/* クイックアクションボタンのグラデーション効果 */
+.status-action-buttons .btn-success {
+  background: linear-gradient(310deg, #17ad37, #98ec2d);
+  border: none;
+  color: white;
+}
+
+.status-action-buttons .btn-success:hover {
+  background: linear-gradient(310deg, #158f2f, #82d827);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(23, 173, 55, 0.3);
+}
+
+.status-action-buttons .btn-primary {
+  background: linear-gradient(310deg, #2152ff, #21d4fd);
+  border: none;
+  color: white;
+}
+
+.status-action-buttons .btn-primary:hover {
+  background: linear-gradient(310deg, #1a42cc, #1aafd1);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(33, 82, 255, 0.3);
+}
+
+.status-action-buttons .btn-warning {
+  background: linear-gradient(310deg, #f53939, #fbcf33);
+  border: none;
+  color: white;
+}
+
+.status-action-buttons .btn-warning:hover {
+  background: linear-gradient(310deg, #c92e2e, #d4ab28);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(245, 57, 57, 0.3);
+}
+
+.status-action-buttons .btn-danger {
+  background: linear-gradient(310deg, #ea0606, #ff667c);
+  border: none;
+  color: white;
+}
+
+.status-action-buttons .btn-danger:hover {
+  background: linear-gradient(310deg, #c00505, #e05566);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(234, 6, 6, 0.3);
 }
 
 /* レスポンシブデザイン */

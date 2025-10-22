@@ -3,7 +3,9 @@ import { listProjects, createProject, updateProject, deleteProject } from "@/ser
 import { listUsers } from "@/services/dbServices";
 import { logProjectCreated } from "@/services/activityService";
 import { getProjectStats, getProjectDetailStats, type ProjectStats, type ProjectDetailStats } from "@/services/dashboardService";
+import { listTasks } from "@/services/taskService";
 import type { Project, ProjectInsert, ProjectUpdate } from "@/types/project";
+import type { Task } from "@/types/task";
 import type { Users } from "@/types/db/users";
 import { formatDateJP } from "@/utils/formatters";
 
@@ -12,11 +14,12 @@ export function useProjectManagement() {
   // 基本状態
   const projects = ref<Project[]>([]);
   const users = ref<Users[]>([]);
+  const tasks = ref<Task[]>([]); // タスクデータを追加
   const isLoading = ref(false);
   const errorMessage = ref("");
 
-  // 統計
-  const projectStats = ref<ProjectStats>({
+  // 統計（全体統計は参照用に保持）
+  const globalProjectStats = ref<ProjectStats>({
     totalProjects: 0,
     activeProjects: 0,
     archivedProjects: 0,
@@ -55,8 +58,9 @@ export function useProjectManagement() {
     let filtered = projects.value;
     if (searchQuery.value.trim()) {
       const q = searchQuery.value.toLowerCase();
+      // プロジェクト名のみで検索（説明は除外）
       filtered = filtered.filter(
-        (p) => p.name.toLowerCase().includes(q) || (p.description && p.description.toLowerCase().includes(q))
+        (p) => p.name.toLowerCase().includes(q)
       );
     }
     if (statusFilter.value !== "all") {
@@ -82,6 +86,46 @@ export function useProjectManagement() {
     return filtered;
   });
 
+  // フィルタリングされたプロジェクトに対する動的統計（フィルタに反応）
+  const projectStats = computed<ProjectStats>(() => {
+    const today = new Date();
+    const filteredProjectIds = new Set(filteredProjects.value.map(p => p.id));
+    
+    // プロジェクト統計
+    const totalProjects = filteredProjects.value.length;
+    const activeProjects = filteredProjects.value.filter(p => !p.is_archived).length;
+    const archivedProjects = filteredProjects.value.filter(p => p.is_archived).length;
+    const overdueProjects = filteredProjects.value.filter(p => 
+      !p.is_archived && p.end_date && new Date(p.end_date) < today
+    ).length;
+
+    // フィルタリングされたプロジェクトに属するタスクのみを集計
+    const filteredTasks = tasks.value.filter(t => 
+      t.project_id && filteredProjectIds.has(t.project_id) && !t.is_archived
+    );
+    
+    const totalTasks = filteredTasks.length;
+    const completedTasks = filteredTasks.filter(t => t.status === "DONE").length;
+    const inProgressTasks = filteredTasks.filter(t => t.status === "IN_PROGRESS").length;
+    const blockedTasks = filteredTasks.filter(t => t.status === "BLOCKED").length;
+    
+    const averageProgress = totalTasks > 0 
+      ? Math.round(filteredTasks.reduce((sum, t) => sum + (t.progress_percent || 0), 0) / totalTasks)
+      : 0;
+
+    return {
+      totalProjects,
+      activeProjects,
+      archivedProjects,
+      overdueProjects,
+      totalTasks,
+      completedTasks,
+      inProgressTasks,
+      blockedTasks,
+      averageProgress,
+    };
+  });
+
   // テーブル設定
   const projectCurrentPage = ref(1);
   const projectPageSize = ref(10);
@@ -89,12 +133,13 @@ export function useProjectManagement() {
   const projectSortDirection = ref<"asc" | "desc">("asc");
   const projectTableColumns = [
     { key: "name", label: "プロジェクト名", sortable: true },
-    { key: "description", label: "説明" },
     { key: "ownerName", label: "オーナー", sortable: true },
+    { key: "progress", label: "進行率", sortable: true },
+    { key: "taskSummary", label: "タスク", sortable: false },
+    { key: "daysRemaining", label: "残り日数", sortable: true },
     { key: "startDate", label: "開始日", sortable: true, formatter: (v: string) => v || "-" },
     { key: "endDate", label: "終了日", sortable: true, formatter: (v: string) => v || "-" },
     { key: "status", label: "状態", sortable: true },
-    { key: "createdAt", label: "作成日", sortable: true },
   ];
 
   const formatDate = (dateString: string | null): string => formatDateJP(dateString ?? null);
@@ -111,22 +156,86 @@ export function useProjectManagement() {
     return endDate < today ? "期限切れ" : "進行中";
   };
 
+  // マガキまでの残り日数を計算する関数
+  const calculateDaysRemaining = (endDate: string | null): { value: number; display: string; status: "overdue" | "warning" | "normal" | "none" } => {
+    if (!endDate) return { value: 999999, display: "-", status: "none" };
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(0, 0, 0, 0);
+    
+    const diffTime = end.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      return { value: diffDays, display: `${Math.abs(diffDays)}日超過`, status: "overdue" };
+    } else if (diffDays === 0) {
+      return { value: 0, display: "今日まで", status: "warning" };
+    } else if (diffDays <= 7) {
+      return { value: diffDays, display: `${diffDays}日`, status: "warning" };
+    } else {
+      return { value: diffDays, display: `${diffDays}日`, status: "normal" };
+    }
+  };
+
   const projectTableRows = computed(() => {
-    const base = filteredProjects.value.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description || "-",
-      ownerName: getOwnerName(p.owner_user_id ?? null),
-      startDate: p.start_date || "-",
-      endDate: p.end_date || "-",
-      status: getProjectStatus(p),
-      createdAt: formatDate(p.created_at),
-    }));
+    const base = filteredProjects.value.map((p) => {
+      // 各プロジェクトのタスク統計を取得
+      const projectTasks = tasks.value.filter(t => t.project_id === p.id && !t.is_archived);
+      const totalTasks = projectTasks.length;
+      const completedTasks = projectTasks.filter(t => t.status === "DONE").length;
+      const inProgressTasks = projectTasks.filter(t => t.status === "IN_PROGRESS").length;
+      
+      // 進行率を計算（タスクベース）
+      const progressPercent = totalTasks > 0 
+        ? Math.round((completedTasks / totalTasks) * 100)
+        : 0;
+      
+      // タスク要約文字列
+      const taskSummary = totalTasks > 0 
+        ? `完了 ${completedTasks}/${totalTasks}`
+        : "タスクなし";
+      
+      // 残り日数計算
+      const daysRemainingData = calculateDaysRemaining(p.end_date);
+      
+      return {
+        id: p.id,
+        name: p.name,
+        ownerName: getOwnerName(p.owner_user_id ?? null),
+        progress: progressPercent,
+        taskSummary,
+        totalTasks,
+        completedTasks,
+        inProgressTasks,
+        daysRemaining: daysRemainingData.display,
+        daysRemainingValue: daysRemainingData.value,
+        daysRemainingStatus: daysRemainingData.status,
+        startDate: p.start_date || "-",
+        endDate: p.end_date || "-",
+        status: getProjectStatus(p),
+      };
+    });
+    
     if (projectSortColumn.value) {
       const col = projectSortColumn.value as keyof (typeof base)[number];
       base.sort((a, b) => {
-        const aVal = (a[col] as any) ?? "";
-        const bVal = (b[col] as any) ?? "";
+        let aVal: any;
+        let bVal: any;
+        
+        // 特定の列の場合は数値でソート
+        if (col === "progress") {
+          aVal = a.progress;
+          bVal = b.progress;
+        } else if (col === "daysRemaining") {
+          aVal = a.daysRemainingValue;
+          bVal = b.daysRemainingValue;
+        } else {
+          aVal = (a[col] as any) ?? "";
+          bVal = (b[col] as any) ?? "";
+        }
+        
         if (aVal < bVal) return projectSortDirection.value === "asc" ? -1 : 1;
         if (aVal > bVal) return projectSortDirection.value === "asc" ? 1 : -1;
         return 0;
@@ -183,6 +292,22 @@ export function useProjectManagement() {
     }
   };
 
+  // タスク一覧を読み込む（フィルタリング統計のため）
+  const loadTasks = async () => {
+    try {
+      const result = await listTasks();
+      if (result.success && result.data) {
+        tasks.value = result.data;
+      } else {
+        console.error("タスク一覧の読み込みに失敗:", result.error);
+        tasks.value = [];
+      }
+    } catch (e) {
+      console.error("タスク一覧の読み込みに失敗:", e);
+      tasks.value = [];
+    }
+  };
+
   const resetForm = () => {
     formData.value = {
       name: "",
@@ -206,7 +331,7 @@ export function useProjectManagement() {
         showCreateModal.value = false;
         const ownerName = getOwnerName(result.data.owner_user_id ?? null);
         await logProjectCreated(result.data.id, result.data.name, ownerName);
-        await loadDashboardStats();
+        await Promise.all([loadTasks(), loadDashboardStats()]);
         resetForm();
         alert("プロジェクトが正常に作成されました！");
       } else {
@@ -238,7 +363,7 @@ export function useProjectManagement() {
         if (index !== -1) projects.value[index] = result.data;
         showEditModal.value = false;
         selectedProject.value = null;
-        await loadDashboardStats();
+        await Promise.all([loadTasks(), loadDashboardStats()]);
         resetForm();
         alert("プロジェクトが正常に更新されました！");
       } else {
@@ -258,7 +383,7 @@ export function useProjectManagement() {
         projects.value = projects.value.filter((p) => p.id !== selectedProject.value!.id);
         showDeleteModal.value = false;
         selectedProject.value = null;
-        await loadDashboardStats();
+        await Promise.all([loadTasks(), loadDashboardStats()]);
         alert("プロジェクトが正常に削除されました。");
       } else {
         alert(result.error || "プロジェクトの削除に失敗しました。");
@@ -295,7 +420,7 @@ export function useProjectManagement() {
   const loadDashboardStats = async () => {
     try {
       const [statsResult, detailStatsResult] = await Promise.all([getProjectStats(), getProjectDetailStats()]);
-      if (statsResult.success && statsResult.data) projectStats.value = statsResult.data;
+      if (statsResult.success && statsResult.data) globalProjectStats.value = statsResult.data;
       if (detailStatsResult.success && detailStatsResult.data) projectDetailStats.value = detailStatsResult.data;
     } catch (e) {
       console.error("ダッシュボード統計の読み込みに失敗:", e);
@@ -321,7 +446,7 @@ export function useProjectManagement() {
 
   // 初期ロード
   onMounted(async () => {
-    await Promise.all([loadProjects(), loadUsers(), loadDashboardStats()]);
+    await Promise.all([loadProjects(), loadUsers(), loadTasks(), loadDashboardStats()]);
   });
 
   return {

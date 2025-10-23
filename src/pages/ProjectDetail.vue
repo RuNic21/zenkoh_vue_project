@@ -175,17 +175,23 @@ console.log("プロジェクト詳細ページが読み込まれました");
 
 <template>
   <!-- プロジェクト詳細ページ -->
-  <div class="project-detail-page">
-    <!-- ローディング/エラー表示 -->
-    <div v-if="isLoading" class="text-center py-4">
-      <LoadingSpinner message="プロジェクト詳細を読み込み中..." />
+  <div class="container-fluid py-4">
+    <!-- ローディング表示 -->
+    <div v-if="isLoading" class="row mb-4">
+      <div class="col-12">
+        <LoadingSpinner message="プロジェクト詳細を読み込み中..." />
+      </div>
     </div>
-    <div v-if="!isLoading && errorMessage" class="alert alert-danger" role="alert">
+
+    <!-- エラー表示 -->
+    <div v-if="!isLoading && errorMessage" class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+      <span class="material-symbols-rounded me-2">error</span>
       {{ errorMessage }}
+      <button type="button" class="btn-close" @click="errorMessage = ''"></button>
     </div>
 
     <!-- プロジェクト詳細が読み込まれている場合 -->
-    <div v-if="!isLoading && projectDetail && !errorMessage">
+    <template v-if="!isLoading && projectDetail && !errorMessage">
       <!-- ページヘッダー -->
       <PageHeader
         :title="projectDetail.name"
@@ -408,7 +414,7 @@ console.log("プロジェクト詳細ページが読み込まれました");
           </div>
         </div>
       </div>
-    </div>
+    </template>
 
     <!-- タスク詳細モーダル -->
     <TaskDetailModal 
@@ -422,9 +428,7 @@ console.log("プロジェクト詳細ページが読み込まれました");
 
 <style scoped>
 /* プロジェクト詳細ページのスタイリング */
-.project-detail-page {
-  padding: 1rem;
-}
+/* Material Dashboard スタイルを優先使用 */
 
 /* カードのスタイリング */
 .card {

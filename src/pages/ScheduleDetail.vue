@@ -341,23 +341,32 @@ onMounted(() => {
 
 <template>
   <!-- スケジュール詳細ページ -->
-  <div class="schedule-detail-page">
-    <!-- ローディング/エラー表示 -->
-    <div v-if="isLoading" class="text-center py-4">
-      <LoadingSpinner message="スケジュール詳細を読み込み中..." />
+  <div class="container-fluid py-4">
+    <!-- ローディング表示 -->
+    <div v-if="isLoading" class="row mb-4">
+      <div class="col-12">
+        <LoadingSpinner message="スケジュール詳細を読み込み中..." />
+      </div>
     </div>
-    <div v-if="!isLoading && errorMessage" class="alert alert-danger" role="alert">
-      {{ errorMessage }}
-    </div>
-    <!-- ページヘッダー -->
-    <PageHeader
-      title="スケジュール詳細"
-      description="スケジュールの詳細情報を確認・編集できます"
-      :actions="getHeaderActions()"
-    />
 
-    <!-- スケジュール統計サマリー -->
-    <div v-if="!isLoading && scheduleDetail.id > 0" class="row mb-4">
+    <!-- エラー表示 -->
+    <div v-if="!isLoading && errorMessage" class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+      <span class="material-symbols-rounded me-2">error</span>
+      {{ errorMessage }}
+      <button type="button" class="btn-close" @click="errorMessage = ''"></button>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <template v-if="!isLoading && scheduleDetail.id > 0">
+      <!-- ページヘッダー -->
+      <PageHeader
+        title="スケジュール詳細"
+        description="スケジュールの詳細情報を確認・編集できます"
+        :actions="getHeaderActions()"
+      />
+
+      <!-- スケジュール統計サマリー -->
+      <div class="row mb-4">
       <div class="col-12">
         <div class="card">
           <CardHeader title="スケジュール統計" subtitle="タスクの進捗と活動状況" />

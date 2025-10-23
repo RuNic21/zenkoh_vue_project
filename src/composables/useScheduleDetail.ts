@@ -61,9 +61,9 @@ export function useScheduleDetail() {
   const availableUsers = ref<Array<{ id: number; name: string; avatar: string }>>([]);
   const loadUsers = async () => {
     try {
-      const result = (await listUsers()) as any;
+      const result = await listUsers();
       if (result.success && result.data) {
-        availableUsers.value = result.data.map((user: any) => ({
+        availableUsers.value = result.data.map((user) => ({
           id: user.id,
           name: user.display_name,
           avatar: user.avatar_url || "",
@@ -94,12 +94,16 @@ export function useScheduleDetail() {
   };
   const addComment = (text: string) => {
     if (!text.trim()) return;
-    editForm.value.comments.push({
+    
+    // ScheduleCommentの正しい型でコメントを作成
+    const comment: ScheduleComment = {
       id: Date.now(),
       user: "ユーザー",
-      text,
+      text: text.trim(),
       createdAt: new Date().toISOString(),
-    } as unknown as ScheduleComment);
+    };
+    
+    editForm.value.comments.push(comment);
     newComment.value = "";
   };
 

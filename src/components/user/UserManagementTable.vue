@@ -7,9 +7,11 @@ import OptimizedDataTable from "@/components/table/OptimizedDataTable.vue";
 import StatusBadge from "@/components/common/StatusBadge.vue";
 import PriorityBadge from "@/components/common/PriorityBadge.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
+import { calculateUserPriority } from "@/utils/formatters";
 
 // ユーザー情報の型定義（team.tsからインポート）
 import type { User } from "@/types/team";
+import type { TaskPriority } from "@/types/task";
 
 // Props定義
 interface Props {
@@ -49,21 +51,8 @@ const isIndeterminate = computed(() => {
 });
 
 // ユーザーの重要度を取得（ログイン回数や最終ログイン日時を基に判定）
-const getUserPriority = (user: User): "LOW" | "MEDIUM" | "HIGH" | "URGENT" => {
-  // ログイン回数が多く、最近ログインしているユーザーを高優先度とする
-  const loginCount = user.login_count || 0;
-  const lastLogin = user.last_login_at ? new Date(user.last_login_at) : null;
-  const now = new Date();
-  
-  if (loginCount > 50 && lastLogin && (now.getTime() - lastLogin.getTime()) < 7 * 24 * 60 * 60 * 1000) {
-    return "URGENT"; // アクティブユーザー
-  } else if (loginCount > 20 && lastLogin && (now.getTime() - lastLogin.getTime()) < 30 * 24 * 60 * 60 * 1000) {
-    return "HIGH"; // 定期的なユーザー
-  } else if (loginCount > 5) {
-    return "MEDIUM"; // 時々使用するユーザー
-  } else {
-    return "LOW"; // 新規または非アクティブユーザー
-  }
+const getUserPriority = (user: User): TaskPriority => {
+  return calculateUserPriority(user.login_count || 0, user.last_login_at || null);
 };
 
 // テーブルカラム定義
@@ -257,8 +246,8 @@ const handleClearSelections = () => {
           <!-- OptimizedDataTable -->
           <OptimizedDataTable
             v-else
-            :data="filteredUsers"
-            :columns="userColumns"
+            :data="filteredUsers as any"
+            :columns="userColumns as any"
             :loading="isLoading"
             :page-size="20"
             :searchable="false"
@@ -285,8 +274,8 @@ const handleClearSelections = () => {
                 <input 
                   type="checkbox" 
                   class="form-check-input"
-                  :checked="selectedUsers.has(item.id)"
-                  @change="handleSelectUser(item.id, ($event.target as HTMLInputElement).checked)"
+                  :checked="selectedUsers.has((item as unknown as User).id)"
+                  @change="handleSelectUser((item as unknown as User).id, ($event.target as HTMLInputElement).checked)"
                 >
               </div>
             </template>
@@ -295,28 +284,28 @@ const handleClearSelections = () => {
             <template #cell-display_name="{ item }">
               <div class="d-flex px-2 py-1">
                 <div class="d-flex flex-column justify-content-center">
-                  <h6 class="mb-0 text-sm">{{ item.display_name }}</h6>
-                  <p class="text-xs text-secondary mb-0">ID: {{ item.id }}</p>
+                  <h6 class="mb-0 text-sm">{{ (item as unknown as User).display_name }}</h6>
+                  <p class="text-xs text-secondary mb-0">ID: {{ (item as unknown as User).id }}</p>
                 </div>
               </div>
             </template>
 
             <!-- メールアドレス列 -->
             <template #cell-email="{ item }">
-              <p class="text-xs font-weight-bold mb-0">{{ item.email }}</p>
+              <p class="text-xs font-weight-bold mb-0">{{ (item as unknown as User).email }}</p>
             </template>
 
             <!-- ステータス列 -->
             <template #cell-is_active="{ item }">
               <div class="text-center">
-                <StatusBadge :status="item.is_active ? 'active' : 'inactive'" />
+                <StatusBadge :status="(item as unknown as User).is_active ? 'active' : 'inactive'" />
               </div>
             </template>
 
             <!-- 重要度列 -->
             <template #cell-priority="{ item }">
               <div class="text-center">
-                <PriorityBadge :priority="getUserPriority(item)" />
+                <PriorityBadge :priority="getUserPriority(item as unknown as User)" />
               </div>
             </template>
 
@@ -325,14 +314,14 @@ const handleClearSelections = () => {
               <div class="btn-group" role="group">
                 <button 
                   class="btn btn-sm bg-gradient-info mb-0" 
-                  @click="handleViewProfile(item)"
+                  @click="handleViewProfile(item as unknown as User)"
                   title="プロフィール"
                 >
                   <i class="material-symbols-rounded text-sm">person</i>
                 </button>
                 <button 
                   class="btn btn-sm bg-gradient-primary mb-0" 
-                  @click="handleEditUser(item)"
+                  @click="handleEditUser(item as unknown as User)"
                   title="編集"
                 >
                   <i class="material-symbols-rounded text-sm">edit</i>

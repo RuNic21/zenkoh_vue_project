@@ -5,6 +5,9 @@ import { ref, watch, computed, onMounted } from "vue";
 import { listProjects } from "@/services/projectService";
 import type { Project } from "@/types/project";
 import type { AlertRuleType } from "@/types/notification";
+import ModalShell from "@/components/common/ModalShell.vue";
+import { ALERT_RULE_TYPE_OPTIONS, ALERT_TARGET_STATUS_OPTIONS } from "@/constants/ui";
+import { ALERT_RULE_DEFAULTS } from "@/constants/validation";
 
 type RuleForm = {
   project_id: number | null;
@@ -12,7 +15,7 @@ type RuleForm = {
   rule_type: AlertRuleType;
   notify_email: string;
   is_enabled: boolean;
-  params_json: Record<string, any>;
+  params_json: Record<string, unknown>;
 };
 
 const props = defineProps<{
@@ -39,37 +42,22 @@ const form = ref<RuleForm>({
   params_json: {}
 });
 
-// ルールタイプのオプション
-const ruleTypeOptions: { value: AlertRuleType; label: string; description: string }[] = [
-  { 
-    value: "DUE_SOON", 
-    label: "期限間近", 
-    description: "タスクの期限が近づいたときに通知" 
-  },
-  { 
-    value: "OVERDUE", 
-    label: "期限超過", 
-    description: "タスクの期限が過ぎたときに通知" 
-  },
-  { 
-    value: "NO_PROGRESS", 
-    label: "進捗なし", 
-    description: "一定期間進捗がないタスクを通知" 
-  },
-  { 
-    value: "CUSTOM", 
-    label: "カスタム", 
-    description: "自由にパラメータを設定" 
-  }
-];
-
 // ルールタイプごとのパラメータ設定
-const ruleParams = ref<any>({
-  days_before: 3,
-  days_overdue: 1,
-  days_no_progress: 7,
-  min_progress_percent: 0,
-  target_status: "IN_PROGRESS",
+type RuleParams = {
+  days_before: number;
+  days_overdue: number;
+  days_no_progress: number;
+  min_progress_percent: number;
+  target_status: string;
+  custom_json: string;
+};
+
+const ruleParams = ref<RuleParams>({
+  days_before: ALERT_RULE_DEFAULTS.days_before,
+  days_overdue: ALERT_RULE_DEFAULTS.days_overdue,
+  days_no_progress: ALERT_RULE_DEFAULTS.days_no_progress,
+  min_progress_percent: ALERT_RULE_DEFAULTS.min_progress_percent,
+  target_status: ALERT_RULE_DEFAULTS.target_status,
   custom_json: "{}"
 });
 
@@ -102,19 +90,19 @@ watch(() => props.initial, (v) => {
     
     // パラメータ復元
     if (v.params_json) {
-      if (v.params_json.days_before !== undefined) {
+      if (typeof v.params_json.days_before === "number") {
         ruleParams.value.days_before = v.params_json.days_before;
       }
-      if (v.params_json.days_overdue !== undefined) {
+      if (typeof v.params_json.days_overdue === "number") {
         ruleParams.value.days_overdue = v.params_json.days_overdue;
       }
-      if (v.params_json.days_no_progress !== undefined) {
+      if (typeof v.params_json.days_no_progress === "number") {
         ruleParams.value.days_no_progress = v.params_json.days_no_progress;
       }
-      if (v.params_json.min_progress_percent !== undefined) {
+      if (typeof v.params_json.min_progress_percent === "number") {
         ruleParams.value.min_progress_percent = v.params_json.min_progress_percent;
       }
-      if (v.params_json.target_status !== undefined) {
+      if (typeof v.params_json.target_status === "string") {
         ruleParams.value.target_status = v.params_json.target_status;
       }
     }
@@ -138,6 +126,15 @@ watch(() => props.initial, (v) => {
     };
   }
 }, { immediate: true });
+
+// 有効なフィルタ数を計算
+const activeFiltersCount = computed(() => {
+  let count = 0;
+  if (form.value.project_id) count++;
+  if (form.value.name.trim()) count++;
+  if (form.value.notify_email.trim()) count++;
+  return count;
+});
 
 // バリデーション
 const canSave = computed(() => {
@@ -188,8 +185,8 @@ const validationErrors = computed(() => {
 });
 
 // params_jsonを生成
-const buildParamsJson = (): Record<string, any> => {
-  const params: Record<string, any> = {};
+const buildParamsJson = (): Record<string, unknown> => {
+  const params: Record<string, unknown> = {};
   
   switch (form.value.rule_type) {
     case "DUE_SOON":
@@ -238,24 +235,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <div
-    class="modal fade"
-    :class="{ show: show }"
-    style="display: block"
-    v-if="show"
-    tabindex="-1"
-    aria-modal="true"
-    role="dialog"
+  <!-- アラートルール作成/編集モーダル -->
+  <ModalShell 
+    :show="show" 
+    :title="initial ? 'アラートルールを編集' : 'アラートルールを作成'"
+    size="lg"
+    @close="onClose"
   >
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">
-            {{ initial ? "アラートルールを編集" : "アラートルールを作成" }}
-          </h5>
-          <button type="button" class="btn-close" aria-label="Close" @click="onClose"></button>
-        </div>
-        <div class="modal-body">
+    <template #default>
           <!-- プロジェクト選択 -->
           <div class="mb-3">
             <label class="form-label">
@@ -300,7 +287,7 @@ onMounted(() => {
             </label>
             <select class="form-select" v-model="form.rule_type">
               <option
-                v-for="option in ruleTypeOptions"
+                v-for="option in ALERT_RULE_TYPE_OPTIONS"
                 :key="option.value"
                 :value="option.value"
               >
@@ -330,11 +317,13 @@ onMounted(() => {
                 <div class="mb-3">
                   <label class="form-label">対象タスクの状態</label>
                   <select class="form-select" v-model="ruleParams.target_status">
-                    <option value="NOT_STARTED">未着手</option>
-                    <option value="IN_PROGRESS">進行中</option>
-                    <option value="DONE">完了</option>
-                    <option value="DELAYED">遅延</option>
-                    <option value="HOLD">保留</option>
+                    <option
+                      v-for="option in ALERT_TARGET_STATUS_OPTIONS"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
                   </select>
                 </div>
               </div>
@@ -355,10 +344,13 @@ onMounted(() => {
                 <div class="mb-3">
                   <label class="form-label">対象タスクの状態</label>
                   <select class="form-select" v-model="ruleParams.target_status">
-                    <option value="NOT_STARTED">未着手</option>
-                    <option value="IN_PROGRESS">進行中</option>
-                    <option value="DELAYED">遅延</option>
-                    <option value="HOLD">保留</option>
+                    <option
+                      v-for="option in ALERT_TARGET_STATUS_OPTIONS"
+                      :key="option.value"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </option>
                   </select>
                 </div>
               </div>
@@ -434,8 +426,9 @@ onMounted(() => {
             </label>
             <small class="d-block text-muted">無効にすると通知は送信されません</small>
           </div>
-        </div>
-        <div class="modal-footer">
+    </template>
+    
+    <template #footer>
           <!-- バリデーションエラー表示 -->
           <div v-if="validationErrors.length > 0" class="text-start flex-grow-1">
             <small class="text-danger">
@@ -460,24 +453,13 @@ onMounted(() => {
             </span>
             <span v-else>保存</span>
           </button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <!-- モーダルバックドロップ -->
-  <div class="modal-backdrop fade show" v-if="show"></div>
+    </template>
+  </ModalShell>
+  <!-- /アラートルール作成/編集モーダル -->
 </template>
 
 <style scoped>
-/* モーダルスタイル */
-.modal {
-  background-color: rgba(0, 0, 0, 0.5);
-}
-
-.modal-dialog {
-  max-width: 800px;
-}
-
+/* カード内コンテンツスタイル */
 .card-title {
   font-size: 0.95rem;
   font-weight: 600;
@@ -510,13 +492,8 @@ onMounted(() => {
   box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
 }
 
-.modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.modal-footer .flex-grow-1 {
+/* フッターレイアウト */
+.flex-grow-1 {
   flex-grow: 1;
 }
 </style>

@@ -3,6 +3,7 @@ import { ref, computed, watch } from "vue";
 import type { TaskInsert } from "@/types/task";
 import type { Project } from "@/types/project";
 import ModalShell from "@/components/common/ModalShell.vue";
+import { TASK_STATUS_OPTIONS, TASK_PRIORITY_OPTIONS } from "@/constants/ui";
 
 // Props & Emits
 interface Props {
@@ -144,10 +145,13 @@ const handleClose = () => {
               class="form-select"
               :disabled="isSubmitting"
             >
-              <option value="LOW">低</option>
-              <option value="MEDIUM">中</option>
-              <option value="HIGH">高</option>
-              <option value="URGENT">緊急</option>
+              <option
+                v-for="option in TASK_PRIORITY_OPTIONS"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
             </select>
           </div>
           <div class="col-md-6">
@@ -158,11 +162,13 @@ const handleClose = () => {
               class="form-select"
               :disabled="isSubmitting"
             >
-              <option value="NOT_STARTED">未着手</option>
-              <option value="IN_PROGRESS">進行中</option>
-              <option value="BLOCKED">ブロック中</option>
-              <option value="DONE">完了</option>
-              <option value="CANCELLED">キャンセル</option>
+              <option
+                v-for="option in TASK_STATUS_OPTIONS"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
             </select>
           </div>
         </div>

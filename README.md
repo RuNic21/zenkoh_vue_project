@@ -201,6 +201,7 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 
 ### フロントエンド
 - **フレームワーク**: Vue 3 (Composition API)
+- **ルーター**: Vue Router 4
 - **ビルドツール**: Vite
 - **UI/レイアウト**: Material Dashboard 3, Bootstrap 5
 - **チャート**: Chart.js, vue-chartjs
@@ -208,7 +209,7 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 
 ### バックエンド・データベース
 - **データベース**: Supabase (PostgreSQL)
-- **認証**: Supabase Auth
+- **認証**: Supabase Auth（ログイン・会員登録・セッション管理）
 - **リアルタイム**: Supabase Realtime
 
 ### ユーティリティ・ライブラリ
@@ -221,6 +222,8 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 
 ### コア機能
 - **モダンな UI**: Material Design 3 準拠のレスポンシブレイアウト
+- **SPA ルーティング**: Vue Router 4 によるシームレスなページ遷移
+- **セキュアな認証**: Supabase Auth による安全なログイン・会員登録・セッション管理
 - **完全なデータベース統合**: Supabase によるリアルタイムデータ同期
 - **包括的なプロジェクト管理**: プロジェクト、タスク、チーム、レポートの一元管理
 
@@ -234,7 +237,9 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 
 ### 技術的特徴
 - **型安全性**: TypeScript による完全な型定義
-- **パフォーマンス最適化**: 効率的なデータ取得・表示
+- **SPA アーキテクチャ**: Vue Router によるクライアントサイドルーティング
+- **認証システム**: Supabase Auth + ルーターガードによるアクセス制御
+- **パフォーマンス最適化**: Lazy Loading、効率的なデータ取得・表示
 - **エラーハンドリング**: 統一されたエラー処理・ユーザーフレンドリーなメッセージ
 - **多言語対応**: 日本語 UI 完全対応
 

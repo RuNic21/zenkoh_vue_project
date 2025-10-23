@@ -2,6 +2,7 @@ import { ref, computed, reactive, onMounted } from "vue";
 import { generateReport, generateTaskStatusChartData, generatePriorityChartData } from "@/services/reportService";
 import { listProjects } from "@/services/projectService";
 import type { ReportData, ReportFilter, ReportOptions } from "@/types/report";
+import { getStatusColor, getDeadlineColor } from "@/utils/chartColors";
 
 // レポートページの主要状態とロジックを集約
 export function useReportPage() {
@@ -46,36 +47,18 @@ export function useReportPage() {
 
   const projectProgressChartData = computed(() => {
     if (!reportData.value || !reportData.value.projectProgress || !Array.isArray(reportData.value.projectProgress)) return null;
+    
+    const statuses = reportData.value.projectProgress.map((p) => p.status);
+    const colors = statuses.map(getStatusColor);
+    
     return {
       labels: reportData.value.projectProgress.map((p) => p.projectName),
       datasets: [
         {
           label: "進捗率 (%)",
           data: reportData.value.projectProgress.map((p) => p.averageProgress),
-          backgroundColor: reportData.value.projectProgress.map((p) => {
-            switch (p.status) {
-              case "完了":
-                return "#28a745";
-              case "進行中":
-                return "#007bff";
-              case "遅延":
-                return "#dc3545";
-              default:
-                return "#6c757d";
-            }
-          }),
-          borderColor: reportData.value.projectProgress.map((p) => {
-            switch (p.status) {
-              case "完了":
-                return "#28a745";
-              case "進行中":
-                return "#007bff";
-              case "遅延":
-                return "#dc3545";
-              default:
-                return "#6c757d";
-            }
-          }),
+          backgroundColor: colors,
+          borderColor: colors,
           borderWidth: 1,
         },
       ],
@@ -100,40 +83,18 @@ export function useReportPage() {
 
   const deadlineChartData = computed(() => {
     if (!reportData.value || !reportData.value.deadlineReport || !Array.isArray(reportData.value.deadlineReport)) return null;
+    
+    const periods = reportData.value.deadlineReport.map((d) => d.period);
+    const colors = periods.map(getDeadlineColor);
+    
     return {
-      labels: reportData.value.deadlineReport.map((d) => d.period),
+      labels: periods,
       datasets: [
         {
           label: "タスク数",
           data: reportData.value.deadlineReport.map((d) => d.taskCount),
-          backgroundColor: reportData.value.deadlineReport.map((d) => {
-            switch (d.period) {
-              case "今週":
-                return "#28a745";
-              case "来週":
-                return "#007bff";
-              case "今月":
-                return "#ffc107";
-              case "期限切れ":
-                return "#dc3545";
-              default:
-                return "#6c757d";
-            }
-          }),
-          borderColor: reportData.value.deadlineReport.map((d) => {
-            switch (d.period) {
-              case "今週":
-                return "#28a745";
-              case "来週":
-                return "#007bff";
-              case "今月":
-                return "#ffc107";
-              case "期限切れ":
-                return "#dc3545";
-              default:
-                return "#6c757d";
-            }
-          }),
+          backgroundColor: colors,
+          borderColor: colors,
           borderWidth: 1,
         },
       ],
@@ -144,10 +105,13 @@ export function useReportPage() {
     try {
       const projRes = await listProjects();
       if (projRes.success && projRes.data) {
-        availableProjects.value = projRes.data.map((p: any) => ({ id: p.id, name: p.name }));
+        availableProjects.value = projRes.data.map((project) => ({ 
+          id: project.id, 
+          name: project.name 
+        }));
       }
-      // Users: 将来のusers取得サービス接続ポイント（今は空を維持）
-      availableUsers.value = availableUsers.value;
+      // TODO: ユーザー一覧取得サービスを実装後に接続
+      // availableUsers.value = await loadUsers();
     } catch (e) {
       console.error("候補データの読み込みに失敗", e);
     }

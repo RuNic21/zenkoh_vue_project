@@ -1,6 +1,12 @@
 // タスク型定義（Supabase tasks テーブルに対応）
 // 日時は ISO 文字列（timestamptz）として扱います
 
+// タスクステータスの型定義
+export type TaskStatus = "NOT_STARTED" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELLED" | "DELAYED" | "HOLD";
+
+// タスク優先度の型定義
+export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
 export interface Task {
   // タスクID
   id: number;
@@ -24,10 +30,10 @@ export interface Task {
   primary_assignee_id?: number | null;
 
   // ステータス（必須）
-  status: "NOT_STARTED" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELLED";
+  status: TaskStatus;
 
   // 優先度（必須）
-  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  priority: TaskPriority;
 
   // 計画開始/終了（任意）
   planned_start?: string | null; // ISO

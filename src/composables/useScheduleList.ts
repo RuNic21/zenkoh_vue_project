@@ -1,6 +1,7 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useScheduleStore } from "@/store/schedule";
-
+import { listProjects } from "@/services/projectService";
+import { createTask as createTaskService } from "@/services/taskService";
 import type { ScheduleItem } from "@/types/schedule";
 import type { Project } from "@/types/project";
 import type { TaskInsert } from "@/types/task";
@@ -20,7 +21,6 @@ export function useScheduleList() {
 
   const loadProjects = async (): Promise<void> => {
     try {
-      const { listProjects } = await import("@/services/projectService");
       const result = await listProjects();
       projects.value = result.success && result.data ? result.data : [];
     } catch (e) {
@@ -147,7 +147,6 @@ export function useScheduleList() {
   const createTask = async (taskData: TaskInsert) => {
     isSubmittingTask.value = true;
     try {
-      const { createTask: createTaskService } = await import("@/services/taskService");
       const result = await createTaskService(taskData);
       
       if (!result.success || !result.data) {
@@ -188,9 +187,9 @@ export function useScheduleList() {
     store.selectSchedule(scheduleId);
   };
 
-  const handleFilterUpdate = (key: string, value: any) => {
-    if (key === "status") filterStatus.value = value;
-    else if (key === "project") selectedProjectId.value = value;
+  const handleFilterUpdate = (key: string, value: string | number | null) => {
+    if (key === "status") filterStatus.value = value as string;
+    else if (key === "project") selectedProjectId.value = value as number | null;
   };
   
   // プロジェクトを選択してタスク一覧を表示

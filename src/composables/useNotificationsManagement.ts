@@ -7,42 +7,104 @@ import {
   updateAlertRule,
   deleteAlertRule,
 } from "@/services/notificationService";
+import type { NotificationInsert, NotificationUpdate, Notifications } from "@/types/db/notifications";
+import type { AlertRuleInsert, AlertRuleUpdate, AlertRules } from "@/types/db/alert_rules";
+import { ERROR_MESSAGES } from "@/constants/messages";
 
 // 通知/アラートルールの編集操作のみを提供する軽量 composable
 export function useNotificationsManagement() {
-  const createNotificationAction = async (payload: any) => {
+  /**
+   * 通知を作成
+   * @param payload 通知データ
+   * @returns 作成された通知データ
+   * @throws エラーが発生した場合
+   */
+  const createNotificationAction = async (payload: NotificationInsert): Promise<Notifications> => {
     const res = await createNotification(payload);
-    return !!res;
+    if (!res) {
+      throw new Error(ERROR_MESSAGES.NOTIFICATION_CREATE_FAILED);
+    }
+    return res;
   };
 
-  const updateNotificationAction = async (id: number, payload: any) => {
+  /**
+   * 通知を更新
+   * @param id 通知ID
+   * @param payload 更新データ
+   * @returns 更新された通知データ
+   * @throws エラーが発生した場合
+   */
+  const updateNotificationAction = async (id: number, payload: NotificationUpdate): Promise<Notifications> => {
     const res = await updateNotification(id, payload);
-    return !!res;
+    if (!res) {
+      throw new Error(ERROR_MESSAGES.NOTIFICATION_UPDATE_FAILED);
+    }
+    return res;
   };
 
-  const deleteNotificationAction = async (id: number) => {
+  /**
+   * 通知を削除
+   * @param id 通知ID
+   * @throws エラーが発生した場合
+   */
+  const deleteNotificationAction = async (id: number): Promise<void> => {
     const success = await deleteNotification(id);
-    return !!success;
+    if (!success) {
+      throw new Error(ERROR_MESSAGES.NOTIFICATION_DELETE_FAILED);
+    }
   };
 
-  const resendNotificationAction = async (id: number) => {
+  /**
+   * 通知を再送信
+   * @param id 通知ID
+   * @throws エラーが発生した場合
+   */
+  const resendNotificationAction = async (id: number): Promise<void> => {
     const success = await resendNotification(id);
-    return !!success;
+    if (!success) {
+      throw new Error(ERROR_MESSAGES.NOTIFICATION_RESEND_FAILED);
+    }
   };
 
-  const createAlertRuleAction = async (payload: any) => {
+  /**
+   * アラートルールを作成
+   * @param payload アラートルールデータ
+   * @returns 作成されたアラートルールデータ
+   * @throws エラーが発生した場合
+   */
+  const createAlertRuleAction = async (payload: AlertRuleInsert): Promise<AlertRules> => {
     const res = await createAlertRule(payload);
-    return !!res;
+    if (!res) {
+      throw new Error(ERROR_MESSAGES.ALERT_RULE_CREATE_FAILED);
+    }
+    return res;
   };
 
-  const updateAlertRuleAction = async (id: number, payload: any) => {
+  /**
+   * アラートルールを更新
+   * @param id アラートルールID
+   * @param payload 更新データ
+   * @returns 更新されたアラートルールデータ
+   * @throws エラーが発生した場合
+   */
+  const updateAlertRuleAction = async (id: number, payload: AlertRuleUpdate): Promise<AlertRules> => {
     const res = await updateAlertRule(id, payload);
-    return !!res;
+    if (!res) {
+      throw new Error(ERROR_MESSAGES.ALERT_RULE_UPDATE_FAILED);
+    }
+    return res;
   };
 
-  const deleteAlertRuleAction = async (id: number) => {
+  /**
+   * アラートルールを削除
+   * @param id アラートルールID
+   * @throws エラーが発生した場合
+   */
+  const deleteAlertRuleAction = async (id: number): Promise<void> => {
     const success = await deleteAlertRule(id);
-    return !!success;
+    if (!success) {
+      throw new Error(ERROR_MESSAGES.ALERT_RULE_DELETE_FAILED);
+    }
   };
 
   return {

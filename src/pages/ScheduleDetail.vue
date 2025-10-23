@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useScheduleDetail } from "@/composables/useScheduleDetail";
 import { useScheduleStore } from "../store/schedule";
+import { useMessage, useConfirm } from "@/composables/useMessage";
 import type { ScheduleItem, ScheduleStatus, SchedulePriority, ScheduleAttachment, ScheduleComment } from "../types/schedule";
 import { listUsers } from "../services/dbServices";
 import type { Users } from "../types/db/users";
@@ -158,6 +159,10 @@ const {
   addComment,         // コメント追加関数
 } = useScheduleDetail();
 
+// メッセージシステム
+const { showSuccess, showError } = useMessage();
+const { confirm: confirmDialog } = useConfirm();
+
 // スケジュールストアを取得
 const store = useScheduleStore();
 
@@ -196,7 +201,14 @@ const cancelEdit = () => {
 // 削除処理
 const deleteSchedule = async () => {
   // 削除確認ダイアログを表示
-  if (!confirm(`"${scheduleDetail.value.title}" を削除してもよろしいですか？\nこの操作は取り消せません。`)) {
+  const confirmed = await confirmDialog({
+    title: "削除確認",
+    message: `"${scheduleDetail.value.title}" を削除してもよろしいですか？\nこの操作は取り消せません。`,
+    type: "danger",
+    confirmText: "削除",
+    cancelText: "キャンセル"
+  });
+  if (!confirmed) {
     return;
   }
   
@@ -205,11 +217,12 @@ const deleteSchedule = async () => {
     console.log("スケジュールが削除されました");
     // 削除後は一覧画面に戻る（Appコンポーネントの currentPage を変更）
     // または emit でページ変更をリクエスト
-    alert("スケジュールを削除しました");
+    showSuccess("スケジュールを削除しました");
   } catch (e) {
     console.error("削除に失敗", e);
     const message = e instanceof Error ? e.message : "削除に失敗しました";
     errorMessage.value = message;
+    showError(message);
   }
 };
 

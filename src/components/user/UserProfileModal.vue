@@ -138,7 +138,7 @@ const getRelativeTime = (timestamp: string): string => {
 };
 
 // フォーム更新ハンドラー
-const handleFormUpdate = (field: keyof UserForm, value: any) => {
+const handleFormUpdate = (field: keyof UserForm, value: string | boolean | string[]) => {
   const updatedForm = { ...props.userForm, [field]: value };
   emit('update:user-form', updatedForm);
 };

@@ -90,6 +90,7 @@ import AlertRuleTable from "@/components/notification/AlertRuleTable.vue";
 import NotificationModal from "@/components/notification/NotificationModal.vue";
 import AlertRuleModal from "@/components/notification/AlertRuleModal.vue";
 import { useNotificationsManagement } from "@/composables/useNotificationsManagement";
+import { useMessage, useConfirm } from "@/composables/useMessage";
 import OptimizedDataTable from "@/components/table/OptimizedDataTable.vue";
 import { useTeamManagement } from "@/composables/useTeamManagement";
 // チーム管理・権限/統計関連の型をインポート
@@ -120,8 +121,6 @@ import ModalShell from "../components/common/ModalShell.vue";
 import LoadingSpinner from "../components/common/LoadingSpinner.vue";
 import EmptyState from "../components/common/EmptyState.vue";
 import CardHeader from "../components/common/CardHeader.vue";
-import TableControls from "../components/table/TableControls.vue";
-import PerformanceOptimizedTable from "../components/table/PerformanceOptimizedTable.vue";
 // 通知・アラートルール関連型のインポート
 import type {
   Notification,           // 通知データ型
@@ -195,6 +194,10 @@ const {
   loadTeamStats,          // チーム統計の再取得関数
   loadNotificationsSummary// 通知サマリーの再取得関数
 } = useTeamManagement();
+
+// メッセージシステム
+const { showSuccess, showError } = useMessage();
+const { confirm: confirmDialog } = useConfirm();
 
 // TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に実装）
 // const {
@@ -693,13 +696,13 @@ const handleCreateNotification = async () => {
       await loadNotifications();
       await loadNotificationStats();
       closeNotificationModal();
-      alert("通知が正常に作成されました");
+      showSuccess("通知が正常に作成されました");
     } else {
-      alert("通知の作成に失敗しました");
+      showError("通知の作成に失敗しました");
     }
   } catch (error) {
     console.error("通知作成エラー:", error);
-    alert("通知作成中にエラーが発生しました");
+    showError("通知作成中にエラーが発生しました");
   }
 };
 
@@ -709,31 +712,35 @@ const handleResendNotification = async (id: number) => {
     if (success) {
       await loadNotifications();
       await loadNotificationStats();
-      alert("通知の再送信が完了しました");
+      showSuccess("通知の再送信が完了しました");
     } else {
-      alert("通知の再送信に失敗しました");
+      showError("通知の再送信に失敗しました");
     }
   } catch (error) {
     console.error("通知再送信エラー:", error);
-    alert("通知再送信中にエラーが発生しました");
+    showError("通知再送信中にエラーが発生しました");
   }
 };
 
 const handleDeleteNotification = async (id: number) => {
-  if (!confirm("この通知を削除しますか？")) return;
+  const confirmed = await confirmDialog({
+    message: "この通知を削除しますか？",
+    type: "danger"
+  });
+  if (!confirmed) return;
   
   try {
     const success = await deleteNotificationAction(id);
     if (success) {
       await loadNotifications();
       await loadNotificationStats();
-      alert("通知が正常に削除されました");
+      showSuccess("通知が正常に削除されました");
     } else {
-      alert("通知の削除に失敗しました");
+      showError("通知の削除に失敗しました");
     }
   } catch (error) {
     console.error("通知削除エラー:", error);
-    alert("通知削除中にエラーが発生しました");
+    showError("通知削除中にエラーが発生しました");
   }
 };
 
@@ -744,13 +751,13 @@ const handleCreateAlertRule = async () => {
     if (newAlertRule) {
       await loadAlertRules();
       closeAlertRuleModal();
-      alert("アラートルールが正常に作成されました");
+      showSuccess("アラートルールが正常に作成されました");
     } else {
-      alert("アラートルールの作成に失敗しました");
+      showError("アラートルールの作成に失敗しました");
     }
   } catch (error) {
     console.error("アラートルール作成エラー:", error);
-    alert("アラートルール作成中にエラーが発生しました");
+    showError("アラートルール作成中にエラーが発生しました");
   }
 };
 
@@ -769,30 +776,34 @@ const handleUpdateAlertRule = async () => {
     if (updatedAlertRule) {
       await loadAlertRules();
       closeAlertRuleModal();
-      alert("アラートルールが正常に更新されました");
+      showSuccess("アラートルールが正常に更新されました");
     } else {
-      alert("アラートルールの更新に失敗しました");
+      showError("アラートルールの更新に失敗しました");
     }
   } catch (error) {
     console.error("アラートルール更新エラー:", error);
-    alert("アラートルール更新中にエラーが発生しました");
+    showError("アラートルール更新中にエラーが発生しました");
   }
 };
 
 const handleDeleteAlertRule = async (id: number) => {
-  if (!confirm("このアラートルールを削除しますか？")) return;
+  const confirmed = await confirmDialog({
+    message: "このアラートルールを削除しますか？",
+    type: "danger"
+  });
+  if (!confirmed) return;
   
   try {
     const success = await deleteAlertRuleAction(id);
     if (success) {
       await loadAlertRules();
-      alert("アラートルールが正常に削除されました");
+      showSuccess("アラートルールが正常に削除されました");
     } else {
-      alert("アラートルールの削除に失敗しました");
+      showError("アラートルールの削除に失敗しました");
     }
   } catch (error) {
     console.error("アラートルール削除エラー:", error);
-    alert("アラートルール削除中にエラーが発生しました");
+    showError("アラートルール削除中にエラーが発生しました");
   }
 };
 
@@ -864,13 +875,13 @@ const handleAvatarUpload = async (event: Event) => {
     const avatarUrl = await uploadUserAvatar(selectedUserProfile.value.id, file);
     if (avatarUrl) {
       userForm.value.avatar_url = avatarUrl;
-      alert("アバターが正常にアップロードされました");
+      showSuccess("アバターが正常にアップロードされました");
     } else {
-      alert("アバターのアップロードに失敗しました");
+      showError("アバターのアップロードに失敗しました");
     }
   } catch (error) {
     console.error("アバターアップロードエラー:", error);
-    alert("アバターアップロード中にエラーが発生しました");
+    showError("アバターアップロード中にエラーが発生しました");
   }
 };
 
@@ -1011,11 +1022,11 @@ const handleBulkDeleteUsers = async () => {
       await loadTeamStats();
       selectedUsers.value.clear();
       updateBulkActionsVisibility();
-      alert(`${successCount}名のユーザーが削除されました`);
+      showSuccess(`${successCount}名のユーザーが削除されました`);
     }
   } catch (error) {
     console.error("一括ユーザー削除エラー:", error);
-    alert("一括削除中にエラーが発生しました");
+    showError("一括削除中にエラーが発生しました");
   }
 };
 
@@ -1038,11 +1049,11 @@ const handleBulkActivateUsers = async () => {
       await loadTeamStats();
       selectedUsers.value.clear();
       updateBulkActionsVisibility();
-      alert(`${successCount}名のユーザーがアクティブになりました`);
+      showSuccess(`${successCount}名のユーザーがアクティブになりました`);
     }
   } catch (error) {
     console.error("一括ユーザーアクティブ化エラー:", error);
-    alert("一括アクティブ化中にエラーが発生しました");
+    showError("一括アクティブ化中にエラーが発生しました");
   }
 };
 
@@ -1065,11 +1076,11 @@ const handleBulkDeactivateUsers = async () => {
       await loadTeamStats();
       selectedUsers.value.clear();
       updateBulkActionsVisibility();
-      alert(`${successCount}名のユーザーが非アクティブになりました`);
+      showSuccess(`${successCount}名のユーザーが非アクティブになりました`);
     }
   } catch (error) {
     console.error("一括ユーザー非アクティブ化エラー:", error);
-    alert("一括非アクティブ化中にエラーが発生しました");
+    showError("一括非アクティブ化中にエラーが発生しました");
   }
 };
 
@@ -1092,11 +1103,11 @@ const handleBulkDeleteNotifications = async () => {
       await loadNotificationStats();
       selectedNotifications.value.clear();
       updateBulkActionsVisibility();
-      alert(`${successCount}件の通知が削除されました`);
+      showSuccess(`${successCount}件の通知が削除されました`);
     }
   } catch (error) {
     console.error("一括通知削除エラー:", error);
-    alert("一括削除中にエラーが発生しました");
+    showError("一括削除中にエラーが発生しました");
   }
 };
 
@@ -1119,11 +1130,11 @@ const handleBulkResendNotifications = async () => {
       await loadNotificationStats();
       selectedNotifications.value.clear();
       updateBulkActionsVisibility();
-      alert(`${successCount}件の通知が再送信されました`);
+      showSuccess(`${successCount}件の通知が再送信されました`);
     }
   } catch (error) {
     console.error("一括通知再送信エラー:", error);
-    alert("一括再送信中にエラーが発生しました");
+    showError("一括再送信中にエラーが発生しました");
   }
 };
 
@@ -1145,11 +1156,11 @@ const handleBulkDeleteAlertRules = async () => {
       await loadAlertRules();
       selectedAlertRules.value.clear();
       updateBulkActionsVisibility();
-      alert(`${successCount}件のアラートルールが削除されました`);
+      showSuccess(`${successCount}件のアラートルールが削除されました`);
     }
   } catch (error) {
     console.error("一括アラートルール削除エラー:", error);
-    alert("一括削除中にエラーが発生しました");
+    showError("一括削除中にエラーが発生しました");
   }
 };
 
@@ -1268,9 +1279,9 @@ const onSaveNotification = async (f: { subject: string; to_email: string; body_t
           loadNotificationStats()
         ]);
         closeNotificationModal();
-        alert("通知が正常に更新されました");
+        showSuccess("通知が正常に更新されました");
       } else {
-        alert("通知の更新に失敗しました。もう一度お試しください。");
+        showError("通知の更新に失敗しました。もう一度お試しください。");
       }
     } else {
       // 作成モード：新規作成処理
@@ -1278,7 +1289,7 @@ const onSaveNotification = async (f: { subject: string; to_email: string; body_t
     }
   } catch (error) {
     console.error("通知保存エラー:", error);
-    alert("通知の保存中にエラーが発生しました。もう一度お試しください。");
+    showError("通知の保存中にエラーが発生しました。もう一度お試しください。");
   }
 };
 
@@ -1312,7 +1323,7 @@ const onSaveAlertRule = async (f: {
   try {
     // project_id が null の場合はエラー
     if (!f.project_id) {
-      alert("プロジェクトを選択してください");
+      showError("プロジェクトを選択してください");
       return;
     }
 

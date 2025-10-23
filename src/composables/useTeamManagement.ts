@@ -7,6 +7,8 @@ import {
   getTeamStats,
 } from "@/services/teamService";
 import { getNotificationStats, listNotifications, listAlertRules } from "@/services/notificationService";
+import { isServiceSuccess } from "@/utils/typeGuards";
+import { ERROR_MESSAGES } from "@/constants/messages";
 
 // チーム管理ページの主要データロード/状態管理の最小セット
 export function useTeamManagement() {
@@ -44,16 +46,17 @@ export function useTeamManagement() {
       isUsersLoading.value = true;
       usersErrorMessage.value = "";
       const result = await listUsers();
-      if (result && typeof result === "object" && "success" in result && result.success && result.data) {
-        users.value = result.data as User[];
+      
+      if (isServiceSuccess<User[]>(result)) {
+        users.value = result.data;
       } else if (Array.isArray(result)) {
-        users.value = result as unknown as User[];
+        users.value = result as User[];
       } else {
         users.value = [];
       }
     } catch (e) {
       console.error("ユーザー読み込みに失敗:", e);
-      usersErrorMessage.value = "ユーザー読み込みに失敗しました。";
+      usersErrorMessage.value = ERROR_MESSAGES.USER_LOAD_FAILED;
       users.value = [];
     } finally {
       isUsersLoading.value = false;

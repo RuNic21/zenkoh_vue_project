@@ -1,88 +1,4 @@
 <script setup lang="ts">
-// チーム管理ページコンポーネント
-// 目的: ユーザー管理、チームメンバー管理、権限管理を提供
-
-import { ref, computed, onMounted } from "vue";
-import { useTeamMembersManagement } from "@/composables/useTeamMembersManagement";
-import { useProjectTeamsManagement } from "@/composables/useProjectTeamsManagement";
-import NotificationTable from "@/components/notification/NotificationTable.vue";
-import AlertRuleTable from "@/components/notification/AlertRuleTable.vue";
-import NotificationModal from "@/components/notification/NotificationModal.vue";
-import AlertRuleModal from "@/components/notification/AlertRuleModal.vue";
-import { useNotificationsManagement } from "@/composables/useNotificationsManagement";
-import TeamMemberTable from "@/components/team/TeamMemberTable.vue";
-import { useTeamManagement } from "@/composables/useTeamManagement";
-import type { 
-  User, 
-  TeamMemberWithUser, 
-  ProjectTeam, 
-  TeamStats, 
-  UserActivity,
-  TeamRole,
-  UserProfileUpdate,
-  UserProfileStats,
-  UserActivityLog
-} from "../types/team";
-
-// 共通コンポーネントのインポート
-import PageHeader from "../components/common/PageHeader.vue";
-import ActionBar from "../components/common/ActionBar.vue";
-import StatCards from "../components/common/StatCards.vue";
-import StatusBadge from "../components/common/StatusBadge.vue";
-import PriorityBadge from "../components/common/PriorityBadge.vue";
-import ModalShell from "../components/common/ModalShell.vue";
-import LoadingSpinner from "../components/common/LoadingSpinner.vue";
-import EmptyState from "../components/common/EmptyState.vue";
-import CardHeader from "../components/common/CardHeader.vue";
-import TableControls from "../components/table/TableControls.vue";
-import PerformanceOptimizedTable from "../components/table/PerformanceOptimizedTable.vue";
-import type {
-  Notification,
-  AlertRule,
-  NotificationStats,
-  NotificationFilter,
-  NotificationStatus,
-  AlertRuleType
-} from "../types/notification";
-import { 
-  listUsers, 
-  listActiveUsers, 
-  createUser, 
-  updateUser,
-  listTeamMembersWithUsers,
-  addTeamMember,
-  updateTeamMemberRole,
-  removeTeamMember,
-  getProjectTeams,
-  getTeamStats,
-  getUserActivityStats,
-  updateUserProfile,
-  getUserProfileStats,
-  getUserActivityLogs,
-  uploadUserAvatar,
-  searchUsers
-} from "../services/teamService";
-import {
-  listNotifications,
-  createNotification,
-  updateNotification,
-  deleteNotification,
-  resendNotification,
-  listAlertRules,
-  createAlertRule,
-  updateAlertRule,
-  deleteAlertRule,
-  getNotificationStats,
-  createNotificationFromTemplate,
-  NOTIFICATION_TEMPLATES
-} from "../services/notificationService";
-import { TEAM_ROLE_LABELS, TEAM_ROLE_COLORS } from "../types/team";
-import { 
-  NOTIFICATION_STATUS_LABELS, 
-  NOTIFICATION_STATUS_COLORS,
-  ALERT_RULE_TYPE_LABELS,
-  ALERT_RULE_TYPE_COLORS
-} from "../types/notification";
 
 // ===== TODO: 実装予定機能 =====
 
@@ -161,45 +77,147 @@ import {
 
 // ===== リアクティブデータ =====
 
+
+// チーム管理ページコンポーネント
+// 目的: ユーザー管理、チームメンバー管理、権限管理を提供
+
+import { ref, computed, onMounted } from "vue";
+// TODO: プロジェクトメンバー管理機能が実装されたら有効化
+// import { useTeamMembersManagement } from "@/composables/useTeamMembersManagement";
+// TODO: プロジェクト別チーム情報機能（project_members テーブル作成後に有効化）
+// import { useProjectTeamsManagement } from "@/composables/useProjectTeamsManagement";
+import AlertRuleTable from "@/components/notification/AlertRuleTable.vue";
+import NotificationModal from "@/components/notification/NotificationModal.vue";
+import AlertRuleModal from "@/components/notification/AlertRuleModal.vue";
+import { useNotificationsManagement } from "@/composables/useNotificationsManagement";
+import OptimizedDataTable from "@/components/table/OptimizedDataTable.vue";
+import { useTeamManagement } from "@/composables/useTeamManagement";
+// チーム管理・権限/統計関連の型をインポート
+import type { 
+  User,                // ユーザー情報
+  TeamMemberWithUser,  // メンバー+ユーザ詳細
+  ProjectTeam,         // プロジェクト単位チーム
+  TeamStats,           // チームの統計情報
+  UserActivity,        // ユーザー個別の活動記録
+  TeamRole,            // チーム役割タイプ
+  UserProfileUpdate,   // ユーザープロフィール更新用
+  UserProfileStats,    // ユーザーの統計データ
+  UserActivityLog      // 活動履歴ログ
+} from "../types/team";
+
+// 共通コンポーネントのインポート
+import PageHeader from "../components/common/PageHeader.vue";
+import ActionBar from "../components/common/ActionBar.vue";
+import StatCards from "../components/common/StatCards.vue";
+import TeamStatsCards from "../components/team/TeamStatsCards.vue";
+import TeamFilterPanel from "../components/team/TeamFilterPanel.vue";
+import UserProfileModal from "../components/user/UserProfileModal.vue";
+// BulkActionsPanel は UserManagementTable に統合されました
+import UserManagementTable from "../components/user/UserManagementTable.vue";
+import StatusBadge from "../components/common/StatusBadge.vue";
+import PriorityBadge from "../components/common/PriorityBadge.vue";
+import ModalShell from "../components/common/ModalShell.vue";
+import LoadingSpinner from "../components/common/LoadingSpinner.vue";
+import EmptyState from "../components/common/EmptyState.vue";
+import CardHeader from "../components/common/CardHeader.vue";
+import TableControls from "../components/table/TableControls.vue";
+import PerformanceOptimizedTable from "../components/table/PerformanceOptimizedTable.vue";
+// 通知・アラートルール関連型のインポート
+import type {
+  Notification,           // 通知データ型
+  AlertRule,              // アラートルール型
+  NotificationStats,      // 通知統計データ型
+  NotificationFilter,     // 通知フィルタ―条件型
+  NotificationStatus,     // 通知の状態（例: SENT, FAILEDなど）
+  AlertRuleType           // アラートルールの種類
+} from "../types/notification";
+
+// チーム関連サービス関数のインポート
+import { 
+  listUsers,                     // ユーザー一覧取得
+  listActiveUsers,               // 有効ユーザーのみ取得
+  createUser,                    // ユーザー新規作成
+  updateUser,                    // ユーザー情報更新
+  listTeamMembersWithUsers,      // チームメンバー+ユーザー詳細取得
+  addTeamMember,                 // チームメンバー追加
+  updateTeamMemberRole,          // メンバーの役割変更
+  removeTeamMember,              // チームメンバー削除
+  getProjectTeams,               // プロジェクト別チーム取得
+  getTeamStats,                  // チーム統計情報取得
+  getUserActivityStats,          // ユーザー活動統計取得
+  updateUserProfile,             // ユーザープロフィール更新
+  getUserProfileStats,           // ユーザープロフィール統計
+  getUserActivityLogs,           // ユーザー活動ログ取得
+  uploadUserAvatar,              // プロフィール画像アップロード
+  searchUsers                    // ユーザー検索
+} from "../services/teamService";
+
+// 通知管理サービス関数のインポート
+import {
+  listNotifications,                 // 通知一覧取得
+  createNotification,                // 通知新規作成
+  updateNotification,                // 通知更新
+  deleteNotification,                // 通知削除
+  resendNotification,                // 通知再送信
+  listAlertRules,                    // アラートルール一覧取得
+  createAlertRule,                   // アラートルール新規作成
+  updateAlertRule,                   // アラートルール更新
+  deleteAlertRule,                   // アラートルール削除
+  getNotificationStats,              // 通知統計取得
+  createNotificationFromTemplate,    // テンプレートから通知作成
+  NOTIFICATION_TEMPLATES             // 利用可能な通知テンプレート
+} from "../services/notificationService";
+
+// チーム役割ラベル・色の定数インポート
+import { TEAM_ROLE_LABELS, TEAM_ROLE_COLORS } from "../types/team";
+
+// 通知状態・アラートルール種類のラベル/色定数インポート
+import { 
+  NOTIFICATION_STATUS_LABELS,    // 通知ステータス日本語ラベル
+  NOTIFICATION_STATUS_COLORS,    // 通知ステータス表示色
+  ALERT_RULE_TYPE_LABELS,        // アラートルール種類ラベル
+  ALERT_RULE_TYPE_COLORS         // アラートルール種類表示色
+} from "../types/notification";
+
 // composable から主要状態を取得（重複を避けるため users/stats/notifications のみ）
 const {
-  users,
-  isUsersLoading,
-  usersErrorMessage,
-  teamStats,
-  isStatsLoading,
-  notifications,
-  notificationStats,
-  alertRules,
-  isNotificationsLoading,
-  isAlertRulesLoading,
-  loadUsers,
-  loadTeamStats,
-  loadNotificationsSummary,
+  users,                  // ユーザー一覧
+  isUsersLoading,         // ユーザー一覧取得中フラグ
+  usersErrorMessage,      // ユーザー取得時のエラーメッセージ
+  teamStats,              // チーム統計データ
+  isStatsLoading,         // チーム統計読み込み中フラグ
+  notifications,          // 通知一覧データ
+  notificationStats,      // 通知の統計値
+  alertRules,             // アラートルール一覧
+  isNotificationsLoading, // 通知読み込み中フラグ
+  isAlertRulesLoading,    // アラートルール読み込み中フラグ
+  loadUsers,              // ユーザー一覧の再取得関数
+  loadTeamStats,          // チーム統計の再取得関数
+  loadNotificationsSummary// 通知サマリーの再取得関数
 } = useTeamManagement();
 
-// チームメンバー管理（新 composable）
-const {
-  members: teamMemberRows,
-  isLoading: isTeamMembersLoading,
-  errorMessage: teamMembersErrorMessage,
-  addMember: addTeamMemberAction,
-  changeRole: changeTeamMemberRoleAction,
-  removeMember: removeTeamMemberAction,
-  loadMembers,
-} = useTeamMembersManagement();
+// TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に実装）
+// const {
+//   members: teamMemberRows,
+//   isLoading: isTeamMembersLoading,
+//   errorMessage: teamMembersErrorMessage,
+//   addMember: addTeamMemberAction,
+//   changeRole: changeTeamMemberRoleAction,
+//   removeMember: removeTeamMemberAction,
+//   loadMembers,
+// } = useTeamMembersManagement();
 
 // 以下のセクション（teamMembers, projectTeams, ...）は既存のローカル状態を維持
 
 // チームメンバー管理（composable 提供を利用）
 
-// プロジェクトチーム情報（composable 提供を利用）
-const {
-  projectTeams,
-  isProjectTeamsLoading,
-  projectTeamsErrorMessage,
-  loadProjectTeams: tmLoadProjectTeams,
-} = useProjectTeamsManagement();
+// TODO: プロジェクト別チーム情報機能（project_members テーブル作成後に有効化）
+// const {
+//   projectTeams,
+//   isProjectTeamsLoading,
+//   projectTeamsErrorMessage,
+//   loadProjectTeams: tmLoadProjectTeams,
+// } = useProjectTeamsManagement();
 
 // ユーザー活動統計
 const userActivities = ref<UserActivity[]>([]);
@@ -214,35 +232,29 @@ const alertRulesErrorMessage = ref("");
 // 通知統計情報
 const isNotificationStatsLoading = ref(false);
 
-// フィルタリング・検索
-const searchQuery = ref("");
-const statusFilter = ref("all"); // 'all' | 'active' | 'inactive'
-const roleFilter = ref("all"); // 'all' | 'OWNER' | 'CONTRIBUTOR' | 'REVIEWER'
+// フィルタリング・検索（セクション別に分離）
+// ユーザー管理用フィルター
+const userSearchQuery = ref("");
+const userStatusFilter = ref("all"); // 'all' | 'active' | 'inactive'
+
+// チームメンバー用フィルター
+const memberSearchQuery = ref("");
+const memberRoleFilter = ref("all"); // 'all' | 'OWNER' | 'CONTRIBUTOR' | 'REVIEWER'
+
+// 通知管理用フィルター
+const notificationSearchQuery = ref("");
 const notificationStatusFilter = ref("all"); // 'all' | 'QUEUED' | 'SENT' | 'FAILED' | 'CANCELLED'
 
-// 高級検索・フィルタリング
-const advancedSearch = ref({
-  department: "",
-  position: "",
-  skills: [] as string[],
-  dateFrom: "",
-  dateTo: "",
-  taskStatus: "all",
-  projectId: 0
-});
+// アラートルール用フィルター
+const alertRuleSearchQuery = ref("");
 
-// 保存された検索条件はDBから取得（将来実装予定）
-const savedSearches = ref<Array<{
-  id: string;
-  name: string;
-  filters: any;
-  createdAt: string;
-}>>([]);
+// ユーザー活動用フィルター
+const activitySearchQuery = ref("");
 
-const showAdvancedSearch = ref(false);
-const showSavedSearches = ref(false);
-// 検索履歴はDBから取得（将来実装予定）
-const searchHistory = ref<string[]>([]);
+// 後方互換性のために維持（TeamFilterPanelで使用）
+const searchQuery = ref("");
+const statusFilter = ref("all");
+const roleFilter = ref("all");
 
 // 一括操作関連
 const selectedUsers = ref<Set<number>>(new Set());
@@ -253,16 +265,17 @@ const showBulkActions = ref(false);
 const bulkActionType = ref<"users" | "teamMembers" | "notifications" | "alertRules">("users");
 
 // モーダル状態
-const showUserModal = ref(false);
-const showMemberModal = ref(false);
+const showUserProfileModal = ref(false);
+const userModalMode = ref<"create" | "edit" | "view">("view");
+const selectedUserProfile = ref<User | null>(null);
+// TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
+// const showMemberModal = ref(false);
 const showNotificationModal = ref(false);
 const showAlertRuleModal = ref(false);
-const showUserProfileModal = ref(false);
-const editingUser = ref<User | null>(null);
-const editingMember = ref<TeamMemberWithUser | null>(null);
+// TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
+// const editingMember = ref<TeamMemberWithUser | null>(null);
 const editingNotification = ref<Notification | null>(null);
 const editingAlertRule = ref<AlertRule | null>(null);
-const selectedUserProfile = ref<User | null>(null);
 
 // ユーザープロフィール関連
 const userProfileStats = ref<UserProfileStats | null>(null);
@@ -270,39 +283,14 @@ const userActivityLogs = ref<UserActivityLog[]>([]);
 const isProfileStatsLoading = ref(false);
 const isActivityLogsLoading = ref(false);
 
-// フォームデータ
+// 統合ユーザーフォーム（基本情報 + プロフィール情報）
 const userForm = ref({
+  // 基本情報
   email: "",
   display_name: "",
   password_hash: "",
-  is_active: true
-});
-
-const memberForm = ref({
-  user_id: 0,
-  task_id: 0,
-  role: "CONTRIBUTOR" as TeamRole
-});
-
-const notificationForm = ref({
-  project_id: 0,
-  task_id: 0,
-  to_email: "",
-  subject: "",
-  body_text: "",
-  send_after: new Date().toISOString()
-});
-
-const alertRuleForm = ref({
-  project_id: 0,
-  name: "",
-  rule_type: "DUE_SOON" as AlertRuleType,
-  params_json: {},
-  is_enabled: true,
-  notify_email: ""
-});
-
-const userProfileForm = ref({
+  is_active: true,
+  // プロフィール情報
   first_name: "",
   last_name: "",
   phone: "",
@@ -318,15 +306,47 @@ const userProfileForm = ref({
   tags: [] as string[]
 });
 
+// TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
+// const memberForm = ref({
+//   user_id: 0,
+//   task_id: 0,
+//   role: "CONTRIBUTOR" as TeamRole
+// });
+
+const notificationForm = ref({
+  project_id: 0,
+  task_id: 0,
+  to_email: "",
+  subject: "",
+  body_text: "",
+  send_after: new Date().toISOString()
+});
+
+const alertRuleForm = ref<{
+  project_id: number | null;
+  name: string;
+  rule_type: AlertRuleType;
+  params_json: Record<string, any>;
+  is_enabled: boolean;
+  notify_email: string;
+}>({
+  project_id: null,
+  name: "",
+  rule_type: "DUE_SOON",
+  params_json: {},
+  is_enabled: true,
+  notify_email: ""
+});
+
 // ===== 計算プロパティ =====
 
-// フィルタリングされたユーザー一覧
+// フィルタリングされたユーザー一覧（ユーザー管理専用フィルター）
 const filteredUsers = computed(() => {
   let filtered = users.value;
 
-  // 基本検索クエリでフィルタリング
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase();
+  // ユーザー検索クエリでフィルタリング
+  if (userSearchQuery.value.trim()) {
+    const query = userSearchQuery.value.toLowerCase();
     filtered = filtered.filter(user => 
       user.display_name.toLowerCase().includes(query) ||
       user.email.toLowerCase().includes(query) ||
@@ -337,10 +357,10 @@ const filteredUsers = computed(() => {
     );
   }
 
-  // ステータスでフィルタリング
-  if (statusFilter.value !== "all") {
+  // ユーザーステータスでフィルタリング
+  if (userStatusFilter.value !== "all") {
     filtered = filtered.filter(user => {
-      switch (statusFilter.value) {
+      switch (userStatusFilter.value) {
         case "active":
           return user.is_active;
         case "inactive":
@@ -351,67 +371,34 @@ const filteredUsers = computed(() => {
     });
   }
 
-  // 高級検索フィルタリング
-  if (advancedSearch.value.department) {
-    filtered = filtered.filter(user => 
-      user.department && user.department.toLowerCase().includes(advancedSearch.value.department.toLowerCase())
-    );
-  }
-
-  if (advancedSearch.value.position) {
-    filtered = filtered.filter(user => 
-      user.position && user.position.toLowerCase().includes(advancedSearch.value.position.toLowerCase())
-    );
-  }
-
-  if (advancedSearch.value.skills.length > 0) {
-    filtered = filtered.filter(user => 
-      user.skills && advancedSearch.value.skills.some(skill => 
-        user.skills!.some(userSkill => userSkill.toLowerCase().includes(skill.toLowerCase()))
-      )
-    );
-  }
-
-  if (advancedSearch.value.dateFrom) {
-    filtered = filtered.filter(user => 
-      new Date(user.created_at) >= new Date(advancedSearch.value.dateFrom)
-    );
-  }
-
-  if (advancedSearch.value.dateTo) {
-    filtered = filtered.filter(user => 
-      new Date(user.created_at) <= new Date(advancedSearch.value.dateTo)
-    );
-  }
-
   return filtered;
 });
 
-// フィルタリングされたチームメンバー一覧
-const filteredTeamMembers = computed(() => {
-  let filtered = (teamMemberRows.value as any[]);
+// TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に実装）
+// const filteredTeamMembers = computed(() => {
+//   let filtered = (teamMemberRows.value as any[]);
+//
+//   if (searchQuery.value.trim()) {
+//     const query = searchQuery.value.toLowerCase();
+//     filtered = filtered.filter((member) =>
+//       (member.user?.display_name || '').toLowerCase().includes(query)
+//     );
+//   }
+//
+//   if (roleFilter.value !== "all") {
+//     filtered = filtered.filter((member) => member.role === roleFilter.value);
+//   }
+//
+//   return filtered;
+// });
 
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase();
-    filtered = filtered.filter((member) =>
-      (member.user?.display_name || '').toLowerCase().includes(query)
-    );
-  }
-
-  if (roleFilter.value !== "all") {
-    filtered = filtered.filter((member) => member.role === roleFilter.value);
-  }
-
-  return filtered;
-});
-
-// フィルタリングされた通知一覧
+// フィルタリングされた通知一覧（通知管理専用フィルター）
 const filteredNotifications = computed(() => {
   let filtered = notifications.value;
 
-  // 検索クエリでフィルタリング
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase();
+  // 通知検索クエリでフィルタリング
+  if (notificationSearchQuery.value.trim()) {
+    const query = notificationSearchQuery.value.toLowerCase();
     filtered = filtered.filter(notification => 
       notification.subject.toLowerCase().includes(query) ||
       notification.to_email.toLowerCase().includes(query) ||
@@ -419,7 +406,7 @@ const filteredNotifications = computed(() => {
     );
   }
 
-  // ステータスでフィルタリング
+  // 通知ステータスでフィルタリング
   if (notificationStatusFilter.value !== "all") {
     filtered = filtered.filter(notification => notification.status === notificationStatusFilter.value);
   }
@@ -427,13 +414,54 @@ const filteredNotifications = computed(() => {
   return filtered;
 });
 
-// フィルタリングされたアラートルール一覧
+// 通知テーブルのカラム定義
+const notificationColumns = computed(() => [
+  {
+    key: "subject",
+    label: "件名",
+    sortable: true,
+    filterable: false,
+    width: "30%"
+  },
+  {
+    key: "to_email",
+    label: "送信先",
+    sortable: true,
+    filterable: false,
+    width: "20%"
+  },
+  {
+    key: "status",
+    label: "ステータス",
+    sortable: true,
+    filterable: true,
+    width: "15%",
+    formatter: (value: string) => NOTIFICATION_STATUS_LABELS[value as keyof typeof NOTIFICATION_STATUS_LABELS] || value
+  },
+  {
+    key: "created_at",
+    label: "作成日時",
+    sortable: true,
+    filterable: false,
+    width: "20%",
+    formatter: (value: string) => new Date(value).toLocaleString("ja-JP")
+  },
+  {
+    key: "actions",
+    label: "操作",
+    sortable: false,
+    filterable: false,
+    width: "15%"
+  }
+]);
+
+// フィルタリングされたアラートルール一覧（アラートルール専用フィルター）
 const filteredAlertRules = computed(() => {
   let filtered = alertRules.value;
 
-  // 検索クエリでフィルタリング
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase();
+  // アラートルール検索クエリでフィルタリング
+  if (alertRuleSearchQuery.value.trim()) {
+    const query = alertRuleSearchQuery.value.toLowerCase();
     filtered = filtered.filter(rule => 
       rule.name.toLowerCase().includes(query) ||
       rule.rule_type.toLowerCase().includes(query) ||
@@ -444,29 +472,45 @@ const filteredAlertRules = computed(() => {
   return filtered;
 });
 
+// フィルタリングされたユーザー活動統計（活動統計専用フィルター）
+const filteredUserActivities = computed(() => {
+  let filtered = userActivities.value;
+
+  // 活動統計検索クエリでフィルタリング（ユーザー名で検索）
+  if (activitySearchQuery.value.trim()) {
+    const query = activitySearchQuery.value.toLowerCase();
+    filtered = filtered.filter(activity => 
+      activity.display_name.toLowerCase().includes(query)
+    );
+  }
+
+  return filtered;
+});
+
 // ===== メソッド =====
 
 // データ読み込みは composable の loadMembers に委譲
 
-const loadProjectTeams = async () => {
-  try {
-    isProjectTeamsLoading.value = true;
-    projectTeamsErrorMessage.value = "";
-    const result = await getProjectTeams();
-    if (result.success && result.data) {
-      projectTeams.value = result.data;
-    } else {
-      projectTeamsErrorMessage.value = result.error || "プロジェクトチームの読み込みに失敗しました";
-      projectTeams.value = [];
-    }
-  } catch (error) {
-    console.error("プロジェクトチーム読み込みエラー:", error);
-    projectTeamsErrorMessage.value = "プロジェクトチームの読み込みに失敗しました";
-    projectTeams.value = [];
-  } finally {
-    isProjectTeamsLoading.value = false;
-  }
-};
+// TODO: プロジェクト別チーム情報機能（project_members テーブル作成後に有効化）
+// const loadProjectTeams = async () => {
+//   try {
+//     isProjectTeamsLoading.value = true;
+//     projectTeamsErrorMessage.value = "";
+//     const result = await getProjectTeams();
+//     if (result.success && result.data) {
+//       projectTeams.value = result.data;
+//     } else {
+//       projectTeamsErrorMessage.value = result.error || "プロジェクトチームの読み込みに失敗しました";
+//       projectTeams.value = [];
+//     }
+//   } catch (error) {
+//     console.error("プロジェクトチーム読み込みエラー:", error);
+//     projectTeamsErrorMessage.value = "プロジェクトチームの読み込みに失敗しました";
+//     projectTeams.value = [];
+//   } finally {
+//     isProjectTeamsLoading.value = false;
+//   }
+// };
 
 const loadUserActivities = async () => {
   try {
@@ -522,110 +566,124 @@ const loadNotificationStats = async () => {
   }
 };
 
-// ユーザー管理
-const handleCreateUser = async () => {
+// ユーザー管理（統合モーダル版）
+const handleSaveUser = async () => {
   try {
-    const newUser = await createUser(userForm.value);
-    if (newUser) {
-      await loadUsers();
-      await loadTeamStats();
-      closeUserModal();
-      alert("ユーザーが正常に作成されました");
-    } else {
-      alert("ユーザーの作成に失敗しました");
+    if (userModalMode.value === "create") {
+      // 新規作成
+      const newUser = await createUser(userForm.value);
+      if (newUser) {
+        await loadUsers();
+        await loadTeamStats();
+        closeUserProfileModal();
+        alert("ユーザーが正常に作成されました");
+      } else {
+        alert("ユーザーの作成に失敗しました");
+      }
+    } else if (userModalMode.value === "edit" && selectedUserProfile.value) {
+      // 更新
+      const updatedUser = await updateUser(selectedUserProfile.value.id, {
+        email: userForm.value.email,
+        display_name: userForm.value.display_name,
+        is_active: userForm.value.is_active
+      });
+      
+      if (updatedUser) {
+        // プロフィール情報も更新（将来実装予定）
+        // await updateUserProfile(selectedUserProfile.value.id, userForm.value);
+        await loadUsers();
+        await loadTeamStats();
+        closeUserProfileModal();
+        alert("ユーザーが正常に更新されました");
+      } else {
+        alert("ユーザーの更新に失敗しました");
+      }
     }
   } catch (error) {
-    console.error("ユーザー作成エラー:", error);
-    alert("ユーザー作成中にエラーが発生しました");
-  }
-};
-
-const handleUpdateUser = async () => {
-  if (!editingUser.value) return;
-  
-  try {
-    const updatedUser = await updateUser(editingUser.value.id, {
-      email: userForm.value.email,
-      display_name: userForm.value.display_name,
-      is_active: userForm.value.is_active
-    });
-    
-    if (updatedUser) {
-      await loadUsers();
-      await loadTeamStats();
-      closeUserModal();
-      alert("ユーザーが正常に更新されました");
-    } else {
-      alert("ユーザーの更新に失敗しました");
-    }
-  } catch (error) {
-    console.error("ユーザー更新エラー:", error);
-    alert("ユーザー更新中にエラーが発生しました");
+    console.error("ユーザー保存エラー:", error);
+    alert("ユーザー保存中にエラーが発生しました");
   }
 };
 
 const handleEditUser = (user: User) => {
-  editingUser.value = user;
+  selectedUserProfile.value = user;
+  userModalMode.value = "edit";
   userForm.value = {
+    // 基本情報
     email: user.email,
     display_name: user.display_name,
     password_hash: "",
-    is_active: user.is_active
+    is_active: user.is_active || true,
+    // プロフィール情報
+    first_name: user.first_name || "",
+    last_name: user.last_name || "",
+    phone: user.phone || "",
+    department: user.department || "",
+    position: user.position || "",
+    avatar_url: user.avatar_url || "",
+    bio: user.bio || "",
+    timezone: user.timezone || "Asia/Tokyo",
+    language: user.language || "ja",
+    work_hours_start: user.work_hours_start || "09:00",
+    work_hours_end: user.work_hours_end || "18:00",
+    skills: user.skills || [],
+    tags: user.tags || []
   };
-  showUserModal.value = true;
+  showUserProfileModal.value = true;
 };
 
-// チームメンバー管理
-const handleAddTeamMember = async () => {
-  try {
-    const newMember = await addTeamMember(memberForm.value);
-    if (newMember) {
-      await loadMembers();
-      await tmLoadProjectTeams();
-      closeMemberModal();
-      alert("チームメンバーが正常に追加されました");
-    } else {
-      alert("チームメンバーの追加に失敗しました");
-    }
-  } catch (error) {
-    console.error("チームメンバー追加エラー:", error);
-    alert("チームメンバー追加中にエラーが発生しました");
-  }
-};
+// TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
+// const handleAddTeamMember = async () => {
+//   try {
+//     const newMember = await addTeamMember(memberForm.value);
+//     if (newMember) {
+//       await loadMembers();
+//       await tmLoadProjectTeams();
+//       closeMemberModal();
+//       alert("チームメンバーが正常に追加されました");
+//     } else {
+//       alert("チームメンバーの追加に失敗しました");
+//     }
+//   } catch (error) {
+//     console.error("チームメンバー追加エラー:", error);
+//     alert("チームメンバー追加中にエラーが発生しました");
+//   }
+// };
 
-const handleUpdateMemberRole = async (userId: number, taskId: number, newRole: TeamRole) => {
-  try {
-    const updatedMember = await updateTeamMemberRole(userId, taskId, { role: newRole });
-    if (updatedMember) {
-      await loadMembers();
-      await tmLoadProjectTeams();
-      alert("チームメンバーの役割が正常に更新されました");
-    } else {
-      alert("チームメンバーの役割更新に失敗しました");
-    }
-  } catch (error) {
-    console.error("チームメンバー役割更新エラー:", error);
-    alert("チームメンバー役割更新中にエラーが発生しました");
-  }
-};
-
-const handleRemoveTeamMember = async (userId: number, taskId: number) => {
-  if (!confirm("このチームメンバーを削除しますか？")) return;
-  
-  try {
-    const success = await removeTeamMember(userId, taskId);
-    if (success) {
-      await loadMembers();
-      await tmLoadProjectTeams();
-      alert("チームメンバーが正常に削除されました");
-    } else {
-      alert("チームメンバーの削除に失敗しました");
-    }
-  } catch (error) {
-    console.error("チームメンバー削除エラー:", error);
-    alert("チームメンバー削除中にエラーが発生しました");
-  }
-};
+// TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
+// const handleUpdateMemberRole = async (userId: number, taskId: number, newRole: TeamRole) => {
+//   try {
+//     const updatedMember = await updateTeamMemberRole(userId, taskId, { role: newRole });
+//     if (updatedMember) {
+//       await loadMembers();
+//       await tmLoadProjectTeams();
+//       alert("チームメンバーの役割が正常に更新されました");
+//     } else {
+//       alert("チームメンバーの役割更新に失敗しました");
+//     }
+//   } catch (error) {
+//     console.error("チームメンバー役割更新エラー:", error);
+//     alert("チームメンバー役割更新中にエラーが発生しました");
+//   }
+// };
+//
+// const handleRemoveTeamMember = async (userId: number, taskId: number) => {
+//   if (!confirm("このチームメンバーを削除しますか？")) return;
+//   
+//   try {
+//     const success = await removeTeamMember(userId, taskId);
+//     if (success) {
+//       await loadMembers();
+//       await tmLoadProjectTeams();
+//       alert("チームメンバーが正常に削除されました");
+//     } else {
+//       alert("チームメンバーの削除に失敗しました");
+//     }
+//   } catch (error) {
+//     console.error("チームメンバー削除エラー:", error);
+//     alert("チームメンバー削除中にエラーが発生しました");
+//   }
+// };
 
 // 通知管理
 const handleCreateNotification = async () => {
@@ -766,6 +824,28 @@ const handleEditAlertRule = (alertRule: AlertRule) => {
 // ユーザープロフィール管理
 const handleViewUserProfile = async (user: User) => {
   selectedUserProfile.value = user;
+  userModalMode.value = "view";
+  userForm.value = {
+    // 基本情報
+    email: user.email,
+    display_name: user.display_name,
+    password_hash: "",
+    is_active: user.is_active || true,
+    // プロフィール情報
+    first_name: user.first_name || "",
+    last_name: user.last_name || "",
+    phone: user.phone || "",
+    department: user.department || "",
+    position: user.position || "",
+    avatar_url: user.avatar_url || "",
+    bio: user.bio || "",
+    timezone: user.timezone || "Asia/Tokyo",
+    language: user.language || "ja",
+    work_hours_start: user.work_hours_start || "09:00",
+    work_hours_end: user.work_hours_end || "18:00",
+    skills: user.skills || [],
+    tags: user.tags || []
+  };
   showUserProfileModal.value = true;
   
   // プロフィール統計と活動履歴を読み込み
@@ -773,24 +853,6 @@ const handleViewUserProfile = async (user: User) => {
     loadUserProfileStats(user.id),
     loadUserActivityLogs(user.id)
   ]);
-};
-
-const handleUpdateUserProfile = async () => {
-  if (!selectedUserProfile.value) return;
-  
-  try {
-    const updatedUser = await updateUserProfile(selectedUserProfile.value.id, userProfileForm.value);
-    if (updatedUser) {
-      await loadUsers();
-      await loadUserProfileStats(selectedUserProfile.value.id);
-      alert("プロフィールが正常に更新されました");
-    } else {
-      alert("プロフィールの更新に失敗しました");
-    }
-  } catch (error) {
-    console.error("プロフィール更新エラー:", error);
-    alert("プロフィール更新中にエラーが発生しました");
-  }
 };
 
 const handleAvatarUpload = async (event: Event) => {
@@ -801,7 +863,7 @@ const handleAvatarUpload = async (event: Event) => {
   try {
     const avatarUrl = await uploadUserAvatar(selectedUserProfile.value.id, file);
     if (avatarUrl) {
-      userProfileForm.value.avatar_url = avatarUrl;
+      userForm.value.avatar_url = avatarUrl;
       alert("アバターが正常にアップロードされました");
     } else {
       alert("アバターのアップロードに失敗しました");
@@ -834,106 +896,13 @@ const loadUserActivityLogs = async (userId: number) => {
   }
 };
 
-// 高級検索・フィルタリング管理
-const handleAdvancedSearch = async () => {
-  try {
-    // 高級検索を実行
-    const results = await searchUsers(searchQuery.value, {
-      department: advancedSearch.value.department || undefined,
-      position: advancedSearch.value.position || undefined,
-      skills: advancedSearch.value.skills.length > 0 ? advancedSearch.value.skills : undefined,
-      is_active: statusFilter.value === "active" ? true : statusFilter.value === "inactive" ? false : undefined
-    });
-    
-    // 検索結果を適用（実際の実装では、検索結果を状態に反映）
-    console.log("高級検索結果:", results);
-    
-    // 検索履歴はDBに保存（将来実装予定）
-    // 現在はローカル配列を使用
-    if (searchQuery.value.trim() && !searchHistory.value.includes(searchQuery.value)) {
-      searchHistory.value.unshift(searchQuery.value);
-      if (searchHistory.value.length > 10) {
-        searchHistory.value = searchHistory.value.slice(0, 10);
-      }
-    }
-    
-    showAdvancedSearch.value = false;
-  } catch (error) {
-    console.error("高級検索エラー:", error);
-    alert("検索中にエラーが発生しました");
-  }
+// 通知ステータス表示のヘルパー関数
+const getNotificationStatusColor = (status: string) => {
+  return NOTIFICATION_STATUS_COLORS[status as keyof typeof NOTIFICATION_STATUS_COLORS] || "bg-gradient-secondary";
 };
 
-const handleSaveSearch = () => {
-  const searchName = prompt("検索条件の名前を入力してください:");
-  if (!searchName) return;
-  
-  const searchId = `search_${Date.now()}`;
-  const newSearch = {
-    id: searchId,
-    name: searchName,
-    filters: {
-      searchQuery: searchQuery.value,
-      statusFilter: statusFilter.value,
-      roleFilter: roleFilter.value,
-      notificationStatusFilter: notificationStatusFilter.value,
-      advancedSearch: { ...advancedSearch.value }
-    },
-    createdAt: new Date().toISOString()
-  };
-  
-  // 保存された検索条件はDBに保存（将来実装予定）
-  // 現在はローカル配列を使用
-  savedSearches.value.unshift(newSearch);
-  if (savedSearches.value.length > 20) {
-    savedSearches.value = savedSearches.value.slice(0, 20);
-  }
-  
-  alert("検索条件が保存されました");
-};
-
-const handleLoadSavedSearch = (savedSearch: any) => {
-  const filters = savedSearch.filters;
-  searchQuery.value = filters.searchQuery || "";
-  statusFilter.value = filters.statusFilter || "all";
-  roleFilter.value = filters.roleFilter || "all";
-  notificationStatusFilter.value = filters.notificationStatusFilter || "all";
-  advancedSearch.value = { ...filters.advancedSearch };
-  
-  showSavedSearches.value = false;
-  alert(`検索条件「${savedSearch.name}」を読み込みました`);
-};
-
-const handleDeleteSavedSearch = (searchId: string) => {
-  if (confirm("この検索条件を削除しますか？")) {
-    savedSearches.value = savedSearches.value.filter(s => s.id !== searchId);
-    alert("検索条件が削除されました");
-  }
-};
-
-const handleClearAdvancedSearch = () => {
-  advancedSearch.value = {
-    department: "",
-    position: "",
-    skills: [],
-    dateFrom: "",
-    dateTo: "",
-    taskStatus: "all",
-    projectId: 0
-  };
-};
-
-const handleSearchFromHistory = (query: string) => {
-  searchQuery.value = query;
-  showSavedSearches.value = false;
-};
-
-const handleSkillsInput = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  const skillsText = target.value.trim();
-  if (skillsText) {
-    advancedSearch.value.skills = skillsText.split(',').map(skill => skill.trim()).filter(Boolean);
-  }
+const getNotificationStatusLabel = (status: string) => {
+  return NOTIFICATION_STATUS_LABELS[status as keyof typeof NOTIFICATION_STATUS_LABELS] || status;
 };
 
 // 一括操作管理
@@ -964,16 +933,17 @@ const handleSelectTeamMember = (memberKey: string, checked: boolean) => {
   updateBulkActionsVisibility();
 };
 
-const handleSelectAllTeamMembers = (checked: boolean) => {
-  if (checked) {
-    filteredTeamMembers.value.forEach(member => 
-      selectedTeamMembers.value.add(`${member.user_id}-${member.task_id}`)
-    );
-  } else {
-    selectedTeamMembers.value.clear();
-  }
-  updateBulkActionsVisibility();
-};
+// TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
+// const handleSelectAllTeamMembers = (checked: boolean) => {
+//   if (checked) {
+//     filteredTeamMembers.value.forEach(member => 
+//       selectedTeamMembers.value.add(`${member.user_id}-${member.task_id}`)
+//     );
+//   } else {
+//     selectedTeamMembers.value.clear();
+//   }
+//   updateBulkActionsVisibility();
+// };
 
 const handleSelectNotification = (notificationId: number, checked: boolean) => {
   if (checked) {
@@ -1031,8 +1001,8 @@ const handleBulkDeleteUsers = async () => {
     
     for (const userId of selectedUsers.value) {
       // TODO: deleteUser 関数を実装してDBから削除
-      // 現在は仮実装としてログ出力のみ
-      console.log(`ユーザー削除: ${userId}`);
+      // 現在は機能無効化（DB削除は未実装）
+      console.log(`ユーザー削除（仮実装）: ${userId}`);
       successCount++;
     }
     
@@ -1193,35 +1163,54 @@ const clearAllSelections = () => {
 
 // モーダル管理
 const openUserModal = () => {
-  editingUser.value = null;
+  selectedUserProfile.value = null;
+  userModalMode.value = "create";
   userForm.value = {
+    // 基本情報
     email: "",
     display_name: "",
     password_hash: "",
-    is_active: true
+    is_active: true,
+    // プロフィール情報
+    first_name: "",
+    last_name: "",
+    phone: "",
+    department: "",
+    position: "",
+    avatar_url: "",
+    bio: "",
+    timezone: "Asia/Tokyo",
+    language: "ja",
+    work_hours_start: "09:00",
+    work_hours_end: "18:00",
+    skills: [],
+    tags: []
   };
-  showUserModal.value = true;
+  showUserProfileModal.value = true;
 };
 
-const closeUserModal = () => {
-  showUserModal.value = false;
-  editingUser.value = null;
+const closeUserProfileModal = () => {
+  showUserProfileModal.value = false;
+  selectedUserProfile.value = null;
+  userProfileStats.value = null;
+  userActivityLogs.value = [];
 };
 
-const openMemberModal = () => {
-  editingMember.value = null;
-  memberForm.value = {
-    user_id: 0,
-    task_id: 0,
-    role: "CONTRIBUTOR"
-  };
-  showMemberModal.value = true;
-};
-
-const closeMemberModal = () => {
-  showMemberModal.value = false;
-  editingMember.value = null;
-};
+// TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
+// const openMemberModal = () => {
+//   editingMember.value = null;
+//   memberForm.value = {
+//     user_id: 0,
+//     task_id: 0,
+//     role: "CONTRIBUTOR"
+//   };
+//   showMemberModal.value = true;
+// };
+//
+// const closeMemberModal = () => {
+//   showMemberModal.value = false;
+//   editingMember.value = null;
+// };
 
 const openNotificationModal = () => {
   editingNotification.value = null;
@@ -1296,7 +1285,7 @@ const onSaveNotification = async (f: { subject: string; to_email: string; body_t
 const openAlertRuleModal = () => {
   editingAlertRule.value = null;
   alertRuleForm.value = {
-    project_id: 0,
+    project_id: null,
     name: "",
     rule_type: "DUE_SOON",
     params_json: {},
@@ -1312,21 +1301,30 @@ const closeAlertRuleModal = () => {
 };
 
 // アラートルールモーダル保存処理（作成/更新の分岐）
-const onSaveAlertRule = async (f: { name: string; channel: string; enabled: boolean }) => {
+const onSaveAlertRule = async (f: {
+  project_id: number | null;
+  name: string;
+  rule_type: AlertRuleType;
+  notify_email: string;
+  is_enabled: boolean;
+  params_json: Record<string, any>;
+}) => {
   try {
-    // フォームデータを更新
-    alertRuleForm.value.name = f.name;
-    alertRuleForm.value.rule_type = f.channel as any;
-    alertRuleForm.value.is_enabled = f.enabled;
-    
+    // project_id が null の場合はエラー
+    if (!f.project_id) {
+      alert("プロジェクトを選択してください");
+      return;
+    }
+
     if (editingAlertRule.value) {
       // 編集モード：更新処理
       const updatePayload = {
+        project_id: f.project_id,
         name: f.name,
-        rule_type: f.channel as any,
-        is_enabled: f.enabled,
-        notify_email: alertRuleForm.value.notify_email,
-        params_json: alertRuleForm.value.params_json,
+        rule_type: f.rule_type,
+        is_enabled: f.is_enabled,
+        notify_email: f.notify_email,
+        params_json: f.params_json,
       };
       
       const success = await updateAlertRuleAction(editingAlertRule.value.id, updatePayload);
@@ -1341,7 +1339,24 @@ const onSaveAlertRule = async (f: { name: string; channel: string; enabled: bool
       }
     } else {
       // 作成モード：新規作成処理
-      await handleCreateAlertRule();
+      const createPayload = {
+        project_id: f.project_id,
+        name: f.name,
+        rule_type: f.rule_type,
+        is_enabled: f.is_enabled,
+        notify_email: f.notify_email,
+        params_json: f.params_json,
+      };
+      
+      const success = await createAlertRuleAction(createPayload);
+      
+      if (success) {
+        await loadAlertRules();
+        closeAlertRuleModal();
+        alert("アラートルールが正常に作成されました");
+      } else {
+        alert("アラートルールの作成に失敗しました。もう一度お試しください。");
+      }
     }
   } catch (error) {
     console.error("アラートルール保存エラー:", error);
@@ -1349,50 +1364,33 @@ const onSaveAlertRule = async (f: { name: string; channel: string; enabled: bool
   }
 };
 
-const openUserProfileModal = (user: User) => {
-  selectedUserProfile.value = user;
-  userProfileForm.value = {
-    first_name: user.first_name || "",
-    last_name: user.last_name || "",
-    phone: user.phone || "",
-    department: user.department || "",
-    position: user.position || "",
-    avatar_url: user.avatar_url || "",
-    bio: user.bio || "",
-    timezone: user.timezone || "Asia/Tokyo",
-    language: user.language || "ja",
-    work_hours_start: user.work_hours_start || "09:00",
-    work_hours_end: user.work_hours_end || "18:00",
-    skills: user.skills || [],
-    tags: user.tags || []
-  };
-  showUserProfileModal.value = true;
+
+// フィルタリセット（セクション別）
+const clearUserFilters = () => {
+  userSearchQuery.value = "";
+  userStatusFilter.value = "all";
 };
 
-const closeUserProfileModal = () => {
-  showUserProfileModal.value = false;
-  selectedUserProfile.value = null;
-  userProfileStats.value = null;
-  userActivityLogs.value = [];
+const clearNotificationFilters = () => {
+  notificationSearchQuery.value = "";
+  notificationStatusFilter.value = "all";
 };
 
-// フィルタリセット
+const clearAlertRuleFilters = () => {
+  alertRuleSearchQuery.value = "";
+};
+
+const clearActivityFilters = () => {
+  activitySearchQuery.value = "";
+};
+
+// TeamFilterPanel用（後方互換性）
 const clearFilters = () => {
   searchQuery.value = "";
   statusFilter.value = "all";
   roleFilter.value = "all";
-  notificationStatusFilter.value = "all";
-  handleClearAdvancedSearch();
 };
 
-// フィルター更新ハンドラー
-const handleFilterUpdate = (key: string, value: any) => {
-  if (key === 'status') {
-    statusFilter.value = value;
-  } else if (key === 'role') {
-    roleFilter.value = value;
-  }
-};
 
 // 相対時間表示
 const getRelativeTime = (timestamp: string): string => {
@@ -1420,80 +1418,70 @@ const getHeaderActions = () => {
       variant: 'primary',
       onClick: () => {
         // ユーザー作成モーダルを開く
-        showUserModal.value = true;
-      }
-    },
-    {
-      label: 'チームメンバー追加',
-      icon: 'group_add',
-      variant: 'outline-primary',
-      onClick: () => {
-        // チームメンバー追加モーダルを開く
-        showMemberModal.value = true;
+        openUserModal();
       }
     }
+    // TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
+    // {
+    //   label: 'チームメンバー追加',
+    //   icon: 'group_add',
+    //   variant: 'outline-primary',
+    //   onClick: () => {
+    //     // チームメンバー追加モーダルを開く
+    //     showMemberModal.value = true;
+    //   }
+    // }
   ];
 };
 
-// 統計カードデータを生成する関数
-const getStatCardsData = () => {
-  return [
-    {
-      label: '総ユーザー数',
-      value: teamStats.value.total_users,
-      icon: 'group',
-      color: 'primary' as const,
-      footer: `${teamStats.value.active_users} アクティブ`
-    },
-    {
-      label: 'プロジェクト数',
-      value: teamStats.value.total_projects,
-      icon: 'work',
-      color: 'success' as const,
-      footer: `${teamStats.value.total_tasks} タスク`
-    },
-    {
-      label: '平均タスク数',
-      value: teamStats.value.average_tasks_per_user,
-      icon: 'analytics',
-      color: 'info' as const,
-      footer: 'ユーザーあたり'
-    },
-    {
-      label: 'アクティブ率',
-      value: `${teamStats.value.total_users > 0 ? Math.round((teamStats.value.active_users / teamStats.value.total_users) * 100) : 0}%`,
-      icon: 'trending_up',
-      color: 'warning' as const,
-      footer: 'ユーザー利用率'
-    }
-  ];
-};
+// TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に実装）
+// const teamMemberColumns = computed(() => [
+//   {
+//     key: "display_name",
+//     label: "ユーザー",
+//     sortable: true,
+//     width: "40%"
+//   },
+//   {
+//     key: "role",
+//     label: "役割",
+//     sortable: true,
+//     filterable: true,
+//     width: "30%"
+//   },
+//   {
+//     key: "joined_at",
+//     label: "参加日時",
+//     sortable: true,
+//     width: "20%",
+//     formatter: (value: string) => {
+//       if (!value) return "-";
+//       return new Date(value).toLocaleDateString("ja-JP", {
+//         year: "numeric",
+//         month: "2-digit",
+//         day: "2-digit"
+//       });
+//     }
+//   },
+//   {
+//     key: "actions",
+//     label: "操作",
+//     sortable: false,
+//     width: "10%"
+//   }
+// ]);
 
-// ユーザーの重要度を取得（ログイン回数や最終ログイン日時を基に判定）
-const getUserPriority = (user: User): "LOW" | "MEDIUM" | "HIGH" | "URGENT" => {
-  // ログイン回数が多く、最近ログインしているユーザーを高優先度とする
-  const loginCount = user.login_count || 0;
-  const lastLogin = user.last_login_at ? new Date(user.last_login_at) : null;
-  const now = new Date();
-  
-  if (loginCount > 50 && lastLogin && (now.getTime() - lastLogin.getTime()) < 7 * 24 * 60 * 60 * 1000) {
-    return "URGENT"; // アクティブユーザー
-  } else if (loginCount > 20 && lastLogin && (now.getTime() - lastLogin.getTime()) < 30 * 24 * 60 * 60 * 1000) {
-    return "HIGH"; // 定期的なユーザー
-  } else if (loginCount > 5) {
-    return "MEDIUM"; // 時々使用するユーザー
-  } else {
-    return "LOW"; // 新規または非アクティブユーザー
-  }
-};
+
 
 // 初期化
 onMounted(async () => {
   console.log("チーム管理ページが初期化されました");
   await Promise.all([
     loadUsers(),
-    loadMembers(),
-    tmLoadProjectTeams(),
+    // TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
+    // loadMembers(),
+    // TODO: プロジェクト別チーム情報機能（project_members テーブル作成後に有効化）
+    // tmLoadProjectTeams(),
     loadTeamStats(),
     loadUserActivities(),
     loadNotifications(),
@@ -1524,660 +1512,106 @@ const {
     />
 
     <!-- 統計カード -->
-    <StatCards :items="getStatCardsData()" />
+    <TeamStatsCards 
+      :team-stats="teamStats"
+      :notification-stats="notificationStats"
+      :alert-rules="alertRules"
+    />
 
-    <!-- 通知統計カード -->
-    <div class="row mb-4">
-      <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-        <div class="card">
-          <div class="card-header p-2 ps-3">
-            <div class="d-flex justify-content-between">
-              <div>
-                <p class="text-sm mb-0 text-capitalize">総通知数</p>
-                <h4 class="mb-0">{{ notificationStats.total_notifications }}</h4>
-              </div>
-              <div class="icon icon-md icon-shape bg-gradient-info shadow-dark shadow text-center border-radius-lg">
-                <i class="material-symbols-rounded opacity-10">notifications</i>
-              </div>
-            </div>
-          </div>
-          <hr class="dark horizontal my-0">
-          <div class="card-footer p-2 ps-3">
-            <p class="mb-0 text-sm">
-              <span class="text-warning font-weight-bolder">{{ notificationStats.queued_notifications }}</span> 送信待ち
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-        <div class="card">
-          <div class="card-header p-2 ps-3">
-            <div class="d-flex justify-content-between">
-              <div>
-                <p class="text-sm mb-0 text-capitalize">送信済み</p>
-                <h4 class="mb-0">{{ notificationStats.sent_notifications }}</h4>
-              </div>
-              <div class="icon icon-md icon-shape bg-gradient-success shadow-dark shadow text-center border-radius-lg">
-                <i class="material-symbols-rounded opacity-10">check_circle</i>
-              </div>
-            </div>
-          </div>
-          <hr class="dark horizontal my-0">
-          <div class="card-footer p-2 ps-3">
-            <p class="mb-0 text-sm">
-              <span class="text-danger font-weight-bolder">{{ notificationStats.failed_notifications }}</span> 失敗
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
-        <div class="card">
-          <div class="card-header p-2 ps-3">
-            <div class="d-flex justify-content-between">
-              <div>
-                <p class="text-sm mb-0 text-capitalize">成功率</p>
-                <h4 class="mb-0">{{ notificationStats.success_rate }}%</h4>
-              </div>
-              <div class="icon icon-md icon-shape bg-gradient-primary shadow-dark shadow text-center border-radius-lg">
-                <i class="material-symbols-rounded opacity-10">analytics</i>
-              </div>
-            </div>
-          </div>
-          <hr class="dark horizontal my-0">
-          <div class="card-footer p-2 ps-3">
-            <p class="mb-0 text-sm">
-              <span class="text-info font-weight-bolder">通知配信効率</span>
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-xl-3 col-sm-6">
-        <div class="card">
-          <div class="card-header p-2 ps-3">
-            <div class="d-flex justify-content-between">
-              <div>
-                <p class="text-sm mb-0 text-capitalize">アラートルール</p>
-                <h4 class="mb-0">{{ alertRules.length }}</h4>
-              </div>
-              <div class="icon icon-md icon-shape bg-gradient-warning shadow-dark shadow text-center border-radius-lg">
-                <i class="material-symbols-rounded opacity-10">rule</i>
-              </div>
-            </div>
-          </div>
-          <hr class="dark horizontal my-0">
-          <div class="card-footer p-2 ps-3">
-            <p class="mb-0 text-sm">
-              <span class="text-success font-weight-bolder">アクティブ</span> ルール
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- フィルタリング・アクションパネル -->
-    <div class="row mb-4">
-      <div class="col-lg-8 col-md-12">
-        <div class="card">
-          <CardHeader title="フィルタリング" subtitle="ユーザー検索とフィルタリング">
-            <template #actions>
-              <div class="btn-group" role="group">
-                <button 
-                  class="btn btn-sm btn-outline-primary"
-                  @click="showAdvancedSearch = !showAdvancedSearch"
-                >
-                  <i class="material-symbols-rounded me-1">tune</i>
-                  高級検索
-                </button>
-                <button 
-                  class="btn btn-sm btn-outline-info"
-                  @click="showSavedSearches = !showSavedSearches"
-                >
-                  <i class="material-symbols-rounded me-1">bookmark</i>
-                  保存済み
-                </button>
-                <button 
-                  class="btn btn-sm btn-outline-success"
-                  @click="handleSaveSearch"
-                >
-                  <i class="material-symbols-rounded me-1">save</i>
-                  保存
-                </button>
-              </div>
-            </template>
-          </CardHeader>
-          <div class="card-body">
-            <!-- 基本検索 -->
-            <ActionBar
-              :search-query="searchQuery"
-              :search-placeholder="'ユーザー名、メール、部署、役職...'"
-              @update:search-query="searchQuery = $event"
-              :filters="[
-                {
-                  key: 'status',
-                  label: 'ステータス',
-                  type: 'select',
-                  value: statusFilter,
-                  options: [
-                    { value: 'all', label: 'すべて' },
-                    { value: 'active', label: 'アクティブ' },
-                    { value: 'inactive', label: '非アクティブ' }
-                  ]
-                },
-                {
-                  key: 'role',
-                  label: '役割',
-                  type: 'select',
-                  value: roleFilter,
-                  options: [
-                    { value: 'all', label: 'すべて' },
-                    { value: 'OWNER', label: 'オーナー' },
-                    { value: 'CONTRIBUTOR', label: '貢献者' },
-                    { value: 'REVIEWER', label: 'レビューアー' }
-                  ]
-                }
-              ]"
-              @update:filter="handleFilterUpdate"
-              :actions="[
-                {
-                  label: 'リセット',
-                  icon: 'refresh',
-                  variant: 'outline-secondary',
-                  onClick: clearFilters
-                }
-              ]"
-            />
-
-            <!-- 高級検索パネル -->
-            <div v-if="showAdvancedSearch" class="advanced-search-panel mt-3 p-3 border rounded">
-              <h6 class="mb-3">高級検索オプション</h6>
-              <div class="row">
-                <div class="col-md-4 mb-3">
-                  <label class="form-label text-sm">部署</label>
-                  <input 
-                    type="text" 
-                    class="form-control" 
-                    placeholder="部署名で検索"
-                    v-model="advancedSearch.department"
-                  >
-                </div>
-                <div class="col-md-4 mb-3">
-                  <label class="form-label text-sm">役職</label>
-                  <input 
-                    type="text" 
-                    class="form-control" 
-                    placeholder="役職で検索"
-                    v-model="advancedSearch.position"
-                  >
-                </div>
-                <div class="col-md-4 mb-3">
-                  <label class="form-label text-sm">スキル</label>
-                  <input 
-                    type="text" 
-                    class="form-control" 
-                    placeholder="スキルで検索（カンマ区切り）"
-                    @blur="handleSkillsInput"
-                    ref="skillsInput"
-                  >
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label text-sm">登録日（開始）</label>
-                  <input 
-                    type="date" 
-                    class="form-control" 
-                    v-model="advancedSearch.dateFrom"
-                  >
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label text-sm">登録日（終了）</label>
-                  <input 
-                    type="date" 
-                    class="form-control" 
-                    v-model="advancedSearch.dateTo"
-                  >
-                </div>
-              </div>
-              <div class="d-flex justify-content-end">
-                <button 
-                  class="btn btn-sm btn-primary me-2"
-                  @click="handleAdvancedSearch"
-                >
-                  検索実行
-                </button>
-                <button 
-                  class="btn btn-sm btn-outline-secondary"
-                  @click="handleClearAdvancedSearch"
-                >
-                  クリア
-                </button>
-              </div>
-            </div>
-
-            <!-- 保存済み検索パネル -->
-            <div v-if="showSavedSearches" class="saved-searches-panel mt-3 p-3 border rounded">
-              <h6 class="mb-3">保存済み検索条件</h6>
-              <div v-if="savedSearches.length > 0" class="row">
-                <div 
-                  v-for="search in savedSearches" 
-                  :key="search.id"
-                  class="col-md-6 mb-2"
-                >
-                  <div class="card">
-                    <div class="card-body p-2">
-                      <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                          <h6 class="mb-0 text-sm">{{ search.name }}</h6>
-                          <small class="text-muted">{{ new Date(search.createdAt).toLocaleDateString('ja-JP') }}</small>
-                        </div>
-                        <div class="btn-group btn-group-sm">
-                          <button 
-                            class="btn btn-outline-primary"
-                            @click="handleLoadSavedSearch(search)"
-                          >
-                            読み込み
-                          </button>
-                          <button 
-                            class="btn btn-outline-danger"
-                            @click="handleDeleteSavedSearch(search.id)"
-                          >
-                            削除
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="text-center text-muted py-3">
-                保存済みの検索条件がありません
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-lg-4 col-md-12">
-        <div class="card">
-          <CardHeader title="クイックアクション" subtitle="よく使用する操作" />
-          <div class="card-body">
-            <div class="row">
-              <div class="col-6 mb-3">
-                <button 
-                  class="btn btn-sm bg-gradient-primary mb-0 w-100"
-                  @click="openUserModal"
-                >
-                  <i class="material-symbols-rounded me-1">person_add</i>
-                  ユーザー追加
-                </button>
-              </div>
-              <div class="col-6 mb-3">
-                <button 
-                  class="btn btn-sm bg-gradient-success mb-0 w-100"
-                  @click="openMemberModal"
-                >
-                  <i class="material-symbols-rounded me-1">group_add</i>
-                  メンバー追加
-                </button>
-              </div>
-              <div class="col-6 mb-3">
-                <button 
-                  class="btn btn-sm bg-gradient-info mb-0 w-100"
-                  @click="openNotificationModal"
-                >
-                  <i class="material-symbols-rounded me-1">notifications</i>
-                  通知作成
-                </button>
-              </div>
-              <div class="col-6 mb-3">
-                <button 
-                  class="btn btn-sm bg-gradient-warning mb-0 w-100"
-                  @click="openAlertRuleModal"
-                >
-                  <i class="material-symbols-rounded me-1">rule</i>
-                  ルール作成
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- フィルタリング・アクションパネル（ユーザー管理専用） -->
+    <TeamFilterPanel
+      v-model:search-query="userSearchQuery"
+      v-model:status-filter="userStatusFilter"
+      v-model:role-filter="roleFilter"
+      @clear-filters="clearUserFilters"
+    />
 
     <!-- ユーザー一覧 -->
-    <div class="row mb-4">
-      <div class="col-12">
-        <div class="card">
-          <div class="card-header pb-0">
-            <div class="row">
-              <div class="col-lg-6 col-8">
-                <h6>ユーザー一覧</h6>
-                <p class="text-sm mb-0">
-                  <i class="fa fa-users text-info" aria-hidden="true"></i>
-                  <span class="font-weight-bold ms-1">システムユーザー</span>の管理
-                  <span class="badge bg-gradient-info ms-2">{{ filteredUsers.length }}名</span>
-                </p>
-              </div>
-            </div>
-          </div>
-          <div class="card-body px-0 pt-0 pb-2">
-            <!-- テーブルコントロール -->
-            <div class="p-3">
-              <TableControls
-                :search="searchQuery"
-                :searchable="true"
-                search-placeholder="ユーザー名、メールアドレスで検索..."
-                @update:search="(v: string) => searchQuery = v"
-                @reset="() => searchQuery = ''"
-              />
-            </div>
-            
-            <!-- ローディング状態 -->
-            <div v-if="isUsersLoading" class="text-center py-4">
-              <LoadingSpinner message="ユーザーデータを読み込み中..." />
-            </div>
-            
-            <!-- エラー表示 -->
-            <div v-else-if="usersErrorMessage" class="alert alert-danger mx-3" role="alert">
-              {{ usersErrorMessage }}
-            </div>
-            
-            <!-- ユーザー一覧テーブル -->
-            <div v-else-if="filteredUsers.length > 0" class="table-responsive p-0">
-              <table class="table align-items-center mb-0">
-                <thead>
-                  <tr>
-                    <th class="text-center">
-                      <input 
-                        type="checkbox" 
-                        class="form-check-input"
-                        @change="handleSelectAllUsers(($event.target as HTMLInputElement).checked)"
-                        :checked="selectedUsers.size === filteredUsers.length && filteredUsers.length > 0"
-                        :indeterminate="selectedUsers.size > 0 && selectedUsers.size < filteredUsers.length"
-                      >
-                    </th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">ユーザー</th>
-                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">メールアドレス</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">ステータス</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">重要度</th>
-                    <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">登録日</th>
-                    <th class="text-secondary opacity-7"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="user in filteredUsers" :key="user.id">
-                    <td class="text-center">
-                      <input 
-                        type="checkbox" 
-                        class="form-check-input"
-                        :checked="selectedUsers.has(user.id)"
-                        @change="handleSelectUser(user.id, ($event.target as HTMLInputElement).checked)"
-                      >
-                    </td>
-                    <td>
-                      <div class="d-flex px-3 py-1">
-                        <div class="d-flex flex-column justify-content-center">
-                          <h6 class="mb-0 text-sm">{{ user.display_name }}</h6>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <p class="text-xs font-weight-bold mb-0">{{ user.email }}</p>
-                    </td>
-                    <td class="align-middle text-center">
-                      <StatusBadge :status="user.is_active ? 'active' : 'inactive'" />
-                    </td>
-                    <td class="align-middle text-center">
-                      <PriorityBadge :priority="getUserPriority(user)" />
-                    </td>
-                    <td class="align-middle text-center">
-                      <span class="text-secondary text-xs font-weight-normal">
-                        {{ new Date(user.created_at).toLocaleDateString('ja-JP') }}
-                      </span>
-                    </td>
-                    <td class="align-middle">
-                      <div class="btn-group" role="group">
-                        <button 
-                          class="btn btn-sm bg-gradient-info mb-0" 
-                          @click="handleViewUserProfile(user)"
-                        >
-                          プロフィール
-                        </button>
-                        <button 
-                          class="btn btn-sm bg-gradient-primary mb-0" 
-                          @click="handleEditUser(user)"
-                        >
-                          編集
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            
-            <!-- ユーザーが存在しない場合 -->
-            <div v-else class="p-3">
-              <EmptyState 
-                icon="person_off" 
-                title="ユーザーが見つかりません" 
-                subtitle="検索条件を変更するか、新しいユーザーを作成してください"
-              >
-                <template #actions>
-                  <button class="btn bg-gradient-primary" @click="showUserModal = true">
-                    <i class="material-symbols-rounded me-1">add</i>
-                    新しいユーザーを作成
-                  </button>
-                </template>
-              </EmptyState>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <UserManagementTable
+      :users="users"
+      :filtered-users="filteredUsers"
+      :selected-users="selectedUsers"
+      :is-loading="isUsersLoading"
+      :error-message="usersErrorMessage"
+      @select-user="handleSelectUser"
+      @select-all-users="handleSelectAllUsers"
+      @view-profile="handleViewUserProfile"
+      @edit-user="handleEditUser"
+      @create-user="openUserModal"
+      @bulk-activate-users="handleBulkActivateUsers"
+      @bulk-deactivate-users="handleBulkDeactivateUsers"
+      @bulk-delete-users="handleBulkDeleteUsers"
+      @clear-selections="clearAllSelections"
+    />
 
-    <!-- 一括操作パネル -->
-    <div v-if="showBulkActions" class="row mb-4">
-      <div class="col-12">
-        <div class="card border-primary">
-          <div class="card-header bg-gradient-primary text-white">
-            <div class="d-flex justify-content-between align-items-center">
-              <h6 class="mb-0">
-                <i class="material-symbols-rounded me-2">select_all</i>
-                一括操作
-              </h6>
-              <button 
-                class="btn btn-sm btn-outline-light"
-                @click="clearAllSelections"
-              >
-                <i class="material-symbols-rounded me-1">clear</i>
-                選択解除
-              </button>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="row">
-              <!-- ユーザー一括操作 -->
-              <div v-if="selectedUsers.size > 0" class="col-md-4 mb-3">
-                <h6 class="text-primary mb-2">
-                  <i class="material-symbols-rounded me-1">person</i>
-                  ユーザー ({{ selectedUsers.size }}名選択中)
-                </h6>
-                <div class="btn-group w-100" role="group">
-                  <button 
-                    class="btn btn-sm btn-success"
-                    @click="handleBulkActivateUsers"
-                  >
-                    <i class="material-symbols-rounded me-1">check_circle</i>
-                    アクティブ化
-                  </button>
-                  <button 
-                    class="btn btn-sm btn-warning"
-                    @click="handleBulkDeactivateUsers"
-                  >
-                    <i class="material-symbols-rounded me-1">pause_circle</i>
-                    非アクティブ化
-                  </button>
-                  <button 
-                    class="btn btn-sm btn-danger"
-                    @click="handleBulkDeleteUsers"
-                  >
-                    <i class="material-symbols-rounded me-1">delete</i>
-                    削除
-                  </button>
-                </div>
-              </div>
+    <!-- 一括操作パネル: UserManagementTable コンポーネントに統合されました -->
 
-              <!-- 通知一括操作 -->
-              <div v-if="selectedNotifications.size > 0" class="col-md-4 mb-3">
-                <h6 class="text-info mb-2">
-                  <i class="material-symbols-rounded me-1">notifications</i>
-                  通知 ({{ selectedNotifications.size }}件選択中)
-                </h6>
-                <div class="btn-group w-100" role="group">
-                  <button 
-                    class="btn btn-sm btn-warning"
-                    @click="handleBulkResendNotifications"
-                  >
-                    <i class="material-symbols-rounded me-1">refresh</i>
-                    再送信
-                  </button>
-                  <button 
-                    class="btn btn-sm btn-danger"
-                    @click="handleBulkDeleteNotifications"
-                  >
-                    <i class="material-symbols-rounded me-1">delete</i>
-                    削除
-                  </button>
-                </div>
-              </div>
+    <!-- TODO: プロジェクトメンバー管理機能
+         現在のスキーマでは実装不可
+         理由: task_members テーブルはタスク単位のメンバー管理のみサポート
+         必要な対応:
+         1. project_members テーブルを新規作成
+            CREATE TABLE project_members (
+              project_id BIGINT NOT NULL REFERENCES projects(id),
+              user_id BIGINT NOT NULL REFERENCES users(id),
+              role TEXT NOT NULL,  -- 'OWNER', 'CONTRIBUTOR', 'REVIEWER'
+              joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              PRIMARY KEY (project_id, user_id)
+            );
+         2. projectService に project_members 関連サービス追加
+         3. composable (useTeamMembersManagement) 実装
+         4. UI コンポーネント実装
+    -->
 
-              <!-- アラートルール一括操作 -->
-              <div v-if="selectedAlertRules.size > 0" class="col-md-4 mb-3">
-                <h6 class="text-warning mb-2">
-                  <i class="material-symbols-rounded me-1">rule</i>
-                  アラートルール ({{ selectedAlertRules.size }}件選択中)
-                </h6>
-                <div class="btn-group w-100" role="group">
-                  <button 
-                    class="btn btn-sm btn-danger"
-                    @click="handleBulkDeleteAlertRules"
-                  >
-                    <i class="material-symbols-rounded me-1">delete</i>
-                    削除
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- チームメンバー一覧 -->
-    <div class="row mb-4">
-      <div class="col-12">
-        <TeamMemberTable 
-          :rows="teamMemberRows as any"
-          :loading="isTeamMembersLoading"
-          @changeRole="(id:string, role:string) => changeTeamMemberRoleAction(id, role as any)"
-          @remove="(id:string) => removeTeamMemberAction(id)"
-        />
-      </div>
-    </div>
-
-    <!-- プロジェクト別チーム情報 -->
-    <div class="row mb-4">
-      <div class="col-12">
-        <div class="card">
-          <div class="card-header pb-0">
-            <div class="row">
-              <div class="col-lg-6 col-8">
-                <h6>プロジェクト別チーム情報</h6>
-                <p class="text-sm mb-0">
-                  <i class="fa fa-project-diagram text-info" aria-hidden="true"></i>
-                  <span class="font-weight-bold ms-1">プロジェクト</span>ごとのチーム構成
-                  <span class="badge bg-gradient-info ms-2">{{ projectTeams.length }}プロジェクト</span>
-                </p>
-              </div>
-            </div>
-          </div>
-          <div class="card-body px-0 pt-0 pb-2">
-            <!-- ローディング状態 -->
-            <div v-if="isProjectTeamsLoading" class="text-center py-4">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">読み込み中...</span>
-              </div>
-              <p class="text-sm text-secondary mt-2">プロジェクトチームデータを読み込み中...</p>
-            </div>
-            
-            <!-- エラー表示 -->
-            <div v-else-if="projectTeamsErrorMessage" class="alert alert-danger mx-3" role="alert">
-              {{ projectTeamsErrorMessage }}
-            </div>
-            
-            <!-- プロジェクトチーム一覧 -->
-            <div v-else class="row p-3">
-              <div 
-                v-for="project in projectTeams" 
-                :key="project.project_id"
-                class="col-lg-4 col-md-6 mb-4"
-              >
-                <div class="card h-100">
-                  <div class="card-header pb-0">
-                    <h6 class="mb-0">{{ project.project_name }}</h6>
-                    <p class="text-sm text-secondary mb-0">プロジェクトID: {{ project.project_id }}</p>
-                  </div>
-                  <div class="card-body">
-                    <div class="row">
-                      <div class="col-6">
-                        <p class="text-sm mb-0">総メンバー数</p>
-                        <h5 class="mb-0">{{ project.total_members }}</h5>
-                      </div>
-                      <div class="col-6">
-                        <p class="text-sm mb-0">アクティブ</p>
-                        <h5 class="mb-0 text-success">{{ project.active_members }}</h5>
-                      </div>
-                    </div>
-                    <hr class="dark horizontal my-2">
-                    <div class="d-flex flex-wrap">
-                      <span 
-                        v-for="member in project.members.slice(0, 3)" 
-                        :key="member.user_id"
-                        class="badge bg-gradient-primary me-1 mb-1"
-                      >
-                        {{ member.user?.display_name || '未設定' }}
-                      </span>
-                      <span 
-                        v-if="project.members.length > 3"
-                        class="badge bg-gradient-secondary me-1 mb-1"
-                      >
-                        +{{ project.members.length - 3 }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- TODO: プロジェクト別チーム情報
+         現在の実装は task_members テーブルからの集計のため制限あり
+         問題点:
+         - タスクがないプロジェクトはメンバー0として表示
+         - タスクに割り当てられていないプロジェクトメンバーは表示されない
+         - プロジェクトレベルの権限管理は不可能
+         
+         正しい実装のために必要:
+         1. project_members テーブル作成
+         2. projectService に project_members 専用サービス追加
+         3. composable (useProjectTeamsManagement) を project_members ベースに再実装
+         4. UI コンポーネントを正しいデータソースで再実装
+    -->
 
     <!-- ユーザー活動統計 -->
-    <div class="row">
+    <div class="row mb-4">
       <div class="col-12">
         <div class="card">
-          <div class="card-header pb-0">
-            <div class="row">
+          <div class="card-header pb-3">
+            <div class="row mb-3">
               <div class="col-lg-6 col-8">
                 <h6>ユーザー活動統計</h6>
                 <p class="text-sm mb-0">
                   <i class="fa fa-chart-line text-info" aria-hidden="true"></i>
                   <span class="font-weight-bold ms-1">ユーザー</span>の活動状況
-                  <span class="badge bg-gradient-info ms-2">{{ userActivities.length }}名</span>
+                  <span class="badge bg-gradient-info ms-2">{{ filteredUserActivities.length }}名</span>
                 </p>
+              </div>
+            </div>
+            <!-- 検索バー（活動統計専用） -->
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <div class="input-group input-group-outline">
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    placeholder="ユーザー名で検索..."
+                    v-model="activitySearchQuery"
+                  >
+                </div>
+              </div>
+              <div class="col-md-3 mb-2">
+                <button 
+                  class="btn btn-sm btn-outline-secondary w-100"
+                  @click="clearActivityFilters"
+                >
+                  <i class="fa fa-times me-1"></i>
+                  フィルタクリア
+                </button>
               </div>
             </div>
           </div>
@@ -2204,7 +1638,8 @@ const {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="activity in userActivities" :key="activity.user_id">
+                  <!-- データがある場合 -->
+                  <tr v-for="activity in filteredUserActivities" :key="activity.user_id">
                     <td>
                       <div class="d-flex px-3 py-1">
                         <div class="d-flex flex-column justify-content-center">
@@ -2238,6 +1673,16 @@ const {
                       </span>
                     </td>
                   </tr>
+                  <!-- フィルタ結果がない場合 -->
+                  <tr v-if="filteredUserActivities.length === 0 && !isUserActivitiesLoading">
+                    <td colspan="6" class="text-center py-4">
+                      <div class="text-muted">
+                        <i class="fas fa-search fa-2x mb-3 opacity-6"></i>
+                        <p class="text-sm mb-0">検索条件に一致するユーザー活動がありません</p>
+                        <p class="text-xs text-secondary mb-0">フィルタ条件を変更してみてください</p>
+                      </div>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -2250,8 +1695,8 @@ const {
     <div class="row mb-4">
       <div class="col-12">
         <div class="card">
-          <div class="card-header pb-0">
-            <div class="row">
+          <div class="card-header pb-3">
+            <div class="row mb-3">  
               <div class="col-lg-6 col-8">
                 <h6>通知一覧</h6>
                 <p class="text-sm mb-0">
@@ -2261,35 +1706,111 @@ const {
                 </p>
               </div>
             </div>
+            <!-- 検索・フィルターバー（通知専用） -->
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <div class="input-group input-group-outline">
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    placeholder="通知を検索（件名、送信先、本文）..."
+                    v-model="notificationSearchQuery"
+                  >
+                </div>
+              </div>
+              <div class="col-md-3 mb-2">
+                <select 
+                  class="form-select" 
+                  v-model="notificationStatusFilter"
+                >
+                  <option value="all">すべてのステータス</option>
+                  <option value="QUEUED">送信待ち</option>
+                  <option value="SENT">送信済み</option>
+                  <option value="FAILED">送信失敗</option>
+                  <option value="CANCELLED">キャンセル</option>
+                </select>
+              </div>
+              <div class="col-md-3 mb-2">
+                <button 
+                  class="btn btn-sm btn-outline-secondary w-100"
+                  @click="clearNotificationFilters"
+                >
+                  <i class="fa fa-times me-1"></i>
+                  フィルタクリア
+                </button>
+              </div>
+            </div>
           </div>
           <div class="card-body px-0 pt-0 pb-2">
-            <!-- ローディング状態 -->
-            <div v-if="isNotificationsLoading" class="text-center py-4">
-              <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">読み込み中...</span>
-              </div>
-              <p class="text-sm text-secondary mt-2">通知データを読み込み中...</p>
-            </div>
-            
             <!-- エラー表示 -->
-            <div v-else-if="notificationsErrorMessage" class="alert alert-danger mx-3" role="alert">
+            <div v-if="notificationsErrorMessage" class="alert alert-danger mx-3 mt-3" role="alert">
               {{ notificationsErrorMessage }}
             </div>
             
-            <!-- 通知一覧テーブル（コンポーネント） -->
+            <!-- 通知一覧テーブル（OptimizedDataTable） -->
             <div v-else class="px-3">
-      <NotificationTable 
-        :rows="filteredNotifications" 
-        :loading="isNotificationsLoading" 
-        :selected-ids="Array.from(selectedNotifications)"
-        @select="(id, checked) => handleSelectNotification(id, checked)"
-        @selectAll="(checked) => handleSelectAllNotifications(checked)"
-        @edit="(id) => openEditNotificationModalById(id)"
-        @resend="handleResendNotification" 
-        @delete="handleDeleteNotification" 
-      />
-                        </div>
-                      </div>
+              <OptimizedDataTable 
+                :data="filteredNotifications"
+                :columns="notificationColumns"
+                :loading="isNotificationsLoading"
+                :page-size="10"
+                :searchable="false"
+                :filterable="false"
+                empty-message="通知データがありません"
+              >
+                <!-- 件名セル：件名とプレビューを表示 -->
+                <template #cell-subject="{ item }">
+                  <div class="d-flex flex-column justify-content-center">
+                    <h6 class="mb-0 text-sm">{{ item.subject }}</h6>
+                    <p class="text-xs text-secondary mb-0">{{ item.body_text?.substring(0, 50) }}...</p>
+                  </div>
+                </template>
+
+                <!-- ステータスセル：色付きバッジ表示 -->
+                <template #cell-status="{ item }">
+                  <div class="text-center">
+                    <span :class="`badge ${getNotificationStatusColor(item.status)}`">
+                      {{ getNotificationStatusLabel(item.status) }}
+                    </span>
+                  </div>
+                </template>
+
+                <!-- 作成日時セル：中央揃え -->
+                <template #cell-created_at="{ value }">
+                  <div class="text-center">
+                    <span class="text-secondary text-xs font-weight-normal">
+                      {{ new Date(value).toLocaleString('ja-JP') }}
+                    </span>
+                  </div>
+                </template>
+
+                <!-- 操作セル：編集・再送信・削除ボタン -->
+                <template #cell-actions="{ item }">
+                  <div class="btn-group" role="group">
+                    <button 
+                      class="btn btn-sm bg-gradient-info mb-0" 
+                      @click="openEditNotificationModalById(item.id)"
+                    >
+                      編集
+                    </button>
+                    <button 
+                      v-if="item.status === 'FAILED'" 
+                      class="btn btn-sm bg-gradient-warning mb-0" 
+                      @click="handleResendNotification(item.id)"
+                    >
+                      再送信
+                    </button>
+                    <button 
+                      class="btn btn-sm bg-gradient-danger mb-0" 
+                      @click="handleDeleteNotification(item.id)"
+                    >
+                      削除
+                    </button>
+                  </div>
+                </template>
+              </OptimizedDataTable>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2298,8 +1819,8 @@ const {
     <div class="row mb-4">
       <div class="col-12">
         <div class="card">
-          <div class="card-header pb-0">
-            <div class="row">
+          <div class="card-header pb-3">
+            <div class="row mb-3">
               <div class="col-lg-6 col-8">
                 <h6>アラートルール一覧</h6>
                 <p class="text-sm mb-0">
@@ -2307,6 +1828,37 @@ const {
                   <span class="font-weight-bold ms-1">自動通知ルール</span>の管理
                   <span class="badge bg-gradient-info ms-2">{{ filteredAlertRules.length }}件</span>
                 </p>
+              </div>
+              <div class="col-lg-6 col-4 text-end">
+                <button 
+                  class="btn bg-gradient-primary btn-sm mb-0"
+                  @click="openAlertRuleModal"
+                >
+                  <i class="fa fa-plus me-1"></i>
+                  新規ルール登録
+                </button>
+              </div>
+            </div>
+            <!-- 検索バー（アラートルール専用） -->
+            <div class="row">
+              <div class="col-md-6 mb-2">
+                <div class="input-group input-group-outline">
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    placeholder="ルール名、タイプ、メールアドレスで検索..."
+                    v-model="alertRuleSearchQuery"
+                  >
+                </div>
+              </div>
+              <div class="col-md-3 mb-2">
+                <button 
+                  class="btn btn-sm btn-outline-secondary w-100"
+                  @click="clearAlertRuleFilters"
+                >
+                  <i class="fa fa-times me-1"></i>
+                  フィルタクリア
+                </button>
               </div>
             </div>
           </div>
@@ -2325,85 +1877,23 @@ const {
             </div>
             
             <!-- アラートルール一覧テーブル（コンポーネント） -->
-            <div v-else class="px-3">
-      <AlertRuleTable 
-        :rows="filteredAlertRules" 
-        :loading="isAlertRulesLoading" 
-        :selected-ids="Array.from(selectedAlertRules)"
-        @select="(id, checked) => handleSelectAlertRule(id, checked)"
-        @selectAll="(checked) => handleSelectAllAlertRules(checked)"
-        @edit="openEditAlertRuleModalById" 
-        @delete="handleDeleteAlertRule" 
-      />
-                        </div>
-                      </div>
+            <AlertRuleTable 
+              v-else
+              :rows="filteredAlertRules" 
+              :loading="false"
+              :selected-ids="Array.from(selectedAlertRules)"
+              @select="(id, checked) => handleSelectAlertRule(id, checked)"
+              @selectAll="(checked) => handleSelectAllAlertRules(checked)"
+              @edit="openEditAlertRuleModalById" 
+              @delete="handleDeleteAlertRule" 
+            />
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- ユーザー編集モーダル -->
-    <ModalShell
-      :show="showUserModal"
-      :title="editingUser ? 'ユーザー編集' : 'ユーザー追加'"
-      @close="closeUserModal"
-      :actions="[
-        {
-          label: 'キャンセル',
-          variant: 'secondary',
-          onClick: closeUserModal
-        },
-        {
-          label: editingUser ? '更新' : '作成',
-          variant: 'primary',
-          onClick: editingUser ? handleUpdateUser : handleCreateUser
-        }
-      ]"
-    >
-      <form>
-        <div class="mb-3">
-          <label class="form-label">メールアドレス</label>
-          <input 
-            type="email" 
-            class="form-control" 
-            v-model="userForm.email"
-            required
-          >
-        </div>
-        <div class="mb-3">
-          <label class="form-label">表示名</label>
-          <input 
-            type="text" 
-            class="form-control" 
-            v-model="userForm.display_name"
-            required
-          >
-        </div>
-        <div v-if="!editingUser" class="mb-3">
-          <label class="form-label">パスワード</label>
-          <input 
-            type="password" 
-            class="form-control" 
-            v-model="userForm.password_hash"
-            required
-          >
-        </div>
-        <div class="mb-3">
-          <div class="form-check">
-            <input 
-              class="form-check-input" 
-              type="checkbox" 
-              v-model="userForm.is_active"
-              id="isActive"
-            >
-            <label class="form-check-label" for="isActive">
-              アクティブ
-            </label>
-          </div>
-        </div>
-      </form>
-    </ModalShell>
 
-    <!-- チームメンバー追加モーダル -->
+    <!-- TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
     <ModalShell
       :show="showMemberModal"
       title="チームメンバー追加"
@@ -2450,6 +1940,7 @@ const {
         </div>
       </form>
     </ModalShell>
+    -->
 
     <!-- 通知作成・編集モーダル（コンポーネント） -->
     <NotificationModal 
@@ -2469,208 +1960,32 @@ const {
       v-if="showAlertRuleModal"
       :show="showAlertRuleModal"
       :initial="editingAlertRule ? {
+        project_id: alertRuleForm.project_id,
         name: alertRuleForm.name,
-        channel: alertRuleForm.rule_type,
-        enabled: alertRuleForm.is_enabled,
+        rule_type: alertRuleForm.rule_type,
+        notify_email: alertRuleForm.notify_email,
+        is_enabled: alertRuleForm.is_enabled,
+        params_json: alertRuleForm.params_json,
       } : null"
       @close="closeAlertRuleModal"
       @save="onSaveAlertRule"
     />
 
-    <!-- ユーザープロフィールモーダル -->
-    <div v-if="showUserProfileModal" class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              {{ selectedUserProfile?.display_name }} のプロフィール
-            </h5>
-            <button type="button" class="btn-close" @click="closeUserProfileModal"></button>
-          </div>
-          <div class="modal-body">
-            <div class="row">
-              <!-- 左側: プロフィール情報 -->
-              <div class="col-md-4">
-                <div class="card">
-                  <div class="card-header text-center">
-                    <div class="avatar-container mb-3">
-                      <img 
-                        v-if="userProfileForm.avatar_url" 
-                        :src="userProfileForm.avatar_url" 
-                        class="avatar-img rounded-circle"
-                        style="width: 100px; height: 100px; object-fit: cover;"
-                        alt="アバター"
-                      >
-                      <div 
-                        v-else 
-                        class="avatar-placeholder rounded-circle d-flex align-items-center justify-content-center"
-                        style="width: 100px; height: 100px; background: #e9ecef; margin: 0 auto;"
-                      >
-                        <i class="material-symbols-rounded" style="font-size: 48px; color: #6c757d;">person</i>
-                      </div>
-                    </div>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      @change="handleAvatarUpload"
-                      class="form-control form-control-sm"
-                      style="display: none;"
-                      id="avatarUpload"
-                    >
-                    <label for="avatarUpload" class="btn btn-sm btn-outline-primary">
-                      アバター変更
-                    </label>
-                  </div>
-                  <div class="card-body">
-                    <form>
-                      <div class="mb-3">
-                        <label class="form-label">姓</label>
-                        <input 
-                          type="text" 
-                          class="form-control" 
-                          v-model="userProfileForm.last_name"
-                        >
-                      </div>
-                      <div class="mb-3">
-                        <label class="form-label">名</label>
-                        <input 
-                          type="text" 
-                          class="form-control" 
-                          v-model="userProfileForm.first_name"
-                        >
-                      </div>
-                      <div class="mb-3">
-                        <label class="form-label">電話番号</label>
-                        <input 
-                          type="tel" 
-                          class="form-control" 
-                          v-model="userProfileForm.phone"
-                        >
-                      </div>
-                      <div class="mb-3">
-                        <label class="form-label">部署</label>
-                        <input 
-                          type="text" 
-                          class="form-control" 
-                          v-model="userProfileForm.department"
-                        >
-                      </div>
-                      <div class="mb-3">
-                        <label class="form-label">役職</label>
-                        <input 
-                          type="text" 
-                          class="form-control" 
-                          v-model="userProfileForm.position"
-                        >
-                      </div>
-                      <div class="mb-3">
-                        <label class="form-label">自己紹介</label>
-                        <textarea 
-                          class="form-control" 
-                          rows="3"
-                          v-model="userProfileForm.bio"
-                        ></textarea>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 右側: 統計情報と活動履歴 -->
-              <div class="col-md-8">
-                <!-- 統計情報 -->
-                <div class="card mb-4">
-                  <div class="card-header">
-                    <h6 class="mb-0">パフォーマンス統計</h6>
-                  </div>
-                  <div class="card-body">
-                    <div v-if="isProfileStatsLoading" class="text-center py-4">
-                      <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">読み込み中...</span>
-                      </div>
-                    </div>
-                    <div v-else-if="userProfileStats" class="row">
-                      <div class="col-md-3 col-6 mb-3">
-                        <div class="text-center">
-                          <h4 class="mb-0 text-primary">{{ userProfileStats.total_tasks }}</h4>
-                          <p class="text-sm mb-0">総タスク数</p>
-                        </div>
-                      </div>
-                      <div class="col-md-3 col-6 mb-3">
-                        <div class="text-center">
-                          <h4 class="mb-0 text-success">{{ userProfileStats.completed_tasks }}</h4>
-                          <p class="text-sm mb-0">完了タスク</p>
-                        </div>
-                      </div>
-                      <div class="col-md-3 col-6 mb-3">
-                        <div class="text-center">
-                          <h4 class="mb-0 text-warning">{{ userProfileStats.in_progress_tasks }}</h4>
-                          <p class="text-sm mb-0">進行中</p>
-                        </div>
-                      </div>
-                      <div class="col-md-3 col-6 mb-3">
-                        <div class="text-center">
-                          <h4 class="mb-0 text-danger">{{ userProfileStats.overdue_tasks }}</h4>
-                          <p class="text-sm mb-0">遅延タスク</p>
-                        </div>
-                      </div>
-                      <div class="col-md-6 mb-3">
-                        <div class="text-center">
-                          <h4 class="mb-0 text-info">{{ userProfileStats.completion_rate }}%</h4>
-                          <p class="text-sm mb-0">完了率</p>
-                        </div>
-                      </div>
-                      <div class="col-md-6 mb-3">
-                        <div class="text-center">
-                          <h4 class="mb-0 text-primary">{{ userProfileStats.productivity_score }}</h4>
-                          <p class="text-sm mb-0">生産性スコア</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 活動履歴 -->
-                <div class="card">
-                  <div class="card-header">
-                    <h6 class="mb-0">最近の活動</h6>
-                  </div>
-                  <div class="card-body">
-                    <div v-if="isActivityLogsLoading" class="text-center py-4">
-                      <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">読み込み中...</span>
-                      </div>
-                    </div>
-                    <div v-else-if="userActivityLogs.length > 0" class="activity-list">
-                      <div 
-                        v-for="log in userActivityLogs.slice(0, 10)" 
-                        :key="log.id"
-                        class="activity-item d-flex align-items-center mb-3"
-                      >
-                        <div class="activity-icon me-3">
-                          <i class="material-symbols-rounded text-primary">task_alt</i>
-                        </div>
-                        <div class="activity-content flex-grow-1">
-                          <p class="mb-1 text-sm">{{ log.description }}</p>
-                          <small class="text-muted">{{ getRelativeTime(log.created_at) }}</small>
-                        </div>
-                      </div>
-                    </div>
-                    <div v-else class="text-center py-4 text-muted">
-                      活動履歴がありません
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="closeUserProfileModal">閉じる</button>
-            <button type="button" class="btn btn-primary" @click="handleUpdateUserProfile">更新</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- ユーザープロフィールモーダル（統合版） -->
+    <UserProfileModal
+      :show="showUserProfileModal"
+      :mode="userModalMode"
+      :user="selectedUserProfile"
+      :user-form="userForm"
+      :user-profile-stats="userProfileStats"
+      :user-activity-logs="userActivityLogs"
+      :is-profile-stats-loading="isProfileStatsLoading"
+      :is-activity-logs-loading="isActivityLogsLoading"
+      @close="closeUserProfileModal"
+      @save="handleSaveUser"
+      @avatar-upload="handleAvatarUpload"
+      @update:user-form="userForm = $event"
+    />
   </div>
 </template>
 

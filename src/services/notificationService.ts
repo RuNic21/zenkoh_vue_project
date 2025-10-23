@@ -171,30 +171,28 @@ export async function resendNotification(id: number): Promise<boolean> {
 // アラートルール一覧取得
 export async function listAlertRules(
   projectId?: number
-): Promise<AlertRule[]> {
-  try {
-    let query = supabase
-      .from(ALERT_RULES_TABLE)
-      .select("*")
-      .order("created_at", { ascending: false });
+): Promise<ServiceResult<AlertRule[]>> {
+  return handleServiceCall(
+    async () => {
+      let query = supabase
+        .from(ALERT_RULES_TABLE)
+        .select("*")
+        .order("created_at", { ascending: false });
 
-    if (projectId) {
-      query = query.eq("project_id", projectId);
-    }
+      if (projectId) {
+        query = query.eq("project_id", projectId);
+      }
 
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error("アラートルール一覧取得に失敗:", error.message);
-      return [];
-    }
-    
-    return (data as AlertRule[]) ?? [];
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("アラートルール一覧取得でエラー:", msg);
-    return [];
-  }
+      const { data, error } = await query;
+      
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
+      
+      return (data as AlertRule[]) ?? [];
+    },
+    "アラートルール一覧取得に失敗しました"
+  );
 }
 
 // アラートルール作成
@@ -269,52 +267,36 @@ export async function deleteAlertRule(id: number): Promise<boolean> {
 // ===== 統計情報 =====
 
 // 通知統計情報取得
-export async function getNotificationStats(): Promise<NotificationStats> {
-  try {
-    const { data, error } = await supabase
-      .from(NOTIFICATIONS_TABLE)
-      .select("status");
-    
-    if (error) {
-      console.error("通知統計取得に失敗:", error.message);
+export async function getNotificationStats(): Promise<ServiceResult<NotificationStats>> {
+  return handleServiceCall(
+    async () => {
+      const { data, error } = await supabase
+        .from(NOTIFICATIONS_TABLE)
+        .select("status");
+      
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
+      
+      const notifications = data || [];
+      const total = notifications.length;
+      const queued = notifications.filter(n => n.status === "QUEUED").length;
+      const sent = notifications.filter(n => n.status === "SENT").length;
+      const failed = notifications.filter(n => n.status === "FAILED").length;
+      const cancelled = notifications.filter(n => n.status === "CANCELLED").length;
+      const success_rate = total > 0 ? Math.round((sent / total) * 100) : 0;
+      
       return {
-        total_notifications: 0,
-        queued_notifications: 0,
-        sent_notifications: 0,
-        failed_notifications: 0,
-        cancelled_notifications: 0,
-        success_rate: 0
+        total_notifications: total,
+        queued_notifications: queued,
+        sent_notifications: sent,
+        failed_notifications: failed,
+        cancelled_notifications: cancelled,
+        success_rate
       };
-    }
-    
-    const notifications = data || [];
-    const total = notifications.length;
-    const queued = notifications.filter(n => n.status === "QUEUED").length;
-    const sent = notifications.filter(n => n.status === "SENT").length;
-    const failed = notifications.filter(n => n.status === "FAILED").length;
-    const cancelled = notifications.filter(n => n.status === "CANCELLED").length;
-    const success_rate = total > 0 ? Math.round((sent / total) * 100) : 0;
-    
-    return {
-      total_notifications: total,
-      queued_notifications: queued,
-      sent_notifications: sent,
-      failed_notifications: failed,
-      cancelled_notifications: cancelled,
-      success_rate
-    };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("通知統計取得でエラー:", msg);
-    return {
-      total_notifications: 0,
-      queued_notifications: 0,
-      sent_notifications: 0,
-      failed_notifications: 0,
-      cancelled_notifications: 0,
-      success_rate: 0
-    };
-  }
+    },
+    "通知統計取得に失敗しました"
+  );
 }
 
 // ===== 通知テンプレート =====

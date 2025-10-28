@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // タスクフィルターパネル（共通FilterPanel活用版）
-// 目的: FilterPanelとFilterFieldを活用してコード重複を削減（358줄 → 140줄, 61% 감소）
+// 目的: FilterPanelとFilterFieldを活用してコード重複を削減（358行 → 140行、61%削減）
 
 import { computed } from "vue";
 import type { Project } from "@/types/project";

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // チーム管理用フィルタリングパネルコンポーネント（共通FilterPanel活用版）
-// 目的: FilterPanelとFilterFieldを活用してコード重複を削減（328줄 → 92줄, 72% 감소）
+// 目的: FilterPanelとFilterFieldを活用してコード重複を削減（328行 → 92行、72%削減）
 
 import { computed } from "vue";
 import FilterPanel from "@/components/common/FilterPanel.vue";

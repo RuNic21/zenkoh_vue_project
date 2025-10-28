@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // レポートフィルター（共通FilterPanel活用版）
-// 目的: FilterPanelを活用してコード一貫性を向上（73줄 → 101줄, 構造改善）
+// 目的: FilterPanelを活用してコード一貫性を向上（73行 → 101行、構造改善）
 
 import { computed } from "vue";
 import FilterPanel from "@/components/common/FilterPanel.vue";

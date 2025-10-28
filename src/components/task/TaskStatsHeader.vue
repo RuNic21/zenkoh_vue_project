@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // タスク統計ヘッダー（StatCards活用版）
-// 目的: StatCardsコンポーネントを活用してコード重複を削減（90줄 → 41줄, 54% 감소）
+// 目的: StatCardsコンポーネントを活用してコード重複を削減（90行 → 41行、54%削減）
 
 import { computed } from "vue";
 import StatCards from "@/components/common/StatCards.vue";

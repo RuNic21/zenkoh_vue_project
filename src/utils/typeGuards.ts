@@ -1,9 +1,9 @@
 /**
- * 타입 가드 유틸리티
- * API 응답 타입 검증 및 타입 안정성 확보
+ * 型ガードユーティリティ
+ * APIレスポンス型検証および型安全性確保
  */
 
-// 서비스 응답 성공 타입 가드
+// サービスレスポンス成功の型ガード
 export const isServiceSuccess = <T>(
   result: any
 ): result is { success: true; data: T } => {
@@ -17,7 +17,7 @@ export const isServiceSuccess = <T>(
   );
 };
 
-// 서비스 응답 실패 타입 가드
+// サービスレスポンス失敗の型ガード
 export const isServiceError = (
   result: any
 ): result is { success: false; error: string } => {
@@ -30,27 +30,27 @@ export const isServiceError = (
   );
 };
 
-// 배열 타입 가드
+// 配列の型ガード
 export const isArray = <T>(value: any): value is T[] => {
   return Array.isArray(value);
 };
 
-// null/undefined 체크
+// null/undefinedチェック
 export const isDefined = <T>(value: T | null | undefined): value is T => {
   return value !== null && value !== undefined;
 };
 
-// 문자열 체크 (빈 문자열 제외)
+// 文字列チェック（空文字列除外）
 export const isNonEmptyString = (value: any): value is string => {
   return typeof value === "string" && value.trim().length > 0;
 };
 
-// 숫자 체크 (NaN 제외)
+// 数値チェック（NaN除外）
 export const isValidNumber = (value: any): value is number => {
   return typeof value === "number" && !isNaN(value) && isFinite(value);
 };
 
-// 날짜 문자열 체크
+// 日付文字列チェック
 export const isValidDateString = (value: any): value is string => {
   if (typeof value !== "string") return false;
   const date = new Date(value);

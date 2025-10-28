@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // チーム管理用統計カードコンポーネント（StatCards活用版）
-// 目的: StatCardsコンポーネントを活用してコード重複を削減（142줄 → 48줄, 66% 감소）
+// 目的: StatCardsコンポーネントを活用してコード重複を削減（142行 → 48行、66%削減）
 
 import { computed } from "vue";
 import StatCards from "@/components/common/StatCards.vue";

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // ダッシュボードフィルター（共通FilterPanel活用版）
-// 目的: FilterPanelとFilterFieldを活用してコード重複を削減（274줄 → 107줄, 61% 감소）
+// 目的: FilterPanelとFilterFieldを活用してコード重複を削減（274行 → 107行、61%削減）
 
 import { computed } from "vue";
 import FilterPanel from "@/components/common/FilterPanel.vue";

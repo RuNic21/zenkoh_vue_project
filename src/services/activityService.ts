@@ -143,7 +143,7 @@ function generateActivityDescription(type: ActivityLog['type'], notification: an
   }
 }
 
-// 通知本文から 사용자명을 추출
+// 通知本文からユーザー名を抽出
 function extractUserFromNotification(bodyText: string): string {
   // 簡単なパターンマッチでユーザー名を抽出
   // 実際にはさらに精密なパースが必要な場合があります
@@ -152,7 +152,7 @@ function extractUserFromNotification(bodyText: string): string {
     return userMatch[1].trim();
   }
 
-  // 기본값
+  // デフォルト値
   return 'システム';
 }
 
@@ -221,7 +221,7 @@ export async function logTaskCreated(projectId: number, taskId: number, projectN
   );
 }
 
-// タスク 完了時の活動ログ生成
+// タスク完了時の活動ログ生成
 export async function logTaskCompleted(projectId: number, taskId: number, projectName: string, taskName: string): Promise<void> {
   // 実際のユーザー情報を取得してから通知を作成
   const usersResult = await listUsers();

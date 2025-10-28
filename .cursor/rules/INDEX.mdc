@@ -1,3 +1,7 @@
+---
+alwaysApply: false
+---
+
 # .cursor/rules インデックス
 
 各ルールの役割と参照先をまとめています。新規ルールの追加・更新時は本インデックスも更新してください。
@@ -21,14 +25,17 @@
 
 - **database-integration.mdc** — データベース統合ルール・Supabase連携・型変換・エラー処理・開発ツール（12個の専門サービス・認証システム対応）
 - **development-workflow.mdc** — 開発ワークフロー・デバッグ手順・トラブルシューティング・デプロイ準備（Vue Router・認証システム・新機能ページ開発プロセス対応）
+- **auto-documentation-sync.mdc** — 自動文書同期ルール・コード変更時の文書/ルール自動更新マッピング・変更タイプ別更新対象・検証プロセス
 
 ## 運用ルール
 - 既存ルール改訂時は互換維持と移行手順を記載
 - 画面文言は日本語、例外時は根拠を明記
 - 型/ヘルパーは重複定義せず既存へ集約
+- コード変更時は関連文書・ルールの更新を自動チェック
 
 ## 変更履歴（要約）
-- 2025-01: **最新更新** - Vue Router 4 統合・Supabase Auth 認証システム統合完了（12個の専門サービス、9つのページ対応）
+- 2025-10: **最新更新** - auto-documentation-sync.mdc 追加（コード変更時の自動文書同期ルール）
+- 2025-01: Vue Router 4 統合・Supabase Auth 認証システム統合完了（12個の専門サービス、9つのページ対応）
 - 2025-01: material-dashboard-ui-styles.mdc 追加（Material Dashboard 3 完全UI/UXガイド - 色彩/タイポグラフィ/レイアウト/コンポーネント/レスポンシブデザイン原則）
 - 2025-01: ルール統合・最適化（typescript-patterns, material-dashboard-integration を vue-patterns に統合）
 - 2025-01: ルール整理・重複削除（vue-components, project-guidelines-ja, project-data-architecture を削除）

@@ -8,3 +8,11 @@ declare interface ImportMetaEnv {
 declare interface ImportMeta {
 	readonly env: ImportMetaEnv;
 }
+
+// Vue Router の型拡張
+declare module 'vue-router' {
+  interface RouteMeta {
+    title?: string;
+    requiresAuth?: boolean;
+  }
+}

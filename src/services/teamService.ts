@@ -298,64 +298,58 @@ export async function getProjectTeams(): Promise<ServiceResult<ProjectTeam[]>> {
 // ===== 統計情報 =====
 
 // チーム統計情報取得
-export async function getTeamStats(): Promise<TeamStats> {
-  try {
-    // ユーザー統計
-    const { data: users, error: usersError } = await supabase
-      .from(USERS_TABLE)
-      .select("id, is_active");
-    
-    if (usersError) {
-      console.error("ユーザー統計取得に失敗:", usersError.message);
+export async function getTeamStats(): Promise<ServiceResult<TeamStats>> {
+  return handleServiceCall(
+    async () => {
+      // ユーザー統計
+      const { data: users, error: usersError } = await supabase
+        .from(USERS_TABLE)
+        .select("id, is_active");
+      
+      if (usersError) {
+        throw new Error(`ユーザー統計取得に失敗: ${usersError.message}`);
+      }
+      
+      const totalUsers = users?.length || 0;
+      const activeUsers = users?.filter(u => u.is_active).length || 0;
+      
+      // プロジェクト統計
+      const { data: projects, error: projectsError } = await supabase
+        .from(PROJECTS_TABLE)
+        .select("id")
+        .eq("is_archived", false);
+      
+      if (projectsError) {
+        console.warn("プロジェクト統計取得に失敗:", projectsError.message);
+      }
+      
+      const totalProjects = projects?.length || 0;
+      
+      // タスク統計
+      const { data: tasks, error: tasksError } = await supabase
+        .from(TASKS_TABLE)
+        .select("id")
+        .eq("is_archived", false);
+      
+      if (tasksError) {
+        console.warn("タスク統計取得に失敗:", tasksError.message);
+      }
+      
+      const totalTasks = tasks?.length || 0;
+      
+      // ユーザーあたりの平均タスク数
+      const averageTasksPerUser = activeUsers > 0 ? Math.round(totalTasks / activeUsers * 100) / 100 : 0;
+      
       return {
-        total_users: 0,
-        active_users: 0,
-        total_projects: 0,
-        total_tasks: 0,
-        average_tasks_per_user: 0
+        total_users: totalUsers,
+        active_users: activeUsers,
+        total_projects: totalProjects,
+        total_tasks: totalTasks,
+        average_tasks_per_user: averageTasksPerUser
       };
-    }
-    
-    const totalUsers = users?.length || 0;
-    const activeUsers = users?.filter(u => u.is_active).length || 0;
-    
-    // プロジェクト統計
-    const { data: projects, error: projectsError } = await supabase
-      .from(PROJECTS_TABLE)
-      .select("id")
-      .eq("is_archived", false);
-    
-    const totalProjects = projects?.length || 0;
-    
-    // タスク統計
-    const { data: tasks, error: tasksError } = await supabase
-      .from(TASKS_TABLE)
-      .select("id")
-      .eq("is_archived", false);
-    
-    const totalTasks = tasks?.length || 0;
-    
-    // ユーザーあたりの平均タスク数
-    const averageTasksPerUser = activeUsers > 0 ? Math.round(totalTasks / activeUsers * 100) / 100 : 0;
-    
-    return {
-      total_users: totalUsers,
-      active_users: activeUsers,
-      total_projects: totalProjects,
-      total_tasks: totalTasks,
-      average_tasks_per_user: averageTasksPerUser
-    };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("チーム統計取得でエラー:", msg);
-    return {
-      total_users: 0,
-      active_users: 0,
-      total_projects: 0,
-      total_tasks: 0,
-      average_tasks_per_user: 0
-    };
-  }
+    },
+    "チーム統計取得に失敗しました"
+  );
 }
 
 // ユーザー活動統計取得
@@ -532,19 +526,21 @@ export async function getUserActivityLogs(
   limit: number = 50
 ): Promise<UserActivityLog[]> {
   try {
-    // 実際の実装では、activity_logs テーブルから取得
-    // 現在は仮の実装として、タスク関連の活動を返す
-    const { data: taskMembers, error } = await supabase
-      .from(TASK_MEMBERS_TABLE)
+    // task_membersテーブルには updated_at がないため、tasksテーブルから直接取得
+    // task_members.user_id でフィルタリングするために inner join を使用
+    const { data: tasks, error } = await supabase
+      .from("tasks")
       .select(`
-        task:tasks (
-          id,
-          task_name,
-          status,
-          updated_at
+        id,
+        task_name,
+        status,
+        updated_at,
+        task_members!inner (
+          user_id,
+          role
         )
       `)
-      .eq("user_id", userId)
+      .eq("task_members.user_id", userId)
       .order("updated_at", { ascending: false })
       .limit(limit);
     
@@ -553,14 +549,14 @@ export async function getUserActivityLogs(
       return [];
     }
     
-    const activities: UserActivityLog[] = (taskMembers || []).map((tm: any, index: number) => ({
+    const activities: UserActivityLog[] = (tasks || []).map((task: any, index: number) => ({
       id: index + 1,
       user_id: userId,
       action: "TASK_UPDATE",
-      description: `タスク「${tm.task.task_name}」のステータスが${tm.task.status}に更新されました`,
+      description: `タスク「${task.task_name}」のステータスが${task.status}に更新されました`,
       target_type: "task",
-      target_id: tm.task.id,
-      created_at: tm.task.updated_at
+      target_id: task.id,
+      created_at: task.updated_at
     }));
     
     return activities;
@@ -571,17 +567,15 @@ export async function getUserActivityLogs(
   }
 }
 
-// ユーザーアバターアップロード（仮実装）
+// ユーザーアバターアップロード（将来実装予定）
 export async function uploadUserAvatar(
   userId: number, 
   file: File
 ): Promise<string | null> {
   try {
-    // 実際の実装では、Supabase Storage を使用
-    // 現在は仮の実装として、ファイル名を返す
-    const fileName = `avatar_${userId}_${Date.now()}.${file.name.split('.').pop()}`;
-    console.log("アバターアップロード（仮実装）:", fileName);
-    return `https://example.com/avatars/${fileName}`;
+    // TODO: Supabase Storage を使用した実際のアバターアップロード実装が必要
+    console.log("アバターアップロード機能は未実装です:", { userId, fileName: file.name });
+    return null;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("アバターアップロードでエラー:", msg);
@@ -603,16 +597,19 @@ export async function searchUsers(
     let supabaseQuery = supabase
       .from(USERS_TABLE)
       .select("*")
-      .or(`display_name.ilike.%${query}%,email.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%`);
+      .or(`display_name.ilike.%${query}%,email.ilike.%${query}%`);
     
-    // フィルター適用
+    // フィルター適用（利用可能なフィールドのみ）
     if (filters) {
+      // TODO: usersテーブルにdepartment, positionフィールドが存在しないため無効化
+      /*
       if (filters.department) {
         supabaseQuery = supabaseQuery.eq("department", filters.department);
       }
       if (filters.position) {
         supabaseQuery = supabaseQuery.eq("position", filters.position);
       }
+      */
       if (filters.is_active !== undefined) {
         supabaseQuery = supabaseQuery.eq("is_active", filters.is_active);
       }

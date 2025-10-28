@@ -1,29 +1,18 @@
 <script setup lang="ts">
 // メインレイアウトコンポーネント: プロジェクト管理スケジューラーの基本レイアウト
-import { ref, computed, watch } from "vue";
+import { ref } from "vue";
+import { useRoute } from "vue-router";
+
+// ルート情報を取得
+const route = useRoute();
 
 // NavigationItem インターフェース定義
 interface NavigationItem {
   id: string;
   name: string;
   icon: string;
-  isActive: boolean;
+  routeName: string;
 }
-
-// Props インターフェース定義
-interface Props {
-  currentPage: string;
-}
-
-// props定義: 親コンポーネントから受け取るデータ
-const props = withDefaults(defineProps<Props>(), {
-  currentPage: "dashboard"
-});
-
-// emit定義: 親コンポーネントにイベントを送信
-const emit = defineEmits<{
-  navigate: [pageId: string];
-}>();
 
 // サイドバーの開閉状態を管理
 const isSidebarOpen = ref(true);
@@ -34,56 +23,43 @@ const navigationItems = ref<NavigationItem[]>([
     id: "dashboard",
     name: "ダッシュボード",
     icon: "dashboard",
-    isActive: true
+    routeName: "dashboard"
   },
   {
     id: "project-management",
     name: "プロジェクト管理",
     icon: "work",
-    isActive: false
+    routeName: "project-management"
   },
   {
     id: "schedule-list",
     name: "タスク管理",
     icon: "schedule",
-    isActive: false
+    routeName: "schedule-list"
   },
   {
     id: "team",
     name: "チーム管理",
     icon: "group",
-    isActive: false
+    routeName: "team"
   },
   {
     id: "report",
     name: "レポート",
     icon: "assessment",
-    isActive: false
+    routeName: "report"
   }
 ]);
-
-// 現在のページに基づいてアクティブなメニューを更新
-const updateActiveMenu = (pageId: string) => {
-  navigationItems.value.forEach(item => {
-    item.isActive = item.id === pageId;
-  });
-};
-
-// ナビゲーション処理
-const handleNavigation = (pageId: string) => {
-  updateActiveMenu(pageId);
-  emit('navigate', pageId);
-};
 
 // サイドバーの開閉切り替え
 const toggleSidebar = () => {
   isSidebarOpen.value = !isSidebarOpen.value;
 };
 
-// 現在のページが変更されたときにメニューを更新
-watch(() => props.currentPage, (newPage) => {
-  updateActiveMenu(newPage);
-}, { immediate: true });
+// アクティブかどうかを判定
+const isActive = (routeName: string): boolean => {
+  return route.name === routeName;
+};
 </script>
 
 <template>
@@ -123,39 +99,38 @@ watch(() => props.currentPage, (newPage) => {
             :key="item.id" 
             class="nav-item"
           >
-            <a 
+            <router-link 
+              :to="{ name: item.routeName }"
               class="nav-link text-dark"
-              :class="{ 'active bg-gradient-primary text-white': item.isActive }"
-              href="javascript:;"
-              @click="handleNavigation(item.id)"
+              :class="{ 'active bg-gradient-primary text-white': isActive(item.routeName) }"
             >
               <i class="material-symbols-rounded opacity-5">{{ item.icon }}</i>
               <span class="nav-link-text ms-1">{{ item.name }}</span>
-            </a>
+            </router-link>
           </li>
         </ul>
       </div>
       
       <!-- サイドバーフッター -->
-      <!-- TODO: 設定とヘルプのボタンを追加 -->
-      <div class="sidenav-footer position-absolute w-100 bottom-0">
+      <!-- TODO: 設定とヘルプのページを実装後に有効化 -->
+      <!-- <div class="sidenav-footer position-absolute w-100 bottom-0">
         <div class="mx-3">
-          <button 
+          <router-link 
+            :to="{ name: 'settings' }"
             class="btn btn-outline-primary mt-4 w-100"
-            @click="handleNavigation('settings')"
           >
             <i class="material-symbols-rounded me-2">settings</i>
             設定
-          </button>
-          <button 
+          </router-link>
+          <router-link 
+            :to="{ name: 'help' }"
             class="btn bg-gradient-primary w-100 mt-2"
-            @click="handleNavigation('help')"
           >
             <i class="material-symbols-rounded me-2">help</i>
             ヘルプ
-          </button>
+          </router-link>
         </div>
-      </div>
+      </div> -->
     </aside>
 
     <!-- メインコンテンツエリア -->

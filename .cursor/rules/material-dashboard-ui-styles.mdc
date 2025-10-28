@@ -1,0 +1,861 @@
+---
+description: Material Dashboard 3 UI/UX スタイルガイド（ファイルタイプ別適用）
+alwaysApply: false
+globs:
+  - "*.vue"
+  - "*.html"
+  - "*.css"
+  - "*.scss"
+---
+# Material Dashboard 3 UI/UX スタイルガイド
+
+## 🎨 色彩パレット
+
+### プライマリカラー
+```css
+/* メインブランドカラー */
+--bs-primary: #e91e63 (ピンク)
+--bs-secondary: #737373 (グレー)
+--bs-success: #4CAF50 (グリーン)
+--bs-info: #1A73E8 (ブルー)
+--bs-warning: #fb8c00 (オレンジ)
+--bs-danger: #F44335 (レッド)
+```
+
+### グラデーションカラー
+```html
+<!-- プライマリグラデーション -->
+<div class="bg-gradient-primary"></div>
+
+<!-- その他のグラデーション -->
+<div class="bg-gradient-success"></div>
+<div class="bg-gradient-info"></div>
+<div class="bg-gradient-warning"></div>
+<div class="bg-gradient-danger"></div>
+<div class="bg-gradient-secondary"></div>
+```
+
+### グレースケール
+```css
+--bs-gray-100: #f5f5f5 (最も明るい)
+--bs-gray-200: #e5e5e5
+--bs-gray-300: #d4d4d4
+--bs-gray-400: #a3a3a3
+--bs-gray-500: #737373
+--bs-gray-600: #525252
+--bs-gray-700: #404040
+--bs-gray-800: #262626
+--bs-gray-900: #171717 (最も暗い)
+```
+
+### 背景カラー使用例
+```html
+<!-- ページ背景 -->
+<div class="bg-gray-100"></div>
+
+<!-- カード背景 -->
+<div class="bg-white"></div>
+
+<!-- サイドバー背景 -->
+<aside class="bg-white"></aside>
+```
+
+## 📝 タイポグラフィ
+
+### フォントファミリー
+```css
+/* デフォルトフォント */
+font-family: Inter, Helvetica, Arial, sans-serif;
+
+/* アイコンフォント */
+font-family: "Material Symbols Rounded";
+```
+
+### 見出しスタイル
+```html
+<!-- ページタイトル (h3推奨) -->
+<h3 class="mb-0 h4 font-weight-bolder">プロジェクト管理ダッシュボード</h3>
+
+<!-- セクションタイトル (h4-h6) -->
+<h4 class="font-weight-bold">セクションタイトル</h4>
+<h5 class="text-dark font-weight-bold">小見出し</h5>
+<h6>カードタイトル</h6>
+```
+
+### テキストサイズ
+```html
+<!-- 小さいテキスト -->
+<p class="text-xs">補足情報・メタデータ</p>
+<p class="text-sm">説明文・サブテキスト</p>
+
+<!-- 通常テキスト -->
+<p class="text-md">通常の本文</p>
+
+<!-- 大きいテキスト -->
+<p class="text-lg">強調テキスト</p>
+```
+
+### フォントウェイト
+```html
+<span class="font-weight-light">細字 (300)</span>
+<span class="font-weight-normal">通常 (400)</span>
+<span class="font-weight-bold">太字 (700)</span>
+<span class="font-weight-bolder">極太 (900)</span>
+```
+
+### テキストカラー
+```html
+<p class="text-dark">濃い文字色</p>
+<p class="text-secondary">セカンダリ文字色</p>
+<p class="text-muted">薄い文字色</p>
+<p class="text-white">白文字</p>
+
+<!-- 状態カラー -->
+<span class="text-primary">プライマリ</span>
+<span class="text-success">成功</span>
+<span class="text-info">情報</span>
+<span class="text-warning">警告</span>
+<span class="text-danger">危険</span>
+```
+
+## 📦 レイアウトとスペーシング
+
+### コンテナ
+```html
+<!-- フルード幅コンテナ -->
+<div class="container-fluid py-4">
+  <!-- ページコンテンツ -->
+</div>
+
+<!-- 固定幅コンテナ -->
+<div class="container">
+  <!-- コンテンツ -->
+</div>
+```
+
+### グリッドシステム
+```html
+<!-- 4カラムレイアウト（統計カード） -->
+<div class="row mb-4">
+  <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+    <!-- 統計カード 1 -->
+  </div>
+  <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+    <!-- 統計カード 2 -->
+  </div>
+  <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+    <!-- 統計カード 3 -->
+  </div>
+  <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+    <!-- 統計カード 4 -->
+  </div>
+</div>
+
+<!-- 2カラムレイアウト（メイン＋サイドバー） -->
+<div class="row">
+  <div class="col-lg-8 col-md-12 mb-4">
+    <!-- メインコンテンツ -->
+  </div>
+  <div class="col-lg-4 col-md-12">
+    <!-- サイドバー -->
+  </div>
+</div>
+
+<!-- 3カラムレイアウト -->
+<div class="row">
+  <div class="col-lg-4 col-md-6 mb-4"><!-- カラム 1 --></div>
+  <div class="col-lg-4 col-md-6 mb-4"><!-- カラム 2 --></div>
+  <div class="col-lg-4 col-md-12 mb-4"><!-- カラム 3 --></div>
+</div>
+```
+
+### スペーシング
+```html
+<!-- マージン -->
+<div class="m-0">マージン0</div>
+<div class="m-1">マージン0.25rem</div>
+<div class="m-2">マージン0.5rem</div>
+<div class="m-3">マージン1rem</div>
+<div class="m-4">マージン1.5rem</div>
+<div class="m-5">マージン3rem</div>
+
+<!-- 方向別マージン -->
+<div class="mt-4">上マージン</div>
+<div class="mb-4">下マージン</div>
+<div class="ms-3">左マージン</div>
+<div class="me-3">右マージン</div>
+<div class="mx-auto">左右中央揃え</div>
+<div class="my-4">上下マージン</div>
+
+<!-- パディング -->
+<div class="p-3">パディング1rem</div>
+<div class="px-4">左右パディング1.5rem</div>
+<div class="py-4">上下パディング1.5rem</div>
+<div class="pt-0">上パディング0</div>
+<div class="pb-2">下パディング0.5rem</div>
+```
+
+## 🎴 カードコンポーネント
+
+### 基本カード
+```html
+<div class="card">
+  <div class="card-header pb-0">
+    <div class="row">
+      <div class="col-lg-6 col-8">
+        <h6>カードタイトル</h6>
+        <p class="text-sm mb-0">
+          <i class="fa fa-chart-line text-info" aria-hidden="true"></i>
+          <span class="font-weight-bold ms-1">サブタイトル</span>
+        </p>
+      </div>
+      <div class="col-lg-6 col-4 text-end">
+        <button class="btn btn-sm bg-gradient-primary">アクション</button>
+      </div>
+    </div>
+  </div>
+  <div class="card-body px-0 pt-0 pb-2">
+    <!-- カードコンテンツ -->
+  </div>
+</div>
+```
+
+### 統計カード
+```html
+<div class="card">
+  <div class="card-header p-2 ps-3">
+    <div class="d-flex justify-content-between">
+      <div>
+        <p class="text-sm mb-0 text-capitalize">総プロジェクト数</p>
+        <h4 class="mb-0">24</h4>
+      </div>
+      <div class="icon icon-md icon-shape bg-gradient-primary shadow-dark shadow text-center border-radius-lg">
+        <i class="material-symbols-rounded opacity-10">folder</i>
+      </div>
+    </div>
+  </div>
+  <hr class="dark horizontal my-0">
+  <div class="card-footer p-2 ps-3">
+    <p class="mb-0 text-sm">
+      <span class="text-success font-weight-bolder">+12%</span> 先月比
+    </p>
+  </div>
+</div>
+```
+
+### カードスタイリング
+```html
+<!-- 影付きカード -->
+<div class="card shadow-lg"></div>
+
+<!-- ホバーエフェクトカード -->
+<div class="card card-hover"></div>
+
+<!-- 境界線なしカード -->
+<div class="card border-0"></div>
+
+<!-- 角丸カード -->
+<div class="card border-radius-lg"></div>
+<div class="card border-radius-xl"></div>
+```
+
+## 🔘 ボタンスタイル
+
+### ボタンバリエーション
+```html
+<!-- グラデーションボタン（推奨） -->
+<button class="btn bg-gradient-primary">プライマリボタン</button>
+<button class="btn bg-gradient-secondary">セカンダリボタン</button>
+<button class="btn bg-gradient-success">成功ボタン</button>
+<button class="btn bg-gradient-info">情報ボタン</button>
+<button class="btn bg-gradient-warning">警告ボタン</button>
+<button class="btn bg-gradient-danger">危険ボタン</button>
+
+<!-- アウトラインボタン -->
+<button class="btn btn-outline-primary">アウトライン</button>
+<button class="btn btn-outline-secondary">アウトライン</button>
+
+<!-- テキストボタン -->
+<button class="btn btn-link text-primary">リンクボタン</button>
+```
+
+### ボタンサイズ
+```html
+<!-- サイズバリエーション -->
+<button class="btn btn-sm bg-gradient-primary">小ボタン</button>
+<button class="btn bg-gradient-primary">通常ボタン</button>
+<button class="btn btn-lg bg-gradient-primary">大ボタン</button>
+
+<!-- 幅いっぱいボタン -->
+<button class="btn bg-gradient-primary w-100">フル幅ボタン</button>
+```
+
+### ボタン状態
+```html
+<!-- ローディング状態 -->
+<button class="btn bg-gradient-primary" disabled>
+  <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+  処理中...
+</button>
+
+<!-- 無効状態 -->
+<button class="btn bg-gradient-primary" disabled>無効ボタン</button>
+
+<!-- アイコン付きボタン -->
+<button class="btn bg-gradient-primary">
+  <i class="material-symbols-rounded me-2">add</i>
+  新規作成
+</button>
+```
+
+### ボタングループ
+```html
+<div class="btn-group" role="group">
+  <button class="btn bg-gradient-primary">ボタン1</button>
+  <button class="btn bg-gradient-secondary">ボタン2</button>
+  <button class="btn bg-gradient-info">ボタン3</button>
+</div>
+```
+
+## 📋 フォーム要素
+
+### 入力フィールド
+```html
+<!-- 基本入力フィールド -->
+<div class="input-group input-group-outline mb-3">
+  <label class="form-label">プロジェクト名</label>
+  <input type="text" class="form-control">
+</div>
+
+<!-- フォーカス状態の入力フィールド -->
+<div class="input-group input-group-outline is-focused mb-3">
+  <label class="form-label">プロジェクト名</label>
+  <input type="text" class="form-control" value="入力済み">
+</div>
+
+<!-- エラー状態の入力フィールド -->
+<div class="input-group input-group-outline mb-3">
+  <label class="form-label">メールアドレス</label>
+  <input type="email" class="form-control is-invalid">
+</div>
+<div class="text-danger text-sm">有効なメールアドレスを入力してください</div>
+```
+
+### テキストエリア
+```html
+<div class="input-group input-group-outline mb-3">
+  <label class="form-label">説明</label>
+  <textarea class="form-control" rows="5"></textarea>
+</div>
+```
+
+### セレクトボックス
+```html
+<div class="input-group input-group-outline mb-3">
+  <label class="form-label">優先度</label>
+  <select class="form-select">
+    <option value="">選択してください</option>
+    <option value="high">高</option>
+    <option value="medium">中</option>
+    <option value="low">低</option>
+  </select>
+</div>
+```
+
+### チェックボックスとスイッチ
+```html
+<!-- チェックボックス -->
+<div class="form-check mb-3">
+  <input class="form-check-input" type="checkbox" id="check1">
+  <label class="form-check-label" for="check1">
+    オプション1
+  </label>
+</div>
+
+<!-- スイッチ -->
+<div class="form-check form-switch mb-3">
+  <input class="form-check-input" type="checkbox" id="switch1">
+  <label class="form-check-label" for="switch1">
+    有効化する
+  </label>
+</div>
+
+<!-- ラジオボタン -->
+<div class="form-check mb-2">
+  <input class="form-check-input" type="radio" name="radio" id="radio1">
+  <label class="form-check-label" for="radio1">
+    オプション1
+  </label>
+</div>
+```
+
+## 🖼️ アイコン使用法
+
+### Material Symbols Rounded
+```html
+<!-- 基本アイコン -->
+<i class="material-symbols-rounded">dashboard</i>
+<i class="material-symbols-rounded">folder</i>
+<i class="material-symbols-rounded">task</i>
+<i class="material-symbols-rounded">group</i>
+<i class="material-symbols-rounded">assessment</i>
+
+<!-- サイズ調整 -->
+<i class="material-symbols-rounded text-xs">icon</i>
+<i class="material-symbols-rounded text-sm">icon</i>
+<i class="material-symbols-rounded text-md">icon</i>
+<i class="material-symbols-rounded text-lg">icon</i>
+
+<!-- カラー付きアイコン -->
+<i class="material-symbols-rounded text-primary">star</i>
+<i class="material-symbols-rounded text-success">check_circle</i>
+<i class="material-symbols-rounded text-warning">warning</i>
+<i class="material-symbols-rounded text-danger">error</i>
+```
+
+### アイコンシェイプ
+```html
+<!-- 丸型アイコンシェイプ -->
+<div class="icon icon-shape icon-sm bg-gradient-primary shadow text-center border-radius-lg">
+  <i class="material-symbols-rounded text-white opacity-10">folder</i>
+</div>
+
+<!-- 中サイズアイコンシェイプ -->
+<div class="icon icon-shape icon-md bg-gradient-success shadow-dark shadow text-center border-radius-lg">
+  <i class="material-symbols-rounded opacity-10">check</i>
+</div>
+
+<!-- 大サイズアイコンシェイプ -->
+<div class="icon icon-shape icon-lg bg-white shadow text-center border-radius-lg">
+  <i class="material-symbols-rounded text-primary">lock</i>
+</div>
+```
+
+## 🏷️ バッジとラベル
+
+### ステータスバッジ
+```html
+<!-- グラデーションバッジ -->
+<span class="badge bg-gradient-success">完了</span>
+<span class="badge bg-gradient-info">進行中</span>
+<span class="badge bg-gradient-warning">保留</span>
+<span class="badge bg-gradient-danger">遅延</span>
+<span class="badge bg-gradient-secondary">キャンセル</span>
+
+<!-- 小サイズバッジ -->
+<span class="badge badge-sm bg-gradient-primary">新規</span>
+
+<!-- ドットバッジ -->
+<span class="badge badge-dot bg-success"></span>
+<span class="badge badge-dot bg-warning"></span>
+<span class="badge badge-dot bg-danger"></span>
+
+<!-- カウントバッジ -->
+<span class="badge bg-gradient-primary ms-2">12</span>
+```
+
+### ラベル
+```html
+<!-- 優先度ラベル -->
+<span class="badge bg-gradient-danger">
+  <i class="material-symbols-rounded text-xs me-1">priority_high</i>
+  高
+</span>
+<span class="badge bg-gradient-warning">
+  <i class="material-symbols-rounded text-xs me-1">remove</i>
+  中
+</span>
+<span class="badge bg-gradient-info">
+  <i class="material-symbols-rounded text-xs me-1">arrow_downward</i>
+  低
+</span>
+```
+
+## 📊 テーブルスタイル
+
+### 基本テーブル
+```html
+<div class="table-responsive">
+  <table class="table align-items-center mb-0">
+    <thead>
+      <tr>
+        <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
+          プロジェクト名
+        </th>
+        <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 ps-2">
+          担当者
+        </th>
+        <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
+          状態
+        </th>
+        <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
+          進捗率
+        </th>
+        <th class="text-secondary opacity-7"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <div class="d-flex px-2 py-1">
+            <div class="d-flex flex-column justify-content-center">
+              <h6 class="mb-0 text-sm">プロジェクト名</h6>
+              <p class="text-xs text-secondary mb-0">説明文</p>
+            </div>
+          </div>
+        </td>
+        <td>
+          <p class="text-xs font-weight-bold mb-0">担当者名</p>
+          <p class="text-xs text-secondary mb-0">部署</p>
+        </td>
+        <td class="align-middle text-center text-sm">
+          <span class="badge badge-sm bg-gradient-success">完了</span>
+        </td>
+        <td class="align-middle text-center">
+          <div class="progress-wrapper w-75 mx-auto">
+            <div class="progress-info">
+              <div class="progress-percentage">
+                <span class="text-xs font-weight-bold">75%</span>
+              </div>
+            </div>
+            <div class="progress">
+              <div class="progress-bar bg-gradient-info" style="width: 75%"></div>
+            </div>
+          </div>
+        </td>
+        <td class="align-middle">
+          <button class="btn btn-sm bg-gradient-primary mb-0">編集</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+```
+
+### テーブルホバー効果
+```html
+<table class="table table-hover align-items-center mb-0">
+  <!-- テーブルコンテンツ -->
+</table>
+```
+
+## 🎭 アニメーションとトランジション
+
+### ホバーエフェクト
+```css
+/* カードホバー */
+.card {
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* ボタンホバー */
+.btn {
+  transition: all 0.2s ease-in-out;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ナビゲーションリンクホバー */
+.nav-link {
+  transition: all 0.2s ease-in-out;
+}
+
+.nav-link:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  transform: translateX(2px);
+}
+```
+
+### フェードインアニメーション
+```css
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+```
+
+### ローディングスピナー
+```html
+<!-- 小スピナー -->
+<div class="spinner-border spinner-border-sm" role="status">
+  <span class="visually-hidden">読み込み中...</span>
+</div>
+
+<!-- 通常スピナー -->
+<div class="spinner-border text-primary" role="status">
+  <span class="visually-hidden">読み込み中...</span>
+</div>
+
+<!-- カラーバリエーション -->
+<div class="spinner-border text-success" role="status"></div>
+<div class="spinner-border text-warning" role="status"></div>
+<div class="spinner-border text-danger" role="status"></div>
+```
+
+## 📱 レスポンシブデザイン
+
+### ブレークポイント
+```css
+/* Extra small devices (portrait phones, less than 576px) */
+@media (max-width: 575.98px) { }
+
+/* Small devices (landscape phones, 576px and up) */
+@media (min-width: 576px) and (max-width: 767.98px) { }
+
+/* Medium devices (tablets, 768px and up) */
+@media (min-width: 768px) and (max-width: 991.98px) { }
+
+/* Large devices (desktops, 992px and up) */
+@media (min-width: 992px) and (max-width: 1199.98px) { }
+
+/* Extra large devices (large desktops, 1200px and up) */
+@media (min-width: 1200px) { }
+```
+
+### レスポンシブユーティリティ
+```html
+<!-- 表示制御 -->
+<div class="d-none d-md-block">タブレット以上で表示</div>
+<div class="d-block d-md-none">モバイルのみ表示</div>
+<div class="d-none d-lg-block">デスクトップのみ表示</div>
+
+<!-- テキスト配置 -->
+<p class="text-start text-md-center text-lg-end">
+  モバイル左揃え、タブレット中央、デスクトップ右揃え
+</p>
+
+<!-- スペーシング調整 -->
+<div class="mb-3 mb-md-4 mb-lg-5">
+  レスポンシブマージン
+</div>
+```
+
+## 🔔 通知とアラート
+
+### アラート
+```html
+<!-- 成功アラート -->
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <span class="material-symbols-rounded me-2">check_circle</span>
+  <strong>成功！</strong> 処理が正常に完了しました。
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+
+<!-- 情報アラート -->
+<div class="alert alert-info alert-dismissible fade show" role="alert">
+  <span class="material-symbols-rounded me-2">info</span>
+  <strong>情報：</strong> 新しいアップデートがあります。
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+
+<!-- 警告アラート -->
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+  <span class="material-symbols-rounded me-2">warning</span>
+  <strong>注意：</strong> 期限が近づいています。
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+
+<!-- エラーアラート -->
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+  <span class="material-symbols-rounded me-2">error</span>
+  <strong>エラー！</strong> 処理に失敗しました。
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+```
+
+### トースト通知
+```html
+<div class="toast align-items-center text-white bg-gradient-success border-0" role="alert">
+  <div class="d-flex">
+    <div class="toast-body">
+      <i class="material-symbols-rounded me-2">check_circle</i>
+      正常に保存されました
+    </div>
+    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+  </div>
+</div>
+```
+
+## 🪟 モーダルとドロップダウン
+
+### モーダル
+```html
+<div class="modal fade" id="exampleModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">モーダルタイトル</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>モーダルコンテンツがここに入ります。</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          キャンセル
+        </button>
+        <button type="button" class="btn bg-gradient-primary">
+          保存
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+### ドロップダウン
+```html
+<div class="dropdown">
+  <button class="btn bg-gradient-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+    アクション
+  </button>
+  <ul class="dropdown-menu">
+    <li>
+      <a class="dropdown-item" href="#">
+        <i class="material-symbols-rounded me-2">edit</i>
+        編集
+      </a>
+    </li>
+    <li>
+      <a class="dropdown-item" href="#">
+        <i class="material-symbols-rounded me-2">visibility</i>
+        表示
+      </a>
+    </li>
+    <li><hr class="dropdown-divider"></li>
+    <li>
+      <a class="dropdown-item text-danger" href="#">
+        <i class="material-symbols-rounded me-2">delete</i>
+        削除
+      </a>
+    </li>
+  </ul>
+</div>
+```
+
+## 📏 デザイン原則
+
+### 1. 一貫性
+- すべてのページで同じスタイルパターンを使用
+- カラーパレットを守る
+- フォントサイズとウェイトを統一
+
+### 2. 階層構造
+- 視覚的な階層を明確にする
+- 重要な要素を強調する
+- ホワイトスペースを適切に使用
+
+### 3. アクセシビリティ
+- 十分なコントラスト比を確保
+- フォーカス状態を視覚的に表示
+- スクリーンリーダー対応
+
+### 4. パフォーマンス
+- 不要なアニメーションを避ける
+- 画像を最適化する
+- CSSトランジションを活用
+
+### 5. ユーザビリティ
+- ボタンとリンクを明確に区別
+- エラーメッセージは具体的に
+- ローディング状態を明示
+
+## 🎯 ベストプラクティス
+
+### カード使用
+```vue
+<template>
+  <!-- ✅ 良い例: 一貫したカード構造 -->
+  <div class="card">
+    <div class="card-header pb-0">
+      <h6>タイトル</h6>
+    </div>
+    <div class="card-body">
+      コンテンツ
+    </div>
+  </div>
+
+  <!-- ❌ 避けるべき: 不統一な構造 -->
+  <div class="card">
+    <div class="p-3">
+      <h3>タイトル</h3>
+      <div>コンテンツ</div>
+    </div>
+  </div>
+</template>
+```
+
+### ボタン使用
+```vue
+<template>
+  <!-- ✅ 良い例: グラデーションボタン + アイコン -->
+  <button class="btn bg-gradient-primary">
+    <i class="material-symbols-rounded me-2">add</i>
+    新規作成
+  </button>
+
+  <!-- ❌ 避けるべき: 一貫性のないスタイル -->
+  <button style="background: blue; color: white; padding: 10px;">
+    新規作成
+  </button>
+</template>
+```
+
+### グリッド使用
+```vue
+<template>
+  <!-- ✅ 良い例: レスポンシブグリッド -->
+  <div class="row">
+    <div class="col-xl-3 col-md-6 col-sm-12 mb-4">
+      <!-- カード -->
+    </div>
+  </div>
+
+  <!-- ❌ 避けるべき: 固定幅レイアウト -->
+  <div style="display: flex;">
+    <div style="width: 300px;">
+      <!-- カード -->
+    </div>
+  </div>
+</template>
+```
+
+## 🚨 注意事項
+
+1. **カスタムCSS最小化**
+   - Material Dashboardのクラスを優先使用
+   - scopedスタイルは必要最小限に
+
+2. **色の一貫性**
+   - CSS変数を使用
+   - カスタムカラーは避ける
+
+3. **レスポンシブ対応**
+   - すべてのコンポーネントでモバイル対応
+   - Bootstrapグリッドを活用
+
+4. **アクセシビリティ**
+   - セマンティックHTML使用
+   - aria属性を適切に設定
+
+5. **パフォーマンス**
+   - 不要なアニメーションを削除
+   - 大きな画像を最適化

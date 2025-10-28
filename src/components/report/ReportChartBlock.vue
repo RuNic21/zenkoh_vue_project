@@ -4,11 +4,24 @@
 
 import ReportChart from "../Charts/ReportChart.vue";
 
+// Chart.jsのデータ構造型定義
+interface ChartData {
+  labels: string[];
+  datasets: Array<{
+    label?: string;
+    data: number[];
+    backgroundColor?: string | string[];
+    borderColor?: string | string[];
+    borderWidth?: number;
+    [key: string]: unknown;
+  }>;
+}
+
 interface Props {
   title: string;
   type: "bar" | "doughnut" | "line" | "pie";
   height?: number;
-  data: any;
+  data: ChartData;
 }
 
 const props = withDefaults(defineProps<Props>(), {

@@ -3,6 +3,7 @@
 import { ref, computed } from "vue";
 import { useScheduleStore } from "../store/schedule";
 import { useProjectDetail } from "@/composables/useProjectDetail";
+import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
 
 // 共通コンポーネントのインポート
 import PageHeader from "../components/common/PageHeader.vue";
@@ -14,7 +15,7 @@ import CardHeader from "../components/common/CardHeader.vue";
 import StatCards from "../components/common/StatCards.vue";
 import ProjectSummary from "@/components/project/ProjectSummary.vue";
 import TaskDetailModal from "@/components/task/TaskDetailModal.vue";
-import PerformanceOptimizedTable from "@/components/table/PerformanceOptimizedTable.vue";
+import OptimizedDataTable from "@/components/table/OptimizedDataTable.vue";
 
 // プロジェクト詳細の状態・ロジックは composable から取得
 // useProjectDetail から状態や操作関数を取得
@@ -48,7 +49,7 @@ const store = useScheduleStore();
 
 // タスクテーブルのページネーション・ソート状態
 const taskCurrentPage = ref(1);
-const taskPageSize = ref(10);
+const taskPageSize = ref(DEFAULT_PAGE_SIZE);
 const taskSortColumn = ref<string>("");
 const taskSortDirection = ref<"asc" | "desc">("asc");
 
@@ -174,17 +175,23 @@ console.log("プロジェクト詳細ページが読み込まれました");
 
 <template>
   <!-- プロジェクト詳細ページ -->
-  <div class="project-detail-page">
-    <!-- ローディング/エラー表示 -->
-    <div v-if="isLoading" class="text-center py-4">
-      <LoadingSpinner message="プロジェクト詳細を読み込み中..." />
+  <div class="container-fluid py-4">
+    <!-- ローディング表示 -->
+    <div v-if="isLoading" class="row mb-4">
+      <div class="col-12">
+        <LoadingSpinner message="プロジェクト詳細を読み込み中..." />
+      </div>
     </div>
-    <div v-if="!isLoading && errorMessage" class="alert alert-danger" role="alert">
+
+    <!-- エラー表示 -->
+    <div v-if="!isLoading && errorMessage" class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+      <span class="material-symbols-rounded me-2">error</span>
       {{ errorMessage }}
+      <button type="button" class="btn-close" @click="errorMessage = ''"></button>
     </div>
 
     <!-- プロジェクト詳細が読み込まれている場合 -->
-    <div v-if="!isLoading && projectDetail && !errorMessage">
+    <template v-if="!isLoading && projectDetail && !errorMessage">
       <!-- ページヘッダー -->
       <PageHeader
         :title="projectDetail.name"
@@ -282,16 +289,17 @@ console.log("プロジェクト詳細ページが読み込まれました");
           <div class="card">
             <CardHeader title="タスク一覧" subtitle="このプロジェクトに関連するタスクを管理できます" />
             <div class="card-body">
-              <PerformanceOptimizedTable
+              <OptimizedDataTable
                 :data="sortedProjectTasks"
                 :columns="taskTableColumns"
-                :current-page="taskCurrentPage"
                 :page-size="taskPageSize"
                 :loading="isLoading"
+                :searchable="false"
+                :filterable="false"
+                :virtual-scroll="false"
                 empty-message="このプロジェクトにタスクを追加してください"
                 @page-change="handleTaskPageChange"
                 @sort-change="handleTaskSortChange"
-                @row-click="showTaskDetail"
               >
                 <!-- タスク名セル: アイコン付き -->
                 <template #cell-task_name="{ item }">
@@ -341,7 +349,7 @@ console.log("プロジェクト詳細ページが読み込まれました");
                     詳細
                   </button>
                 </template>
-              </PerformanceOptimizedTable>
+              </OptimizedDataTable>
             </div>
           </div>
         </div>
@@ -406,7 +414,7 @@ console.log("プロジェクト詳細ページが読み込まれました");
           </div>
         </div>
       </div>
-    </div>
+    </template>
 
     <!-- タスク詳細モーダル -->
     <TaskDetailModal 
@@ -420,9 +428,7 @@ console.log("プロジェクト詳細ページが読み込まれました");
 
 <style scoped>
 /* プロジェクト詳細ページのスタイリング */
-.project-detail-page {
-  padding: 1rem;
-}
+/* Material Dashboard スタイルを優先使用 */
 
 /* カードのスタイリング */
 .card {

@@ -86,10 +86,9 @@
 
 // using useProjectManagement composable; no local refs required
 import { useProjectManagement } from "@/composables/useProjectManagement";
-import PerformanceOptimizedTable from "../components/table/PerformanceOptimizedTable.vue";
+import OptimizedDataTable from "../components/table/OptimizedDataTable.vue";
 import ProjectFilterPanel from "../components/project/ProjectFilterPanel.vue";
-import ProjectCreateModal from "../components/project/ProjectCreateModal.vue";
-import ProjectEditModal from "../components/project/ProjectEditModal.vue";
+import ProjectFormModal from "../components/project/ProjectFormModal.vue";
 import ProjectDeleteModal from "../components/project/ProjectDeleteModal.vue";
 import LoadingSpinner from "@/components/common/LoadingSpinner.vue";
 import EmptyState from "@/components/common/EmptyState.vue";
@@ -239,22 +238,17 @@ const {
 
             <!-- パフォーマンス最適化テーブルを使用 -->
             <div v-else class="p-3">
-              <PerformanceOptimizedTable
+              <OptimizedDataTable
                 :data="projectTableRows"
                 :columns="projectTableColumns"
                 :page-size="projectPageSize"
-                :current-page="projectCurrentPage"
                 :loading="isLoading"
+                :searchable="false"
+                :filterable="false"
+                :virtual-scroll="false"
                 empty-message="プロジェクトが見つかりません"
                 @page-change="handleProjectPageChange"
                 @sort-change="handleProjectSortChange"
-                @row-click="(row) => {
-                  // 行クリックで該当プロジェクトのタスクモーダルを開く
-                  const project = projects.find(p => p.id === row.id);
-                  if (project) {
-                    showProjectTasks(project);
-                  }
-                }"
               >
                 <!-- 進行率セル: プログレスバーで表示 -->
                 <template #cell-progress="{ value }">
@@ -280,12 +274,12 @@ const {
                 </template>
 
                 <!-- タスク要約セル: バッジで表示 -->
-                <template #cell-taskSummary="{ value, row }">
+                <template #cell-taskSummary="{ value, item }">
                   <div class="d-flex align-items-center gap-1">
                     <span class="badge badge-sm" :class="{
-                      'bg-gradient-success': row.completedTasks === row.totalTasks && row.totalTasks > 0,
-                      'bg-gradient-info': row.completedTasks < row.totalTasks && row.totalTasks > 0,
-                      'bg-gradient-secondary': row.totalTasks === 0
+                      'bg-gradient-success': item.completedTasks === item.totalTasks && item.totalTasks > 0,
+                      'bg-gradient-info': item.completedTasks < item.totalTasks && item.totalTasks > 0,
+                      'bg-gradient-secondary': item.totalTasks === 0
                     }">
                       {{ value }}
                     </span>
@@ -293,15 +287,15 @@ const {
                 </template>
 
                 <!-- 残り日数セル: 緊急度に応じた色分け -->
-                <template #cell-daysRemaining="{ value, row }">
+                <template #cell-daysRemaining="{ value, item }">
                   <span class="badge badge-sm" :class="{
-                    'bg-gradient-danger': row.daysRemainingStatus === 'overdue',
-                    'bg-gradient-warning': row.daysRemainingStatus === 'warning',
-                    'bg-gradient-success': row.daysRemainingStatus === 'normal',
-                    'bg-gradient-secondary': row.daysRemainingStatus === 'none'
+                    'bg-gradient-danger': item.daysRemainingStatus === 'overdue',
+                    'bg-gradient-warning': item.daysRemainingStatus === 'warning',
+                    'bg-gradient-success': item.daysRemainingStatus === 'normal',
+                    'bg-gradient-secondary': item.daysRemainingStatus === 'none'
                   }">
                     <i class="material-symbols-rounded text-xs me-1" style="font-size: 14px;">
-                      {{ row.daysRemainingStatus === 'overdue' ? 'warning' : 'schedule' }}
+                      {{ item.daysRemainingStatus === 'overdue' ? 'warning' : 'schedule' }}
                     </i>
                     {{ value }}
                   </span>
@@ -311,7 +305,7 @@ const {
                 <template #cell-status="{ value }">
                   <StatusBadge :status="value" />
                 </template>
-              </PerformanceOptimizedTable>
+              </OptimizedDataTable>
 
               <!-- 行アクション: 簡易な別テーブル操作を補完するため、下に選択不要の操作ガイドを提示 -->
               <div class="mt-3 text-xs text-secondary">
@@ -335,8 +329,9 @@ const {
     </div>
 
     <!-- 新規作成モーダル -->
-    <ProjectCreateModal
+    <ProjectFormModal
       :show="showCreateModal"
+      mode="create"
       :form-data="formData"
       :users="users"
       @close="showCreateModal = false"
@@ -344,8 +339,9 @@ const {
     />
 
     <!-- 編集モーダル -->
-    <ProjectEditModal
+    <ProjectFormModal
       :show="showEditModal"
+      mode="edit"
       :form-data="formData"
       :users="users"
       @close="showEditModal = false"

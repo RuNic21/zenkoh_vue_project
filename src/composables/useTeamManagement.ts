@@ -7,6 +7,8 @@ import {
   getTeamStats,
 } from "@/services/teamService";
 import { getNotificationStats, listNotifications, listAlertRules } from "@/services/notificationService";
+import { isServiceSuccess } from "@/utils/typeGuards";
+import { ERROR_MESSAGES } from "@/constants/messages";
 
 // チーム管理ページの主要データロード/状態管理の最小セット
 export function useTeamManagement() {
@@ -32,6 +34,7 @@ export function useTeamManagement() {
     sent_notifications: 0,
     failed_notifications: 0,
     cancelled_notifications: 0,
+    success_rate: 0
   });
   const isNotificationsLoading = ref(false);
   const notifications = ref<Notification[]>([]);
@@ -43,16 +46,17 @@ export function useTeamManagement() {
       isUsersLoading.value = true;
       usersErrorMessage.value = "";
       const result = await listUsers();
-      if (result && typeof result === "object" && "success" in result && result.success && result.data) {
-        users.value = result.data as User[];
+      
+      if (isServiceSuccess<User[]>(result)) {
+        users.value = result.data;
       } else if (Array.isArray(result)) {
-        users.value = result as unknown as User[];
+        users.value = result as User[];
       } else {
         users.value = [];
       }
     } catch (e) {
       console.error("ユーザー読み込みに失敗:", e);
-      usersErrorMessage.value = "ユーザー読み込みに失敗しました。";
+      usersErrorMessage.value = ERROR_MESSAGES.USER_LOAD_FAILED;
       users.value = [];
     } finally {
       isUsersLoading.value = false;
@@ -63,9 +67,14 @@ export function useTeamManagement() {
     try {
       isStatsLoading.value = true;
       const result = await getTeamStats();
-      if (result.success && result.data) teamStats.value = result.data;
+      if (result.success && result.data) {
+        teamStats.value = result.data;
+        console.log("✅ チーム統計をDBから読み込みました:", result.data);
+      } else {
+        console.error("❌ チーム統計の読み込みに失敗:", result.error);
+      }
     } catch (e) {
-      console.error("チーム統計読み込みに失敗:", e);
+      console.error("❌ チーム統計読み込みでエラー:", e);
     } finally {
       isStatsLoading.value = false;
     }
@@ -75,12 +84,30 @@ export function useTeamManagement() {
     try {
       isNotificationsLoading.value = true;
       const statRes = await getNotificationStats();
-      if (statRes.success && statRes.data) notificationStats.value = statRes.data;
+      if (statRes.success && statRes.data) {
+        notificationStats.value = statRes.data;
+        console.log("✅ 通知統計をDBから読み込みました:", statRes.data);
+      } else {
+        console.error("❌ 通知統計の読み込みに失敗:", statRes.error);
+      }
+      
       const [notiRes, ruleRes] = await Promise.all([listNotifications(), listAlertRules()]);
-      if (notiRes.success && notiRes.data) notifications.value = notiRes.data as Notification[];
-      if (ruleRes.success && ruleRes.data) alertRules.value = ruleRes.data as AlertRule[];
+      
+      if (notiRes.success && notiRes.data) {
+        notifications.value = notiRes.data as Notification[];
+        console.log("✅ 通知一覧をDBから読み込みました:", notiRes.data.length, "件");
+      } else {
+        console.error("❌ 通知一覧の読み込みに失敗:", notiRes.error);
+      }
+      
+      if (ruleRes.success && ruleRes.data) {
+        alertRules.value = ruleRes.data as AlertRule[];
+        console.log("✅ アラートルールをDBから読み込みました:", ruleRes.data.length, "件");
+      } else {
+        console.error("❌ アラートルールの読み込みに失敗:", ruleRes.error);
+      }
     } catch (e) {
-      console.error("通知情報読み込みに失敗:", e);
+      console.error("❌ 通知情報読み込みでエラー:", e);
     } finally {
       isNotificationsLoading.value = false;
       isAlertRulesLoading.value = false;

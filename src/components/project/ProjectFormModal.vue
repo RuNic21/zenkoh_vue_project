@@ -1,5 +1,7 @@
 <script setup lang="ts">
-// プロジェクト作成モーダル: 新規プロジェクトの作成フォーム
+// プロジェクトフォームモーダル: 作成・編集を統合
+// 目的: ProjectCreateModalとProjectEditModalの統合により重複コード削減
+import { computed } from "vue";
 import ModalShell from "@/components/common/ModalShell.vue";
 import type { Users } from "@/types/db/users";
 import type { ProjectInsert } from "@/types/project";
@@ -7,7 +9,8 @@ import type { ProjectInsert } from "@/types/project";
 // Props 定義
 interface Props {
   show: boolean; // モーダル表示状態
-  formData: ProjectInsert; // プロジェクト作成フォームデータ
+  mode: "create" | "edit"; // 作成モードまたは編集モード
+  formData: ProjectInsert; // プロジェクトフォームデータ
   users: Users[]; // ユーザー一覧（オーナー選択用）
 }
 
@@ -18,10 +21,23 @@ const emit = defineEmits<{
   close: []; // モーダルを閉じる
   submit: []; // フォーム送信
 }>();
+
+// モードに応じたタイトルとボタンテキストを計算
+const modalTitle = computed(() => {
+  return props.mode === "create" ? "新しいプロジェクト作成" : "プロジェクト編集";
+});
+
+const submitButtonText = computed(() => {
+  return props.mode === "create" ? "作成" : "更新";
+});
+
+const submitButtonIcon = computed(() => {
+  return props.mode === "create" ? "add" : "save";
+});
 </script>
 
 <template>
-  <ModalShell :show="show" title="新しいプロジェクト作成" size="md" @close="emit('close')">
+  <ModalShell :show="show" :title="modalTitle" size="md" @close="emit('close')">
     <template #default>
       <form class="project-form">
         <!-- 基本情報セクション -->
@@ -154,8 +170,10 @@ const emit = defineEmits<{
               id="isArchived"
             >
             <label class="form-check-label text-body ms-3 text-truncate w-80" for="isArchived">
-              <span class="font-weight-bold">アーカイブ状態で作成</span>
-              <small class="text-muted d-block">プロジェクトをアーカイブ状態で作成します</small>
+              <span class="font-weight-bold">アーカイブ状態</span>
+              <small class="text-muted d-block">
+                {{ mode === 'create' ? 'プロジェクトをアーカイブ状態で作成します' : 'プロジェクトをアーカイブします' }}
+              </small>
             </label>
           </div>
         </div>
@@ -167,8 +185,8 @@ const emit = defineEmits<{
         キャンセル
       </button>
       <button type="button" class="btn bg-gradient-primary" @click="emit('submit')">
-        <i class="material-symbols-rounded me-2">add</i>
-        作成
+        <i class="material-symbols-rounded me-2">{{ submitButtonIcon }}</i>
+        {{ submitButtonText }}
       </button>
     </template>
   </ModalShell>

@@ -8,9 +8,16 @@ import type { Project, ProjectInsert, ProjectUpdate } from "@/types/project";
 import type { Task } from "@/types/task";
 import type { Users } from "@/types/db/users";
 import { formatDateJP } from "@/utils/formatters";
+import { useMessage } from "./useMessage";
+import { isServiceSuccess } from "@/utils/typeGuards";
+import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
+import { SUCCESS_MESSAGES, ERROR_MESSAGES } from "@/constants/messages";
 
 // プロジェクト管理ページの状態とロジックを集約する composable
 export function useProjectManagement() {
+  // メッセージ管理
+  const { showSuccess, showError } = useMessage();
+  
   // 基本状態
   const projects = ref<Project[]>([]);
   const users = ref<Users[]>([]);
@@ -128,7 +135,7 @@ export function useProjectManagement() {
 
   // テーブル設定
   const projectCurrentPage = ref(1);
-  const projectPageSize = ref(10);
+  const projectPageSize = ref(DEFAULT_PAGE_SIZE);
   const projectSortColumn = ref<string>("");
   const projectSortDirection = ref<"asc" | "desc">("asc");
   const projectTableColumns = [
@@ -198,7 +205,7 @@ export function useProjectManagement() {
         : "タスクなし";
       
       // 残り日数計算
-      const daysRemainingData = calculateDaysRemaining(p.end_date);
+      const daysRemainingData = calculateDaysRemaining(p.end_date ?? null);
       
       return {
         id: p.id,
@@ -219,10 +226,11 @@ export function useProjectManagement() {
     });
     
     if (projectSortColumn.value) {
-      const col = projectSortColumn.value as keyof (typeof base)[number];
+      type ProjectRow = typeof base[number];
+      const col = projectSortColumn.value as keyof ProjectRow;
       base.sort((a, b) => {
-        let aVal: any;
-        let bVal: any;
+        let aVal: string | number;
+        let bVal: string | number;
         
         // 特定の列の場合は数値でソート
         if (col === "progress") {
@@ -232,8 +240,10 @@ export function useProjectManagement() {
           aVal = a.daysRemainingValue;
           bVal = b.daysRemainingValue;
         } else {
-          aVal = (a[col] as any) ?? "";
-          bVal = (b[col] as any) ?? "";
+          const aValue = a[col];
+          const bValue = b[col];
+          aVal = typeof aValue === "string" || typeof aValue === "number" ? aValue : "";
+          bVal = typeof bValue === "string" || typeof bValue === "number" ? bValue : "";
         }
         
         if (aVal < bVal) return projectSortDirection.value === "asc" ? -1 : 1;
@@ -266,12 +276,12 @@ export function useProjectManagement() {
       if (result.success && result.data) {
         projects.value = result.data;
       } else {
-        errorMessage.value = result.error || "プロジェクト一覧の読み込みに失敗しました。";
+        errorMessage.value = result.error || ERROR_MESSAGES.PROJECT_LOAD_FAILED;
         projects.value = [];
       }
     } catch (e) {
       console.error("プロジェクト一覧の読み込みに失敗:", e);
-      errorMessage.value = "プロジェクト一覧の読み込みに失敗しました。";
+      errorMessage.value = ERROR_MESSAGES.PROJECT_LOAD_FAILED;
       projects.value = [];
     } finally {
       isLoading.value = false;
@@ -281,10 +291,12 @@ export function useProjectManagement() {
   const loadUsers = async () => {
     try {
       const result = await listUsers();
-      if (result && typeof result === "object" && "success" in result) {
-        users.value = result.success && result.data ? (result.data as Users[]) : [];
+      if (isServiceSuccess<Users[]>(result)) {
+        users.value = result.data;
+      } else if (Array.isArray(result)) {
+        users.value = result as Users[];
       } else {
-        users.value = (result as unknown as Users[]) ?? [];
+        users.value = [];
       }
     } catch (e) {
       console.error("ユーザー一覧の読み込みに失敗:", e);
@@ -322,7 +334,7 @@ export function useProjectManagement() {
   const handleCreateProject = async () => {
     try {
       if (!formData.value.name.trim()) {
-        alert("プロジェクト名を入力してください。");
+        showError(ERROR_MESSAGES.REQUIRED_FIELD);
         return;
       }
       const result = await createProject(formData.value);
@@ -333,20 +345,20 @@ export function useProjectManagement() {
         await logProjectCreated(result.data.id, result.data.name, ownerName);
         await Promise.all([loadTasks(), loadDashboardStats()]);
         resetForm();
-        alert("プロジェクトが正常に作成されました！");
+        showSuccess(SUCCESS_MESSAGES.PROJECT_CREATE);
       } else {
-        alert(result.error || "プロジェクトの作成に失敗しました。");
+        showError(result.error || "プロジェクトの作成に失敗しました。");
       }
     } catch (e) {
       console.error("プロジェクト作成エラー:", e);
-      alert("プロジェクト作成中にエラーが発生しました。");
+      showError(ERROR_MESSAGES.PROJECT_CREATE_FAILED);
     }
   };
 
   const handleEditProject = async () => {
     try {
       if (!selectedProject.value || !formData.value.name.trim()) {
-        alert("プロジェクト名を入力してください。");
+        showError("プロジェクト名を入力してください。");
         return;
       }
       const updateData: ProjectUpdate = {
@@ -365,13 +377,13 @@ export function useProjectManagement() {
         selectedProject.value = null;
         await Promise.all([loadTasks(), loadDashboardStats()]);
         resetForm();
-        alert("プロジェクトが正常に更新されました！");
+        showSuccess(SUCCESS_MESSAGES.PROJECT_UPDATE);
       } else {
-        alert(result.error || "プロジェクトの更新に失敗しました。");
+        showError(result.error || "プロジェクトの更新に失敗しました。");
       }
     } catch (e) {
       console.error("プロジェクト更新エラー:", e);
-      alert("プロジェクト更新中にエラーが発生しました。");
+      showError(ERROR_MESSAGES.PROJECT_UPDATE_FAILED);
     }
   };
 
@@ -384,13 +396,13 @@ export function useProjectManagement() {
         showDeleteModal.value = false;
         selectedProject.value = null;
         await Promise.all([loadTasks(), loadDashboardStats()]);
-        alert("プロジェクトが正常に削除されました。");
+        showSuccess(SUCCESS_MESSAGES.PROJECT_DELETE);
       } else {
-        alert(result.error || "プロジェクトの削除に失敗しました。");
+        showError(result.error || "プロジェクトの削除に失敗しました。");
       }
     } catch (e) {
       console.error("プロジェクト削除エラー:", e);
-      alert("プロジェクト削除中にエラーが発生しました。");
+      showError(ERROR_MESSAGES.PROJECT_DELETE_FAILED);
     }
   };
 
@@ -427,7 +439,7 @@ export function useProjectManagement() {
     }
   };
 
-  const showProjectTasks = async (project: Project) => {
+  const showProjectTasks = (project: Project) => {
     try {
       const projectId = project.id;
       const url = new URL(window.location.href);
@@ -440,7 +452,7 @@ export function useProjectManagement() {
       }, 100);
     } catch (e) {
       console.error("プロジェクト詳細への遷移に失敗:", e);
-      alert("プロジェクト詳細ページへの遷移に失敗しました。");
+      showError("プロジェクト詳細ページへの遷移に失敗しました。");
     }
   };
 

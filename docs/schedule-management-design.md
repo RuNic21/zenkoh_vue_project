@@ -8,7 +8,19 @@ Zenkoh Project Schedulerは、Vue 3 + Supabaseを基盤とした現代的プロ�
 
 **管理者中心運用**: ユーザー管理は管理者が直接修正
 
-## 🎯 主要画面構成（5つのメインページ）
+## 🎯 主要画面構成（9つのページ）
+
+### 認証ページ
+
+#### ログインページ (LoginPage.vue)
+- **主要機能**: Supabase Auth によるログイン
+- **使用技術**: Material Design 3, リアルタイムバリデーション
+- **セキュリティ**: HTTPS通信、セキュアなセッション管理
+
+#### 会員登録ページ (SignUpPage.vue)
+- **主要機能**: 新規ユーザー登録
+- **バリデーション**: メール形式、パスワード強度チェック
+- **セキュリティ**: パスワード暗号化、Supabase Auth 統合
 
 ### 1. ダッシュボード画面 (Dashboard)
 
@@ -39,7 +51,14 @@ Zenkoh Project Schedulerは、Vue 3 + Supabaseを基盤とした現代的プロ�
 - **ユーティリティ**: `src/utils/uiHelpers.ts` (状態別色クラス)
 - **チャート**: `src/components/Charts/ReportChart.vue` (データ可視化)
 
-### 2. プロジェクト管理画面 (Project Management)
+### プロジェクト詳細画面 (ProjectDetail.vue)
+#### 主要機能
+- **プロジェクト詳細情報表示**: 選択されたプロジェクトの詳細情報
+- **タスクタイムライン**: プロジェクト内タスクの時系列表示
+- **カンバンボード**: タスクの視覚的な進捗管理
+- **統計チャート**: プロジェクト統計情報の可視化
+
+### 2. プロジェクト管理画面 (ProjectManagement.vue)
 
 #### 主要機能
 - **プロジェクト一覧照会**: 全てのプロジェクトの基本情報表示
@@ -309,10 +328,11 @@ src/
     └── ReportPage.vue         # レポート・分析画面
 ```
 
-### 2. サービス階層 (11個の専門サービス)
+### 2. サービス階層 (12個の専門サービス)
 ```
 src/services/
 ├── supabaseClient.ts          # Supabase接続クライアント
+├── authService.ts             # 認証サービス（Supabase Auth）
 ├── crud.ts                    # 汎用CRUDファクトリ
 ├── dbServices.ts              # 自動生成CRUDリポジトリ
 ├── taskService.ts             # タスク専用サービス

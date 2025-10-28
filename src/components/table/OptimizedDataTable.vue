@@ -6,18 +6,21 @@ import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { debounce, throttle, useVirtualScroll, PerformanceMonitor } from "../../utils/performanceUtils";
 import TablePagination from "./TablePagination.vue";
 
+// データ行の型（汎用的なレコード型）
+type DataRow = Record<string, unknown>;
+
 // Props定義
 interface Column {
   key: string;
   label: string;
   sortable?: boolean;
   filterable?: boolean;
-  formatter?: (value: any) => string;
+  formatter?: (value: unknown) => string;
   width?: string;
 }
 
 interface Props {
-  data: any[];
+  data: DataRow[];
   columns: Column[];
   pageSize?: number;
   virtualScroll?: boolean;
@@ -45,7 +48,7 @@ const emit = defineEmits<{
   'page-change': [page: number];
   'sort-change': [column: string, direction: 'asc' | 'desc'];
   'search-change': [query: string];
-  'filter-change': [filters: Record<string, any>];
+  'filter-change': [filters: Record<string, unknown>];
 }>();
 
 // リアクティブデータ
@@ -88,8 +91,12 @@ const processedData = computed(() => {
   // ソート
   if (sortColumn.value) {
     result.sort((a, b) => {
-      const aVal = a[sortColumn.value];
-      const bVal = b[sortColumn.value];
+      const aVal = a[sortColumn.value] as string | number | null;
+      const bVal = b[sortColumn.value] as string | number | null;
+      
+      // null/undefinedの場合は最後にソート
+      if (aVal === null || aVal === undefined) return 1;
+      if (bVal === null || bVal === undefined) return -1;
       
       if (aVal < bVal) return sortDirection.value === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDirection.value === 'asc' ? 1 : -1;
@@ -175,7 +182,7 @@ const handlePageChange = (page: number) => {
   emit('page-change', page);
 };
 
-const handleFilterChange = (key: string, value: any) => {
+const handleFilterChange = (key: string, value: unknown) => {
   filters.value = { ...filters.value, [key]: value };
   emit('filter-change', filters.value);
   if (!props.virtualScroll) {
@@ -250,8 +257,8 @@ const isDev = import.meta.env.DEV;
               <option value="">すべての{{ column.label }}</option>
               <option 
                 v-for="value in [...new Set(data.map(item => item[column.key]))]" 
-                :key="value" 
-                :value="value"
+                :key="String(value)" 
+                :value="String(value)"
               >
                 {{ value }}
               </option>

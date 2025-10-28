@@ -6,13 +6,16 @@ Zenkoh Project Scheduler は Supabase を基盤とした現代的プロジェク
 
 ## 🎯 最新の更新（2025年1月）
 
-- **サービス層拡張**: 11個の専門サービスに拡張完了
-- **ページ拡張**: 5つのメインページ（ダッシュボード、スケジュール一覧・詳細、プロジェクト管理、チーム管理、レポート）
+- **サービス層拡張**: 12個の専門サービス（認証サービス追加）
+- **ページ拡張**: 9つのページ（ダッシュボード、ログイン、会員登録、スケジュール一覧・詳細、プロジェクト管理・詳細、チーム管理、レポート）
+- **Vue Router 4 統合**: 完全なSPAルーティング、Lazy Loading対応
+- **Supabase Auth 統合**: 認証システム完全実装（ログイン・会員登録・セッション管理・ルーターガード）
 - **自動型生成**: SupabaseスキーマからTypeScript型を自動生成
 - **完全なDB統合**: 実際のSupabaseデータで動作確認完了
 - **開発ワークフロー**: 環境テスト、シードデータ、CRUDテストスクリプト完備
 - **型安全性確保**: TypeScriptによる完全な型チェック
 - **データ可視化**: Chart.js、vue-chartjsを活用した統計・分析機能
+- **Composables**: 12個のComposition API関数（useAuth追加）
 
 ## 🏗️ 全体アーキテクチャ
 
@@ -223,13 +226,19 @@ TASKS (primary_assignee) + TASK_MEMBERS (追加メンバー) → 協業進行
 - **自動生成**: `src/types/db/*.ts` (Supabaseスキーマから自動生成)
 - **手動定義**: `src/types/task.ts`, `src/types/project.ts` (ビジネスロジック用)
 
-### サービスレイヤー（6個のコアファイル）
-- **基本接続**: `src/services/supabaseClient.ts` (Supabaseクライアントおよび基本クエリ)
+### サービスレイヤー（12個の専門サービス）
+- **基本接続**: `src/services/supabaseClient.ts` (Supabaseクライアント)
+- **認証**: `src/services/authService.ts` (Supabase Auth - ログイン・会員登録・セッション管理)
 - **汎用CRUD**: `src/services/crud.ts` (型安全なCRUDファクトリ)
-- **自動生成サービス**: `src/services/dbServices.ts` (スキーマベースCRUDサービス)
-- **タスクサービス**: `src/services/taskService.ts` (タスク専用ビジネスロジック)
-- **プロジェクトサービス**: `src/services/projectService.ts` (プロジェクト専用ビジネスロジック)
-- **関係サービス**: `src/services/relationService.ts` (JOINクエリおよび関係型データ)
+- **自動生成**: `src/services/dbServices.ts` (スキーマベースCRUDサービス)
+- **タスク**: `src/services/taskService.ts` (タスク専用ビジネスロジック)
+- **プロジェクト**: `src/services/projectService.ts` (プロジェクト専用ビジネスロジック)
+- **関係データ**: `src/services/relationService.ts` (JOINクエリおよび関係型データ)
+- **ダッシュボード**: `src/services/dashboardService.ts` (統計・分析)
+- **活動**: `src/services/activityService.ts` (活動フィード・通知管理)
+- **レポート**: `src/services/reportService.ts` (レポート生成・エクスポート)
+- **チーム**: `src/services/teamService.ts` (チーム管理)
+- **通知**: `src/services/notificationService.ts` (通知システム)
 
 ### データ変換
 - **アダプター**: `src/utils/taskAdapter.ts` (DB ↔ UI変換)
@@ -277,17 +286,21 @@ id,project_id,task_name,description,status,priority,progress_percent,planned_sta
 
 ## 🎯 サービス層対応
 
-### 11個の専門サービス
+### 12個の専門サービス
 - **基本CRUD**: `crud.ts`, `dbServices.ts`
+- **認証**: `authService.ts` (Supabase Auth)
 - **専門機能**: `taskService.ts`, `projectService.ts`, `teamService.ts`
 - **分析機能**: `dashboardService.ts`, `reportService.ts`
 - **通知機能**: `notificationService.ts`, `activityService.ts`
 - **関係型データ**: `relationService.ts`
 
-### 5つのメインページ
-- **ダッシュボード**: プロジェクト進捗統計・可視化
-- **スケジュール一覧**: タスク一覧・フィルタリング
-- **スケジュール詳細**: タスク詳細・編集
-- **プロジェクト管理**: プロジェクトCRUD・カンバンボード
-- **チーム管理**: ユーザー管理・権限設定
-- **レポート・分析**: 統計・分析・レポート生成
+### 9つのページ
+- **ダッシュボード** (`DashboardPage.vue`): プロジェクト進捗統計・可視化
+- **ログイン** (`LoginPage.vue`): Supabase Auth ログイン
+- **会員登録** (`SignUpPage.vue`): Supabase Auth 会員登録
+- **スケジュール一覧** (`ScheduleList.vue`): タスク一覧・フィルタリング
+- **スケジュール詳細** (`ScheduleDetail.vue`): タスク詳細・編集
+- **プロジェクト管理** (`ProjectManagement.vue`): プロジェクトCRUD
+- **プロジェクト詳細** (`ProjectDetail.vue`): プロジェクト詳細・カンバンボード
+- **チーム管理** (`TeamManagement.vue`): ユーザー管理・権限設定・通知管理
+- **レポート・分析** (`ReportPage.vue`): 統計・分析・レポート生成

@@ -1,19 +1,17 @@
 <script setup lang="ts">
 // ナビゲーションバーコンポーネント: ページタイトル・検索・通知・設定を表示
 import { computed } from "vue";
+import { useAuth } from "@/composables/useAuth";
 
 // Props 定義
 interface Props {
   currentPage: string;
-  searchQuery: string;
 }
 
 const props = defineProps<Props>();
 
-// Emits 定義
-const emit = defineEmits<{
-  "update:searchQuery": [value: string];
-}>();
+// 認証状態を取得
+const { user, displayName, isAuthenticated, logout } = useAuth();
 
 // ページ名から表示テキストを取得
 const pageDisplayName = computed(() => {
@@ -28,15 +26,20 @@ const pageDisplayName = computed(() => {
       return "チーム管理";
     case "report":
       return "レポート";
+    case "schedule-list":
+      return "タスク管理";
+    case "schedule-detail":
+      return "タスク詳細";
     default:
-      return "スケジュール管理";
+      return "プロジェクト管理";
   }
 });
 
-// 検索クエリ更新ハンドラ
-const handleSearchInput = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  emit("update:searchQuery", target.value);
+// ログアウト処理
+const handleLogout = async () => {
+  if (confirm("ログアウトしますか？")) {
+    await logout();
+  }
 };
 </script>
 
@@ -62,19 +65,17 @@ const handleSearchInput = (event: Event) => {
 
       <!-- 検索・アイコンエリア -->
       <div class="collapse navbar-collapse mt-sm-0 mt-2 me-md-0 me-sm-4" id="navbar">
-        <!-- 検索フォーム -->
-        <div class="ms-md-auto pe-md-3 d-flex align-items-center">
+        <!-- 検索フォーム（グローバル検索は将来実装予定） -->
+        <!-- <div class="ms-md-auto pe-md-3 d-flex align-items-center">
           <div class="input-group input-group-outline">
             <label class="form-label"></label>
             <input
               type="text"
               class="form-control"
               placeholder="プロジェクトや担当者を検索してください"
-              :value="searchQuery"
-              @input="handleSearchInput"
             />
           </div>
-        </div>
+        </div> -->
 
         <!-- 右側アイコンメニュー -->
         <ul class="navbar-nav d-flex align-items-center justify-content-end">
@@ -124,11 +125,52 @@ const handleSearchInput = (event: Event) => {
             </ul>
           </li>
 
-          <!-- ユーザーアイコン -->
-          <li class="nav-item d-flex align-items-center">
-            <a href="javascript:;" class="nav-link text-body font-weight-bold px-0">
-              <i class="material-symbols-rounded">account_circle</i>
+          <!-- ユーザーメニュー -->
+          <li v-if="isAuthenticated" class="nav-item dropdown d-flex align-items-center">
+            <a
+              href="javascript:;"
+              class="nav-link text-body font-weight-bold px-0 dropdown-toggle"
+              id="userMenuButton"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              <i class="material-symbols-rounded me-1">account_circle</i>
+              <span class="d-none d-sm-inline">{{ displayName }}</span>
             </a>
+            <ul
+              class="dropdown-menu dropdown-menu-end px-2 py-3"
+              aria-labelledby="userMenuButton"
+            >
+              <li class="mb-2">
+                <a class="dropdown-item border-radius-md" href="javascript:;">
+                  <div class="d-flex align-items-center">
+                    <i class="material-symbols-rounded me-2">person</i>
+                    <span>プロフィール</span>
+                  </div>
+                </a>
+              </li>
+              <li class="mb-2">
+                <a class="dropdown-item border-radius-md" href="javascript:;">
+                  <div class="d-flex align-items-center">
+                    <i class="material-symbols-rounded me-2">settings</i>
+                    <span>設定</span>
+                  </div>
+                </a>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <a 
+                  class="dropdown-item border-radius-md text-danger" 
+                  href="javascript:;"
+                  @click="handleLogout"
+                >
+                  <div class="d-flex align-items-center">
+                    <i class="material-symbols-rounded me-2">logout</i>
+                    <span>ログアウト</span>
+                  </div>
+                </a>
+              </li>
+            </ul>
           </li>
         </ul>
       </div>

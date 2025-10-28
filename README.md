@@ -10,8 +10,9 @@ Zenkoh のプロジェクト/スケジュール管理用 Web アプリケーシ�
 - **データベース統合**: Supabase を基盤とした完全な DB 連携
 - **エラーハンドリング**: `src/utils/errorHandler.ts` - 統一されたエラー処理
 
-### サービス層（11個の専門サービス）
+### サービス層（12個の専門サービス）
 - `src/services/supabaseClient.ts` - Supabase 接続クライアント
+- `src/services/authService.ts` - 認証サービス（Supabase Auth - ログイン・会員登録・セッション管理）
 - `src/services/taskService.ts` - タスク専用サービス
 - `src/services/projectService.ts` - プロジェクト専用サービス
 - `src/services/relationService.ts` - 複合関係取得
@@ -29,12 +30,16 @@ Zenkoh のプロジェクト/スケジュール管理用 Web アプリケーシ�
   - 同期操作: `selectSchedule`, `updateSchedule`, `addSchedule`, `removeSchedule`
   - 非同期操作: `loadAll`, `save`, `create`, `delete`（Supabase 連携）
 
-### 画面構成（5つのメインページ）
-- **ダッシュボード** (`App.vue`): プロジェクト進捗一覧、統計情報、フィルタリング
+### 画面構成（9つのページ）
+- **ダッシュボード** (`pages/DashboardPage.vue`): プロジェクト進捗一覧、統計情報、フィルタリング
+- **ログイン** (`pages/LoginPage.vue`): Supabase Auth ログイン、セッション管理
+- **会員登録** (`pages/SignUpPage.vue`): 新規ユーザー登録、プロフィール設定
 - **プロジェクト管理** (`pages/ProjectManagement.vue`): プロジェクト CRUD、統計チャート
-- **タスク管理** (`pages/ScheduleList.vue`): タスク一覧、詳細表示
-- **チーム管理** (`pages/TeamManagement.vue`): ユーザー管理、権限設定
-- **レポート** (`pages/ReportPage.vue`): 分析レポート、エクスポート機能
+- **プロジェクト詳細** (`pages/ProjectDetail.vue`): プロジェクト詳細、カンバンボード、タスクタイムライン
+- **タスク管理** (`pages/ScheduleList.vue`): タスク一覧、詳細表示、フィルタリング
+- **タスク詳細** (`pages/ScheduleDetail.vue`): タスク詳細、編集、コメント・添付ファイル管理
+- **チーム管理** (`pages/TeamManagement.vue`): ユーザー管理、権限設定、通知管理
+- **レポート** (`pages/ReportPage.vue`): 分析レポート、エクスポート機能、統計チャート
 
 詳しくは `.cursor/rules/project-data-architecture.mdc` を参照してください。
 
@@ -201,6 +206,7 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 
 ### フロントエンド
 - **フレームワーク**: Vue 3 (Composition API)
+- **ルーター**: Vue Router 4
 - **ビルドツール**: Vite
 - **UI/レイアウト**: Material Dashboard 3, Bootstrap 5
 - **チャート**: Chart.js, vue-chartjs
@@ -208,7 +214,7 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 
 ### バックエンド・データベース
 - **データベース**: Supabase (PostgreSQL)
-- **認証**: Supabase Auth
+- **認証**: Supabase Auth（ログイン・会員登録・セッション管理）
 - **リアルタイム**: Supabase Realtime
 
 ### ユーティリティ・ライブラリ
@@ -221,7 +227,9 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 
 ### コア機能
 - **モダンな UI**: Material Design 3 準拠のレスポンシブレイアウト
-- **完全なデータベース統合**: Supabase によるリアルタイムデータ同期
+- **SPA ルーティング**: Vue Router 4 によるシームレスなページ遷移（9つのページ）
+- **セキュアな認証**: Supabase Auth による安全なログイン・会員登録・セッション管理・ルーターガード
+- **完全なデータベース統合**: Supabase によるリアルタイムデータ同期（12個の専門サービス）
 - **包括的なプロジェクト管理**: プロジェクト、タスク、チーム、レポートの一元管理
 
 ### 高度な機能
@@ -233,9 +241,13 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 - **アラート・通知システム**: 締切監視、自動通知
 
 ### 技術的特徴
-- **型安全性**: TypeScript による完全な型定義
-- **パフォーマンス最適化**: 効率的なデータ取得・表示
+- **型安全性**: TypeScript による完全な型定義（15個の型定義ファイル）
+- **SPA アーキテクチャ**: Vue Router 4 によるクライアントサイドルーティング
+- **認証システム**: Supabase Auth + ルーターガードによるアクセス制御
+- **Composables**: 12個のComposition API関数（useAuth, useDashboard, useMessage 等）
+- **パフォーマンス最適化**: Lazy Loading、効率的なデータ取得・表示、最適化されたテーブルコンポーネント
 - **エラーハンドリング**: 統一されたエラー処理・ユーザーフレンドリーなメッセージ
+- **定数管理**: 7つの定数ファイルによる一貫したUI・ロジック（pagination, format, messages, database, validation, ui, chart）
 - **多言語対応**: 日本語 UI 完全対応
 
 ## 📝 注意事項
@@ -247,9 +259,13 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 - **型安全性**: `src/types/db/*.ts` は自動生成ファイル（編集禁止）
 
 ### アーキテクチャ
-- **サービス層**: 11個の専門サービスに整理完了、クリーンなコードベース
-- **コンポーネント設計**: 必要なセクションをコンポーネント化して Vue に統合
-- **データフロー**: コンポーネント → Store/Service → Supabase の一方向フロー
+- **サービス層**: 12個の専門サービス（認証サービス追加）、クリーンなコードベース
+- **ページ構成**: 9つのページ（ダッシュボード、認証、プロジェクト、タスク、チーム、レポート）
+- **Vue Router 4**: SPA アーキテクチャ、Lazy Loading、ルーターガード
+- **コンポーネント設計**: カテゴリ別に整理された再利用可能コンポーネント（9つのカテゴリ）
+- **Composables**: 12個の Composition API 関数（useAuth 等）
+- **定数管理**: 一貫した定数管理（7つの定数ファイル）
+- **データフロー**: コンポーネント → Composable/Store → Service → Supabase の一方向フロー
 
 ## 📚 ルール/ガイドライン
 
@@ -257,9 +273,26 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 
 ## 📖 ドキュメント
 
-- [データベーススキーマ](./docs/database-schema.md) - 詳細なDB構造説明（2025年1月更新）
+### データベース
+- [データベーススキーマ](./docs/database-schema.md) - 詳細なDB構造説明（2025年1月更新 - 12サービス・9ページ対応）
 - [データベース統合ガイド](./docs/database-integration-guide.md) - クイックスタートガイド
-- [フロントエンドアーキテクチャ](./docs/frontend-architecture.md) - Vue/UI構造説明
+
+### UI/UX・レイアウト
+- [UI/UX スタイルガイド](./docs/ui-ux-style-guide.md) - Material Dashboard 3 完全スタイルガイド
+- [ページレイアウトテンプレート](./docs/page-layout-template.md) - 標準ページ構造・テンプレート
+- [レイアウト統一作業サマリー](./docs/layout-improvements-summary.md) - レイアウト改善記録
+
+### 認証システム
+- [認証システム統合ガイド](./docs/auth-system-integration.md) - Supabase Auth 完全統合ガイド（ログイン・会員登録・セッション管理）
+- [認証とusersテーブルの課題](./docs/auth-users-table-issue.md) - 技術的課題と解決策
+- [Supabaseメール確認設定](./docs/supabase-email-confirmation-setup.md) - メール確認設定ガイド
+
+### Vue Router
+- [Vue Router統合ガイド](./docs/vue-router-integration.md) - Vue Router 4 完全統合（9ページ・ルーターガード）
+
+### 開発ガイド
+- [スケジュール管理設計書](./docs/schedule-management-design.md) - 画面設計・データフロー（12サービス・9ページ対応）
+- [定数リファクタリング](./docs/constants-refactoring.md) - 定数管理の統一化
 
 ## 🔗 リンク
 
@@ -292,6 +325,12 @@ Property 'someField' does not exist on type 'Task'
 Cannot find module './scheduleService'
 ```
 → サービス層整理により `scheduleService.ts` は削除されました。`src/store/schedule.ts` の `useScheduleStore()` を使用してください
+
+### 認証エラー
+```
+Email not confirmed
+```
+→ Supabase ダッシュボードでメール確認を無効化してください。詳細は `docs/supabase-email-confirmation-setup.md` を参照
 
 ### チャート表示エラー
 ```

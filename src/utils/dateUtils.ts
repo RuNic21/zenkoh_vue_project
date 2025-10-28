@@ -89,3 +89,39 @@ export function isOverdue(endDate: string): boolean {
     return false;
   }
 }
+
+/**
+ * 日付を日本語形式でフォーマット（YYYY/MM/DD）
+ * @param dateString ISO文字列または日付文字列
+ * @returns フォーマット済み日付文字列
+ */
+export function formatDate(dateString: string | null | undefined): string {
+  if (!dateString) return "-";
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString("ja-JP");
+  } catch (error) {
+    console.error("日付フォーマットエラー:", error);
+    return "-";
+  }
+}
+
+/**
+ * 日時を日本語形式でフォーマット（YYYY/MM/DD HH:mm）
+ * @param dateTimeString ISO文字列または日時文字列
+ * @returns フォーマット済み日時文字列
+ */
+export function formatDateTime(dateTimeString: string | null | undefined): string {
+  if (!dateTimeString) return "-";
+  try {
+    const date = new Date(dateTimeString);
+    if (isNaN(date.getTime())) return "-";
+    const datePart = date.toLocaleDateString("ja-JP");
+    const timePart = date.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+    return `${datePart} ${timePart}`;
+  } catch (error) {
+    console.error("日時フォーマットエラー:", error);
+    return "-";
+  }
+}

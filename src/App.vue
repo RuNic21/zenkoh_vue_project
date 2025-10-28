@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // プロジェクト管理スケジューラー: メインアプリケーションコンポーネント
-import { onMounted } from "vue";
+import { onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import { useScheduleStore } from "./store/schedule";
 import MainLayout from "./layouts/MainLayout.vue";
@@ -12,6 +12,8 @@ import ConfirmDialog from "./components/common/ConfirmDialog.vue";
 const route = useRoute();
 const store = useScheduleStore();
 
+// 認証が必要なページかどうかを判定
+const requiresAuth = computed(() => route.meta.requiresAuth !== false);
 
 // アプリケーション初期化
 onMounted(async () => {
@@ -23,22 +25,30 @@ onMounted(async () => {
 
 <template>
   <!-- メインレイアウトコンテナ -->
-  <div id="app" class="g-sidenav-show bg-gray-100">
-    <!-- メインレイアウトコンポーネント -->
-    <MainLayout>
-      <!-- 動的コンテンツエリア -->
-      <div class="main-content position-relative max-height-vh-100 h-100 border-radius-lg">
-        
-        <!-- ナビゲーションバー -->
-        <NavigationBar :current-page="route.name?.toString() || 'dashboard'" />
+  <div id="app" :class="{ 'g-sidenav-show bg-gray-100': requiresAuth }">
+    
+    <!-- 認証が必要なページ: MainLayoutを適用 -->
+    <template v-if="requiresAuth">
+      <MainLayout>
+        <!-- 動的コンテンツエリア -->
+        <div class="main-content position-relative max-height-vh-100 h-100 border-radius-lg">
+          
+          <!-- ナビゲーションバー -->
+          <NavigationBar :current-page="route.name?.toString() || 'dashboard'" />
 
-        <!-- メインコンテンツエリア -->
-        <div class="container-fluid py-4">
-          <!-- Vue Router による動的ページ表示 -->
-          <router-view />
+          <!-- メインコンテンツエリア -->
+          <div class="container-fluid py-4">
+            <!-- Vue Router による動的ページ表示 -->
+            <router-view />
+          </div>
         </div>
-      </div>
-    </MainLayout>
+      </MainLayout>
+    </template>
+    
+    <!-- 認証不要なページ: レイアウトなしで直接表示 -->
+    <template v-else>
+      <router-view />
+    </template>
   </div>
 
   <!-- グローバルメッセージシステム -->

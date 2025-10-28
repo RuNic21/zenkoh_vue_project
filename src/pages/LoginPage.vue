@@ -251,7 +251,7 @@ onMounted(() => {
 <style scoped>
 .login-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-color: #e5e5e5;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -289,7 +289,7 @@ onMounted(() => {
 }
 
 .input-group.is-focused {
-  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+  box-shadow: 0 0 0 0.2rem rgba(233, 30, 99, 0.25);
 }
 
 .btn {

@@ -41,8 +41,9 @@ npm run dev
 - **alert_rules**: アラートルール
 - **notifications**: 通知履歴
 
-### サービス層（11個の専門サービス）
+### サービス層（12個の専門サービス）
 - **基本CRUD**: `crud.ts`, `dbServices.ts`
+- **認証**: `authService.ts` (Supabase Auth)
 - **専門機能**: `taskService.ts`, `projectService.ts`, `teamService.ts`
 - **分析機能**: `dashboardService.ts`, `reportService.ts`
 - **通知機能**: `notificationService.ts`, `activityService.ts`

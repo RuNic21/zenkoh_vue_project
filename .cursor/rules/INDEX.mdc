@@ -6,21 +6,21 @@
 **すべてのリクエストで自動的に参照される基本ルール**
 
 - **coding-style.mdc** — 日本語コメント方針、UI テキスト日本語、セミコロン/ダブルクォート、既存インデント遵守、新機能開発ガイドライン
-- **project-structure.mdc** — プロジェクト構造・ディレクトリ配置・ファイル命名規則・主要ファイル役割（11個の専門サービス、5つのメインページ対応）
+- **project-structure.mdc** — プロジェクト構造・ディレクトリ配置・ファイル命名規則・主要ファイル役割（12個の専門サービス、9つのページ対応、Vue Router・認証システム統合）
 
 ## 🎯 ファイルタイプ別適用ルール（globs指定）
 **特定のファイルタイプで自動的に参照されるルール**
 
 - **javascript-typescript.mdc** (`*.js,*.ts,*.tsx`) — JS/TS 基本スタイル、エラー処理、import/export、型定義、非同期処理、ユーティリティ関数
-- **japanese-ui-guidelines.mdc** (`*.vue,*.js,*.html`) — ボタン/メッセージ/フォーム/テーブル/状態/空/ツールチップ/日付の標準文言（5つのメインページ対応）
-- **vue-patterns.mdc** (`*.vue,*.ts,*.js,*.html,*.css,*.scss`) — Vue 3 Composition API パターン・TypeScript パターン・Material Dashboard UI パターン・データフロー・状態管理・専門サービス使用パターン
+- **japanese-ui-guidelines.mdc** (`*.vue,*.js,*.html`) — ボタン/メッセージ/フォーム/テーブル/状態/空/ツールチップ/日付の標準文言（9つのページ・認証システム対応）
+- **vue-patterns.mdc** (`*.vue,*.ts,*.js,*.html,*.css,*.scss`) — Vue 3 Composition API パターン・TypeScript パターン・Material Dashboard UI パターン・データフロー・状態管理・Vue Router・認証・専門サービス使用パターン
 - **material-dashboard-ui-styles.mdc** (`*.vue,*.html,*.css,*.scss`) — Material Dashboard 3 UI/UX スタイルガイド・色彩パレット・タイポグラフィ・レイアウト・カード・ボタン・フォーム・アイコン・バッジ・テーブル・アニメーション・レスポンシブデザイン原則
 
 ## 📚 選択的参照ルール（description指定）
 **ユーザーが明示的に参照する必要がある専門ルール**
 
-- **database-integration.mdc** — データベース統合ルール・Supabase連携・型変換・エラー処理・開発ツール（11個の専門サービス対応）
-- **development-workflow.mdc** — 開発ワークフロー・デバッグ手順・トラブルシューティング・デプロイ準備（新機能ページ 개발プロセス追加）
+- **database-integration.mdc** — データベース統合ルール・Supabase連携・型変換・エラー処理・開発ツール（12個の専門サービス・認証システム対応）
+- **development-workflow.mdc** — 開発ワークフロー・デバッグ手順・トラブルシューティング・デプロイ準備（Vue Router・認証システム・新機能ページ開発プロセス対応）
 
 ## 運用ルール
 - 既存ルール改訂時は互換維持と移行手順を記載
@@ -28,11 +28,12 @@
 - 型/ヘルパーは重複定義せず既存へ集約
 
 ## 変更履歴（要約）
+- 2025-01: **最新更新** - Vue Router 4 統合・Supabase Auth 認証システム統合完了（12個の専門サービス、9つのページ対応）
 - 2025-01: material-dashboard-ui-styles.mdc 追加（Material Dashboard 3 完全UI/UXガイド - 色彩/タイポグラフィ/レイアウト/コンポーネント/レスポンシブデザイン原則）
 - 2025-01: ルール統合・最適化（typescript-patterns, material-dashboard-integration を vue-patterns に統合）
 - 2025-01: ルール整理・重複削除（vue-components, project-guidelines-ja, project-data-architecture を削除）
 - 2025-01: database-integration.mdc 追加（DB統合完了・実際連携ルール）
 - 2025-01: 不要ファイル削除（scheduleService.ts, supabaseClient.js）
-- 2025-01: サービス層整理完了（6個のコアファイルに集約）
-- 2025-01: プロジェクト拡張対応（11個の専門サービス、5つのメインページ、新機能開発ガイドライン追加）
+- 2025-01: サービス層整理完了（12個の専門サービスに拡張）
+- 2025-01: プロジェクト拡張対応（新機能開発ガイドライン追加）
 - 2025-01: 全ルールファイル更新（現在のプロジェクト状態に完全対応）

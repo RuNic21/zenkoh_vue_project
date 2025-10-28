@@ -340,7 +340,7 @@ const goToLogin = () => {
 <style scoped>
 .signup-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  background-color: #e5e5e5;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -378,7 +378,7 @@ const goToLogin = () => {
 }
 
 .input-group.is-focused {
-  box-shadow: 0 0 0 0.2rem rgba(17, 153, 142, 0.25);
+  box-shadow: 0 0 0 0.2rem rgba(76, 175, 80, 0.25);
 }
 
 .btn {

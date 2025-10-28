@@ -1523,37 +1523,43 @@ const {
     />
 
     <!-- 統計カード -->
-    <TeamStatsCards 
-      :team-stats="teamStats"
-      :notification-stats="notificationStats"
-      :alert-rules="alertRules"
-    />
+    <div class="mb-4">
+      <TeamStatsCards 
+        :team-stats="teamStats"
+        :notification-stats="notificationStats"
+        :alert-rules="alertRules"
+      />
+    </div>
 
     <!-- フィルタリング・アクションパネル（ユーザー管理専用） -->
-    <TeamFilterPanel
-      v-model:search-query="userSearchQuery"
-      v-model:status-filter="userStatusFilter"
-      v-model:role-filter="roleFilter"
-      @clear-filters="clearUserFilters"
-    />
+    <div class="mb-4">
+      <TeamFilterPanel
+        v-model:search-query="userSearchQuery"
+        v-model:status-filter="userStatusFilter"
+        v-model:role-filter="roleFilter"
+        @clear-filters="clearUserFilters"
+      />
+    </div>
 
     <!-- ユーザー一覧 -->
-    <UserManagementTable
-      :users="users"
-      :filtered-users="filteredUsers"
-      :selected-users="selectedUsers"
-      :is-loading="isUsersLoading"
-      :error-message="usersErrorMessage"
-      @select-user="handleSelectUser"
-      @select-all-users="handleSelectAllUsers"
-      @view-profile="handleViewUserProfile"
-      @edit-user="handleEditUser"
-      @create-user="openUserModal"
-      @bulk-activate-users="handleBulkActivateUsers"
-      @bulk-deactivate-users="handleBulkDeactivateUsers"
-      @bulk-delete-users="handleBulkDeleteUsers"
-      @clear-selections="clearAllSelections"
-    />
+    <div class="mb-4">
+      <UserManagementTable
+        :users="users"
+        :filtered-users="filteredUsers"
+        :selected-users="selectedUsers"
+        :is-loading="isUsersLoading"
+        :error-message="usersErrorMessage"
+        @select-user="handleSelectUser"
+        @select-all-users="handleSelectAllUsers"
+        @view-profile="handleViewUserProfile"
+        @edit-user="handleEditUser"
+        @create-user="openUserModal"
+        @bulk-activate-users="handleBulkActivateUsers"
+        @bulk-deactivate-users="handleBulkDeactivateUsers"
+        @bulk-delete-users="handleBulkDeleteUsers"
+        @clear-selections="clearAllSelections"
+      />
+    </div>
 
     <!-- 一括操作パネル: UserManagementTable コンポーネントに統合されました -->
 

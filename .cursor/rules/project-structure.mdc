@@ -26,17 +26,29 @@ src/
 ├── App.vue                 # ルートコンポーネント（ダッシュボード含む）
 ├── layouts/                # レイアウトコンポーネント
 │   └── MainLayout.vue      # メインレイアウト
-├── pages/                  # ページコンポーネント（5つのメインページ）
+├── pages/                  # ページコンポーネント（9つのページ）
+│   ├── DashboardPage.vue   # ダッシュボード
+│   ├── LoginPage.vue       # ログイン
+│   ├── SignUpPage.vue      # 会員登録
 │   ├── ScheduleList.vue    # スケジュール一覧
 │   ├── ScheduleDetail.vue  # スケジュール詳細
 │   ├── ProjectManagement.vue # プロジェクト管理
+│   ├── ProjectDetail.vue   # プロジェクト詳細
 │   ├── TeamManagement.vue  # チーム管理
 │   └── ReportPage.vue      # レポート・分析
 ├── components/             # 再利用可能コンポーネント
 │   ├── Charts/             # チャートコンポーネント
-│   ├── OptimizedDataTable.vue # 最適化データテーブル
-│   └── PerformanceOptimizedTable.vue # パフォーマンス最適化テーブル
-├── services/               # データベース・API サービス（11個の専門サービス）
+│   ├── common/             # 共通コンポーネント
+│   ├── dashboard/          # ダッシュボード用
+│   ├── notification/       # 通知用
+│   ├── project/            # プロジェクト用
+│   ├── report/             # レポート用
+│   ├── table/              # テーブル用
+│   ├── task/               # タスク用
+│   ├── team/               # チーム用
+│   └── user/               # ユーザー用
+├── composables/            # Composition API 関数
+├── services/               # データベース・API サービス（12個の専門サービス）
 ├── store/                  # 状態管理
 ├── types/                  # TypeScript 型定義
 ├── utils/                  # ユーティリティ関数
@@ -76,8 +88,9 @@ import { ref } from "vue";
 - [src/main.js](mdc:src/main.js): Vue アプリ初期化、Material Dashboard CSS 読み込み
 - [src/App.vue](mdc:src/App.vue): ルートコンポーネント、ページルーティング、ダッシュボード
 
-### サービス層（11個の専門サービス）
+### サービス層（12個の専門サービス）
 - [src/services/supabaseClient.ts](mdc:src/services/supabaseClient.ts): Supabase 接続クライアント
+- [src/services/authService.ts](mdc:src/services/authService.ts): 認証サービス（Supabase Auth）
 - [src/services/crud.ts](mdc:src/services/crud.ts): 汎用 CRUD ファクトリ
 - [src/services/dbServices.ts](mdc:src/services/dbServices.ts): 自動生成 CRUD リポジトリ
 - [src/services/taskService.ts](mdc:src/services/taskService.ts): タスク専用サービス
@@ -96,6 +109,7 @@ import { ref } from "vue";
 - [src/types/db/](mdc:src/types/db/): Supabase スキーマ自動生成型（編集禁止）
   - projects.ts, tasks.ts, users.ts, boards.ts, board_columns.ts
   - task_members.ts, notifications.ts, alert_rules.ts
+- [src/types/auth.ts](mdc:src/types/auth.ts): 認証関連型
 - [src/types/schedule.ts](mdc:src/types/schedule.ts): UI 表示用型
 - [src/types/task.ts](mdc:src/types/task.ts): ビジネスロジック用型
 - [src/types/project.ts](mdc:src/types/project.ts): プロジェクト用型

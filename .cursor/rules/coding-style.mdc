@@ -25,15 +25,22 @@ description: コーディングスタイルガイド（日本語）
 - スタイルは関連箇所のみ `scoped`。Material Dashboard のクラスを優先
 
 ## ファイル構造の参照
-- [src/main.js](mdc:src/main.js): エントリーポイント
-- [src/App.vue](mdc:src/App.vue): ルートコンポーネント（ダッシュボード含む）
+- [src/main.js](mdc:src/main.js): エントリーポイント（Vue Router・認証システム初期化）
+- [src/App.vue](mdc:src/App.vue): ルートコンポーネント（router-view）
 - [src/layouts/MainLayout.vue](mdc:src/layouts/MainLayout.vue): メインレイアウト
-- [src/pages/](mdc:src/pages/): ページコンポーネント（5つのメインページ）
+- [src/router/index.ts](mdc:src/router/index.ts): Vue Router 設定
+- [src/pages/](mdc:src/pages/): ページコンポーネント（9つのページ）
+  - DashboardPage.vue, LoginPage.vue, SignUpPage.vue
+  - ScheduleList.vue, ScheduleDetail.vue
+  - ProjectManagement.vue, ProjectDetail.vue
+  - TeamManagement.vue, ReportPage.vue
 - [src/components/](mdc:src/components/): 再利用コンポーネント
-- [src/services/](mdc:src/services/): データベース・API サービス（11個の専門サービス）
+- [src/composables/](mdc:src/composables/): Composition API 関数
+- [src/services/](mdc:src/services/): データベース・API サービス（12個の専門サービス）
 - [src/store/](mdc:src/store/): 状態管理
 - [src/types/](mdc:src/types/): TypeScript 型定義
 - [src/utils/](mdc:src/utils/): ユーティリティ関数
+- [src/constants/](mdc:src/constants/): 定数定義
 - [src/assets/](mdc:src/assets/): 画像/CSS/JS 等のアセット
 
 ## 新機能開発ガイドライン

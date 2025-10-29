@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+// Keep-Alive 캐싱을 위한 컴포넌트 이름 설정
+defineOptions({
+  name: 'ScheduleList'
+});
+
+import { ref, computed, onActivated } from "vue";
 import { useScheduleList } from "@/composables/useScheduleList";
 import { getProgressBarClass } from "../utils/uiHelpers";
 import type { ScheduleItem } from "../types/schedule";
@@ -87,7 +92,16 @@ const {
   viewDetails,          // タスク詳細画面への遷移ハンドラ
   // new: filter ops
   resetFilters,
+  loadSchedulesFromDb,  // データ再読み込み関数
 } = useScheduleList();
+
+// Keep-Alive: ページが再度アクティブになったときにデータを更新
+// 詳細ページから戻ってきたときに最新のデータを表示するため
+onActivated(() => {
+  console.log("ScheduleList ページが再アクティブ化されました");
+  // DBから最新のデータを再読み込み
+  loadSchedulesFromDb();
+});
 
 // フィルター値を一つのオブジェクトとして管理（SearchFilterBar用）
 const filterValues = computed({
@@ -142,12 +156,15 @@ const filterValues = computed({
 
 
     <!-- フィルターと検索 -->
-    <SearchFilterBar
-      v-model="filterValues"
-      :projects="projects"
-      @reset="resetFilters()"
-    />
-    
+    <div class="row mb-4">
+      <div class="col-12">
+        <SearchFilterBar
+          v-model="filterValues"
+          :projects="projects"
+          @reset="resetFilters()"
+        />
+      </div>
+    </div>
     
     <!-- プロジェクト統計サマリー -->
     <div v-if="!isLoading && Object.keys(groupedSchedules).length > 0" class="row mb-4">
@@ -194,7 +211,7 @@ const filterValues = computed({
 
 
     <!-- プロジェクト一覧表示（初期画面） -->
-    <div v-if="selectedProjectView === null" class="project-list-view">
+    <div v-if="selectedProjectView === null" class="project-list-view mb-4">
       <ProjectListGrid
         :grouped-schedules="groupedSchedules"
         :project-stats="projectStats"
@@ -203,7 +220,7 @@ const filterValues = computed({
     </div>
 
     <!-- 選択されたプロジェクトのタスク一覧 -->
-    <div v-else class="project-detail-view">
+    <div v-else class="project-detail-view mb-4">
       <ProjectDetailHeader
         :project-name="selectedProjectView"
         :stats="projectStats[selectedProjectView]"

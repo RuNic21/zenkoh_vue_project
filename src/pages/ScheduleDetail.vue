@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useScheduleDetail } from "@/composables/useScheduleDetail";
 import { useScheduleStore } from "../store/schedule";
 import { useMessage, useConfirm } from "@/composables/useMessage";
 import type { ScheduleItem, ScheduleStatus, SchedulePriority, ScheduleAttachment, ScheduleComment } from "../types/schedule";
 import { listUsers } from "../services/dbServices";
 import type { Users } from "../types/db/users";
+
+// Router
+const route = useRoute();
+const router = useRouter();
 
 // 共通コンポーネントのインポート
 import PageHeader from "../components/common/PageHeader.vue";
@@ -138,6 +143,7 @@ import CommentsSection from "../components/common/CommentsSection.vue";
 //    - デフォルト値処理の統一実装が必要
 
 // スケジュール詳細画面のデータ/操作群をcomposable(useScheduleDetail)から取得
+// route params の id を渡してDBから直接ロード
 const {
   isLoading,          // ローディング中フラグ
   errorMessage,       // エラーメッセージ（表示用）
@@ -157,7 +163,9 @@ const {
   addTag,             // タグ追加関数
   removeTag,          // タグ削除関数
   addComment,         // コメント追加関数
-} = useScheduleDetail();
+  loadUsers,          // ユーザー読み込み関数
+  loadTaskById,       // タスク読み込み関数
+} = useScheduleDetail(route.params.id as string);
 
 // メッセージシステム
 const { showSuccess, showError } = useMessage();
@@ -334,9 +342,7 @@ const getHeaderActions = () => {
 };
 
 // コンポーネント初期化
-onMounted(() => {
-  console.log("スケジュール詳細ページが読み込まれました");
-});
+// 注: loadTaskFromRoute()とloadUsers()はcomposable内のonMountedで自動実行されます
 </script>
 
 <template>
@@ -362,53 +368,61 @@ onMounted(() => {
       <PageHeader
         title="スケジュール詳細"
         description="スケジュールの詳細情報を確認・編集できます"
-        :actions="getHeaderActions()"
+        :actions="[
+          {
+            label: '戻る',
+            icon: 'arrow_back',
+            variant: 'outline-secondary',
+            onClick: () => $router.back()
+          },
+          ...getHeaderActions()
+        ]"
       />
 
       <!-- スケジュール統計サマリー -->
       <div class="row mb-4">
-      <div class="col-12">
-        <div class="card">
-          <CardHeader title="スケジュール統計" subtitle="タスクの進捗と活動状況" />
-          <div class="card-body">
-            <StatCards
-              :items="[
-                { 
-                  label: '進捗率', 
-                  value: `${scheduleDetail.progress}%`, 
-                  icon: 'trending_up', 
-                  color: 'primary',
-                  footer: '完了度'
-                },
-                { 
-                  label: 'コメント数', 
-                  value: scheduleDetail.comments?.length || 0, 
-                  icon: 'comment', 
-                  color: 'info',
-                  footer: '総コメント'
-                },
-                { 
-                  label: '添付ファイル', 
-                  value: scheduleDetail.attachments?.length || 0, 
-                  icon: 'attach_file', 
-                  color: 'success',
-                  footer: 'ファイル数'
-                },
-                { 
-                  label: 'タグ数', 
-                  value: scheduleDetail.tags?.length || 0, 
-                  icon: 'label', 
-                  color: 'warning',
-                  footer: '関連タグ'
-                }
-              ]"
-            />
+        <div class="col-12">
+          <div class="card">
+            <CardHeader title="スケジュール統計" subtitle="タスクの進捗と活動状況" />
+            <div class="card-body">
+              <StatCards
+                :items="[
+                  { 
+                    label: '進捗率', 
+                    value: `${scheduleDetail.progress}%`, 
+                    icon: 'trending_up', 
+                    color: 'primary',
+                    footer: '完了度'
+                  },
+                  { 
+                    label: 'コメント数', 
+                    value: scheduleDetail.comments?.length || 0, 
+                    icon: 'comment', 
+                    color: 'info',
+                    footer: '総コメント'
+                  },
+                  { 
+                    label: '添付ファイル', 
+                    value: scheduleDetail.attachments?.length || 0, 
+                    icon: 'attach_file', 
+                    color: 'success',
+                    footer: 'ファイル数'
+                  },
+                  { 
+                    label: 'タグ数', 
+                    value: scheduleDetail.tags?.length || 0, 
+                    icon: 'label', 
+                    color: 'warning',
+                    footer: '関連タグ'
+                  }
+                ]"
+              />
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="row">
+      <div class="row">
       <!-- メインコンテンツ -->
       <div class="col-lg-8">
         <!-- 基本情報カード -->
@@ -700,6 +714,7 @@ onMounted(() => {
       @close="showTagModal = false"
       @add="(tag: string) => addTag(tag)"
     />
+    </template>
   </div>
 </template>
 

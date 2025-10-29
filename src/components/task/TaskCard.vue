@@ -31,37 +31,41 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <!-- タスクカード -->
-  <div class="card h-100 task-card">
+  <!-- タスクカード（クリックで詳細画面へ） -->
+  <div class="card h-100 task-card" @click="emit('view', task.id)" role="button" tabindex="0">
     <div class="card-header pb-0">
       <div class="d-flex justify-content-between align-items-start">
         <div class="flex-grow-1">
           <h6 class="mb-1 font-weight-bold">{{ task.title }}</h6>
           <p class="text-sm text-muted mb-0">{{ task.description }}</p>
         </div>
-        <div class="dropdown">
+        <div class="dropdown" @click.stop>
           <button class="btn btn-link text-muted p-0" data-bs-toggle="dropdown" aria-expanded="false">
             <i class="material-symbols-rounded">more_vert</i>
           </button>
           <ul class="dropdown-menu">
-            <li>
+            <!-- 編集ボタン: 非表示 -->
+            <!-- <li>
               <a class="dropdown-item" href="javascript:;" @click="emit('edit', task.id)">
                 <i class="material-symbols-rounded me-2">edit</i>
                 編集
               </a>
-            </li>
+            </li> -->
+            
             <li>
               <a class="dropdown-item text-danger" href="javascript:;" @click="emit('delete', task.id)">
                 <i class="material-symbols-rounded me-2">delete</i>
                 削除
               </a>
             </li>
-            <li>
+            
+            <!-- 詳細ボタン: 非表示（カードクリックで詳細画面に遷移） -->
+            <!-- <li>
               <a class="dropdown-item" href="javascript:;" @click="emit('view', task.id)">
                 <i class="material-symbols-rounded me-2">visibility</i>
                 詳細
               </a>
-            </li>
+            </li> -->
           </ul>
         </div>
       </div>
@@ -117,12 +121,18 @@ const emit = defineEmits<{
   border: 1px solid rgba(0, 0, 0, 0.05);
   border-radius: 0.75rem;
   overflow: hidden;
+  cursor: pointer; /* カード全体をクリック可能に */
 }
 
 .task-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
   border-color: rgba(0, 123, 255, 0.2);
+}
+
+.task-card:focus {
+  outline: 2px solid rgba(0, 123, 255, 0.5);
+  outline-offset: 2px;
 }
 </style>
 

@@ -4,6 +4,8 @@ import { listUsers } from "@/services/dbServices";
 import { logProjectCreated } from "@/services/activityService";
 import { getProjectStats, getProjectDetailStats, type ProjectStats, type ProjectDetailStats } from "@/services/dashboardService";
 import { listTasks } from "@/services/taskService";
+import { triggerProjectUpdatedNotification } from "@/utils/notificationTrigger";
+import { getCurrentUserInfo } from "@/utils/userHelper";
 import type { Project, ProjectInsert, ProjectUpdate } from "@/types/project";
 import type { Task } from "@/types/task";
 import type { Users } from "@/types/db/users";
@@ -373,6 +375,55 @@ export function useProjectManagement() {
       if (result.success && result.data) {
         const index = projects.value.findIndex((p) => p.id === selectedProject.value!.id);
         if (index !== -1) projects.value[index] = result.data;
+        
+        // プロジェクト更新通知を送信（オーナーがいる場合）
+        if (result.data.owner_user_id) {
+          try {
+            // 現在のユーザー情報を取得
+            const currentUser = await getCurrentUserInfo();
+            
+            // オーナー情報を取得
+            const owner = users.value.find(u => u.id === result.data.owner_user_id);
+            
+            if (owner && owner.email && currentUser) {
+              // 変更内容を生成
+              const changes: string[] = [];
+              if (formData.value.name !== selectedProject.value.name) {
+                changes.push(`名前変更: "${selectedProject.value.name}" → "${formData.value.name}"`);
+              }
+              if (formData.value.description !== selectedProject.value.description) {
+                changes.push("説明が更新されました");
+              }
+              if (formData.value.start_date !== selectedProject.value.start_date) {
+                changes.push("開始日が変更されました");
+              }
+              if (formData.value.end_date !== selectedProject.value.end_date) {
+                changes.push("終了日が変更されました");
+              }
+              if (formData.value.is_archived !== selectedProject.value.is_archived) {
+                changes.push(formData.value.is_archived ? "アーカイブされました" : "アーカイブ解除されました");
+              }
+              
+              const updateDescription = changes.length > 0 
+                ? changes.join(", ") 
+                : "プロジェクトが更新されました";
+              
+              // プロジェクト更新通知を送信
+              await triggerProjectUpdatedNotification(
+                result.data,
+                owner.display_name || owner.username,
+                owner.email,
+                updateDescription,
+                currentUser.name
+              );
+              console.log("✅ プロジェクト更新通知を送信しました");
+            }
+          } catch (notificationError) {
+            // 通知送信失敗してもプロジェクト更新は成功として扱う
+            console.warn("⚠️ プロジェクト更新通知の送信に失敗:", notificationError);
+          }
+        }
+        
         showEditModal.value = false;
         selectedProject.value = null;
         await Promise.all([loadTasks(), loadDashboardStats()]);

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // プロジェクト詳細ページ: 個別プロジェクトの詳細表示・編集機能
 import { ref, computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useScheduleStore } from "../store/schedule";
 import { useProjectDetail } from "@/composables/useProjectDetail";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
@@ -16,6 +17,10 @@ import StatCards from "../components/common/StatCards.vue";
 import ProjectSummary from "@/components/project/ProjectSummary.vue";
 import TaskDetailModal from "@/components/task/TaskDetailModal.vue";
 import OptimizedDataTable from "@/components/table/OptimizedDataTable.vue";
+
+// Router
+const route = useRoute();
+const router = useRouter();
 
 // プロジェクト詳細の状態・ロジックは composable から取得
 // useProjectDetail から状態や操作関数を取得
@@ -42,7 +47,8 @@ const {
   completedTasksCount,      // 完了済みタスク数
   inProgressTasksCount,     // 進行中タスク数
   notStartedTasksCount,     // 未開始タスク数
-} = useProjectDetail();
+  loadProjectDetail,        // プロジェクト読み込み関数
+} = useProjectDetail(route.params.id as string);
 
 // 共有ストアから選択中プロジェクトを取得
 const store = useScheduleStore();
@@ -138,6 +144,14 @@ const handleTaskSortChange = (column: string, direction: "asc" | "desc") => {
 const getHeaderActions = () => {
   const actions = [];
   
+  // 戻るボタンを最初に追加
+  actions.push({
+    label: '戻る',
+    icon: 'arrow_back',
+    variant: 'outline-secondary',
+    onClick: () => router.back()
+  });
+  
   if (!isEditMode.value) {
     actions.push({
       label: '編集',
@@ -170,6 +184,7 @@ const getHeaderActions = () => {
 };
 
 // 初期化ログのみ維持
+// 注: loadProjectFromRoute()はcomposable内のonMountedで自動実行されます
 console.log("プロジェクト詳細ページが読み込まれました");
 </script>
 
@@ -213,7 +228,7 @@ console.log("プロジェクト詳細ページが読み込まれました");
         </div>
       </div>
 
-      <div class="row">
+      <div class="row mb-4">
         <!-- メインコンテンツ -->
         <div class="col-lg-8">
           <!-- 基本情報カード -->
@@ -286,7 +301,7 @@ console.log("プロジェクト詳細ページが読み込まれました");
           </div>
 
           <!-- タスク一覧 -->
-          <div class="card">
+          <div class="card mb-4">
             <CardHeader title="タスク一覧" subtitle="このプロジェクトに関連するタスクを管理できます" />
             <div class="card-body">
               <OptimizedDataTable

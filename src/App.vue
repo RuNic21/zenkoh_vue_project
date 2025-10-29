@@ -38,8 +38,13 @@ onMounted(async () => {
 
           <!-- メインコンテンツエリア -->
           <div class="container-fluid py-4">
-            <!-- Vue Router による動的ページ表示 -->
-            <router-view />
+            <!-- Vue Router による動的ページ表示 (Keep-Alive で状態維持) -->
+            <!-- 一覧ページのみキャッシュして、戻るボタン時に状態を維持 -->
+            <router-view v-slot="{ Component, route }">
+              <keep-alive :include="['ScheduleList', 'ProjectManagement', 'TeamManagement', 'DashboardPage']">
+                <component :is="Component" :key="route.path" />
+              </keep-alive>
+            </router-view>
           </div>
         </div>
       </MainLayout>
@@ -47,6 +52,7 @@ onMounted(async () => {
     
     <!-- 認証不要なページ: レイアウトなしで直接表示 -->
     <template v-else>
+      <!-- ログインページはキャッシュ不要 -->
       <router-view />
     </template>
   </div>

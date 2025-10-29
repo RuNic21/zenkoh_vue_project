@@ -84,8 +84,15 @@
 //    - アクティビティログ（プロジェクト変更履歴）
 //    - 実装：Supabase Realtime＋ファイルストレージ活用
 
+// Keep-Alive 캐싱을 위한 컴포넌트 이름 설정
+defineOptions({
+  name: 'ProjectManagement'
+});
+
 // using useProjectManagement composable; no local refs required
+import { onActivated } from "vue";
 import { useProjectManagement } from "@/composables/useProjectManagement";
+import { useRouter } from "vue-router";
 import OptimizedDataTable from "../components/table/OptimizedDataTable.vue";
 import ProjectFilterPanel from "../components/project/ProjectFilterPanel.vue";
 import ProjectFormModal from "../components/project/ProjectFormModal.vue";
@@ -98,6 +105,9 @@ import CardHeader from "@/components/common/CardHeader.vue";
 import ActionBar from "@/components/common/ActionBar.vue";
 import StatCards from "@/components/common/StatCards.vue";
 import { formatPercent, truncate } from "@/utils/formatters";
+
+// Router インスタンスを取得
+const router = useRouter();
 
 // プロジェクト管理の状態・ロジックは composable から取得
 // useProjectManagement コンポーザブルから状態・アクションを分割代入する
@@ -142,6 +152,19 @@ const {
 } = useProjectManagement(); // 各プロジェクト管理画面で必須な状態管理・操作を提供
 
 // composable を利用するため、以降のローカル定義は不要です
+
+// プロジェクト行クリック時に詳細ページへ遷移
+const handleProjectRowClick = (row: any) => {
+  // プロジェクト詳細ページへ遷移
+  router.push({ name: "project-detail", params: { id: row.id } });
+};
+
+// Keep-Alive: ページが再度アクティブになったときにデータを更新
+onActivated(() => {
+  console.log("ProjectManagement ページが再アクティブ化されました");
+  // 詳細ページから戻ってきたときに最新のデータを表示
+  loadProjects();
+});
 </script>
 
 <template>
@@ -193,7 +216,6 @@ const {
       </div>
     </div>
 
-    
     <!-- プロジェクト分析ダッシュボード -->
     <div class="row mb-4">
       <div class="col-12">
@@ -212,10 +234,8 @@ const {
         </div>
       </div>
     </div>
-
-
     <!-- プロジェクト一覧 -->
-    <div class="row">
+    <div class="row mb-4">
       <div class="col-12">
         <div class="card">
           <div class="card-header pb-0">
@@ -249,6 +269,8 @@ const {
                 empty-message="プロジェクトが見つかりません"
                 @page-change="handleProjectPageChange"
                 @sort-change="handleProjectSortChange"
+                @row-click="handleProjectRowClick"
+                class="cursor-pointer"
               >
                 <!-- 進行率セル: プログレスバーで表示 -->
                 <template #cell-progress="{ value }">
@@ -309,8 +331,9 @@ const {
 
               <!-- 行アクション: 簡易な別テーブル操作を補完するため、下に選択不要の操作ガイドを提示 -->
               <div class="mt-3 text-xs text-secondary">
-                <span class="me-2">操作:</span>
-                <span class="me-2">行の「オーナー/状態」でソート可能</span>
+                <span class="me-2">💡 ヒント:</span>
+                <span class="me-2">プロジェクト行をクリックで詳細ページへ移動</span>
+                <span class="me-2">列ヘッダーでソート可能</span>
                 <span class="me-2">上部フィルターで件数を絞り込み</span>
                       </div>
 
@@ -361,6 +384,16 @@ const {
 </template>
 
 <style scoped>
+/* テーブル行にカーソルポインター追加 */
+.cursor-pointer :deep(tbody tr) {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.cursor-pointer :deep(tbody tr:hover) {
+  background-color: rgba(233, 30, 99, 0.05);
+}
+
 /* テーブルホバーエフェクト */
 .table tbody tr:hover {
   background-color: rgba(0, 0, 0, 0.02);

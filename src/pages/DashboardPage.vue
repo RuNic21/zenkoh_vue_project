@@ -1,12 +1,18 @@
 <script setup lang="ts">
 // ダッシュボードページ: プロジェクト進捗一覧、統計情報、フィルタリング
-import { ref, onMounted } from "vue";
+// Keep-Alive 캐싱을 위한 컴포넌트 이름 설정
+defineOptions({
+  name: 'DashboardPage'
+});
+
+import { ref, onMounted, onActivated } from "vue";
 import { useRouter } from "vue-router";
 import { useScheduleStore } from "@/store/schedule";
 import DashboardFilters from "@/components/dashboard/DashboardFilters.vue";
 import ProjectProgressTable from "@/components/dashboard/ProjectProgressTable.vue";
 import TaskProgressTable from "@/components/dashboard/TaskProgressTable.vue";
 import RecentActivities from "@/components/dashboard/RecentActivities.vue";
+import RecentNotifications from "@/components/dashboard/RecentNotifications.vue";
 import ProjectTasksModal from "@/components/dashboard/ProjectTasksModal.vue";
 import { useDashboard } from "@/composables/useDashboard";
 import { useMessage } from "@/composables/useMessage";
@@ -241,6 +247,17 @@ onMounted(async () => {
   await loadRecentTasks();
   await loadActivityFeed();
 });
+
+// Keep-Alive: ページが再度アクティブになったときにデータを更新
+onActivated(async () => {
+  console.log("Dashboard ページが再アクティブ化されました");
+  // 詳細ページから戻ってきたときに最新のデータを表示
+  await Promise.all([
+    loadDashboardFromDb(),
+    loadRecentTasks(),
+    loadActivityFeed()
+  ]);
+});
 </script>
 
 <template>
@@ -295,7 +312,7 @@ onMounted(async () => {
     </div>
 
     <!-- タスク別進捗の一覧表示 -->
-    <div class="row mt-4">
+    <div class="row mb-4">
       <div class="col-12">
         <TaskProgressTable 
           :rows="filteredTasks"
@@ -304,10 +321,10 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- 最近の活動フィード -->
-    <div class="row mt-4">
+    <!-- 最近の通知 -->
+    <div class="row mb-4">
       <div class="col-12">
-        <RecentActivities :activities="recentActivities" :is-loading="isActivityLoading" />
+        <RecentNotifications />
       </div>
     </div>
 

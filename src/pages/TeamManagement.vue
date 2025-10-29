@@ -80,8 +80,12 @@
 
 // チーム管理ページコンポーネント
 // 目的: ユーザー管理、チームメンバー管理、権限管理を提供
+// Keep-Alive 캐싱을 위한 컴포넌트 이름 설정
+defineOptions({
+  name: 'TeamManagement'
+});
 
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onActivated } from "vue";
 // TODO: プロジェクトメンバー管理機能が実装されたら有効化
 // import { useTeamMembersManagement } from "@/composables/useTeamMembersManagement";
 // TODO: プロジェクト別チーム情報機能（project_members テーブル作成後に有効化）
@@ -1501,6 +1505,20 @@ onMounted(async () => {
   ]);
 });
 
+// Keep-Alive: ページが再度アクティブになったときにデータを更新
+onActivated(async () => {
+  console.log("TeamManagement ページが再アクティブ化されました");
+  // 詳細ページから戻ってきたときに最新のデータを表示
+  await Promise.all([
+    loadUsers(),
+    loadTeamStats(),
+    loadUserActivities(),
+    loadNotifications(),
+    loadAlertRules(),
+    loadNotificationStats()
+  ]);
+});
+
 const {
   createNotificationAction,
   updateNotificationAction,
@@ -1532,17 +1550,20 @@ const {
     </div>
 
     <!-- フィルタリング・アクションパネル（ユーザー管理専用） -->
-    <div class="mb-4">
-      <TeamFilterPanel
-        v-model:search-query="userSearchQuery"
-        v-model:status-filter="userStatusFilter"
-        v-model:role-filter="roleFilter"
-        @clear-filters="clearUserFilters"
-      />
+    <div class="row mb-4">
+      <div class="col-12">
+        <TeamFilterPanel
+          v-model:search-query="userSearchQuery"
+          v-model:status-filter="userStatusFilter"
+          v-model:role-filter="roleFilter"
+          @clear-filters="clearUserFilters"
+        />
+      </div>
     </div>
 
     <!-- ユーザー一覧 -->
-    <div class="mb-4">
+    <div class="row mb-4">
+      <div class="col-12">
       <UserManagementTable
         :users="users"
         :filtered-users="filteredUsers"
@@ -1559,6 +1580,7 @@ const {
         @bulk-delete-users="handleBulkDeleteUsers"
         @clear-selections="clearAllSelections"
       />
+      </div>
     </div>
 
     <!-- 一括操作パネル: UserManagementTable コンポーネントに統合されました -->

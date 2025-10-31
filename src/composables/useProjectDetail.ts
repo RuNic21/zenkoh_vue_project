@@ -7,7 +7,7 @@ import type { Users } from "@/types/db/users";
 import type { ProjectDetailStats } from "@/services/dashboardService";
 
 // プロジェクト詳細ページの状態とロジックを集約する composable
-export function useProjectDetail() {
+export function useProjectDetail(projectId?: string | number) {
   // 画面状態
   const isLoading = ref(false);
   const errorMessage = ref("");
@@ -116,7 +116,7 @@ export function useProjectDetail() {
     isEditMode.value = false;
   };
 
-  const deleteProject = async () => {
+  const deleteProject = async (onSuccess?: () => void) => {
     if (!projectDetail.value) return;
     if (confirm("このプロジェクトを削除してもよろしいですか？")) {
       try {
@@ -124,7 +124,11 @@ export function useProjectDetail() {
         const result = await deleteProject(projectDetail.value.id);
         if (result.success) {
           alert("プロジェクトが削除されました");
-          window.history.back();
+          if (onSuccess) {
+            onSuccess();
+          } else {
+            window.history.back();
+          }
         } else {
           errorMessage.value = result.error || "プロジェクトの削除に失敗しました";
         }
@@ -157,37 +161,17 @@ export function useProjectDetail() {
   const inProgressTasksCount = computed(() => projectTasks.value.filter((t) => t.status === "IN_PROGRESS").length);
   const notStartedTasksCount = computed(() => projectTasks.value.filter((t) => t.status === "NOT_STARTED").length);
 
-  // URL から ID を取得してロード
-  const loadProjectFromUrl = async () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const projectId = urlParams.get("id");
-    if (projectId) {
-      await loadProjectDetail(parseInt(projectId));
-    } else {
-      errorMessage.value = "プロジェクトIDが指定されていません";
-    }
-  };
-
+  // コンポーネントマウント時に自動的にプロジェクトをロード（projectIdが渡された場合）
   onMounted(async () => {
     await loadUsers();
-    await loadProjectFromUrl();
-  });
-
-  watch(
-    () => window.location.search,
-    () => {
-      loadProjectFromUrl();
-    },
-    { immediate: false }
-  );
-
-  onMounted(() => {
-    const handleUrlChange = () => {
-      loadProjectFromUrl();
-    };
-    window.addEventListener("popstate", handleUrlChange);
-    window.addEventListener("hashchange", handleUrlChange);
-    window.addEventListener("navigate-to-project-detail", handleUrlChange);
+    if (projectId) {
+      const id = Number(projectId);
+      if (id && !isNaN(id)) {
+        await loadProjectDetail(id);
+      } else {
+        errorMessage.value = "プロジェクトIDが無効です";
+      }
+    }
   });
 
   return {
@@ -211,6 +195,7 @@ export function useProjectDetail() {
     deleteProject,
     showTaskDetail,
     closeTaskModal,
+    loadProjectDetail, // プロジェクト読み込み関数を公開
     // stats
     projectProgress,
     completedTasksCount,

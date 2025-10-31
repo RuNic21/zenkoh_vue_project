@@ -49,6 +49,7 @@ const emit = defineEmits<{
   'sort-change': [column: string, direction: 'asc' | 'desc'];
   'search-change': [query: string];
   'filter-change': [filters: Record<string, unknown>];
+  'row-click': [row: DataRow];
 }>();
 
 // リアクティブデータ
@@ -312,6 +313,7 @@ const isDev = import.meta.env.DEV;
                   v-for="(item, index) in paginatedData" 
                   :key="visibleItems.startIndex + index"
                   :style="{ height: itemHeight + 'px' }"
+                  @click="emit('row-click', item)"
                 >
                   <td v-for="column in columns" :key="column.key">
                     <slot :name="`cell-${column.key}`" :item="item" :value="item[column.key]">
@@ -351,7 +353,11 @@ const isDev = import.meta.env.DEV;
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(item, index) in paginatedData" :key="index">
+            <tr 
+              v-for="(item, index) in paginatedData" 
+              :key="index"
+              @click="emit('row-click', item)"
+            >
               <td v-for="column in columns" :key="column.key">
                 <slot :name="`cell-${column.key}`" :item="item" :value="item[column.key]">
                   <span v-if="column.formatter">

@@ -80,8 +80,12 @@
 
 // チーム管理ページコンポーネント
 // 目的: ユーザー管理、チームメンバー管理、権限管理を提供
+// Keep-Alive 캐싱을 위한 컴포넌트 이름 설정
+defineOptions({
+  name: 'TeamManagement'
+});
 
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onActivated, onUnmounted } from "vue";
 // TODO: プロジェクトメンバー管理機能が実装されたら有効化
 // import { useTeamMembersManagement } from "@/composables/useTeamMembersManagement";
 // TODO: プロジェクト別チーム情報機能（project_members テーブル作成後に有効化）
@@ -135,6 +139,8 @@ import type {
 import { 
   listUsers,                     // ユーザー一覧取得
   listActiveUsers,               // 有効ユーザーのみ取得
+  getUserById,                   // ユーザーIDで取得
+  getUserByAuthId,               // auth_idでユーザー取得
   createUser,                    // ユーザー新規作成
   updateUser,                    // ユーザー情報更新
   listTeamMembersWithUsers,      // チームメンバー+ユーザー詳細取得
@@ -142,13 +148,17 @@ import {
   updateTeamMemberRole,          // メンバーの役割変更
   removeTeamMember,              // チームメンバー削除
   getProjectTeams,               // プロジェクト別チーム取得
+  addProjectMember,              // プロジェクトメンバー追加
+  updateProjectMemberRole,       // プロジェクトメンバー役割更新
+  removeProjectMember,           // プロジェクトメンバー削除
   getTeamStats,                  // チーム統計情報取得
   getUserActivityStats,          // ユーザー活動統計取得
   updateUserProfile,             // ユーザープロフィール更新
   getUserProfileStats,           // ユーザープロフィール統計
   getUserActivityLogs,           // ユーザー活動ログ取得
   uploadUserAvatar,              // プロフィール画像アップロード
-  searchUsers                    // ユーザー検索
+  searchUsers,                   // ユーザー検索
+  deleteUser                     // ユーザー削除
 } from "../services/teamService";
 
 // 通知管理サービス関数のインポート
@@ -221,6 +231,11 @@ const { confirm: confirmDialog } = useConfirm();
 //   projectTeamsErrorMessage,
 //   loadProjectTeams: tmLoadProjectTeams,
 // } = useProjectTeamsManagement();
+
+// project_members ベースのプロジェクトチーム状態
+const projectTeams = ref<ProjectTeam[]>([]);
+const isProjectTeamsLoading = ref(false);
+const projectTeamsErrorMessage = ref("");
 
 // ユーザー活動統計
 const userActivities = ref<UserActivity[]>([]);
@@ -315,6 +330,13 @@ const userForm = ref({
 //   task_id: 0,
 //   role: "CONTRIBUTOR" as TeamRole
 // });
+
+// プロジェクトメンバー追加用フォーム（project_members 用）
+const memberForm = ref({
+  project_id: 0,
+  user_id: 0,
+  role: "CONTRIBUTOR" as TeamRole
+});
 
 const notificationForm = ref({
   project_id: 0,
@@ -495,25 +517,25 @@ const filteredUserActivities = computed(() => {
 // データ読み込みは composable の loadMembers に委譲
 
 // TODO: プロジェクト別チーム情報機能（project_members テーブル作成後に有効化）
-// const loadProjectTeams = async () => {
-//   try {
-//     isProjectTeamsLoading.value = true;
-//     projectTeamsErrorMessage.value = "";
-//     const result = await getProjectTeams();
-//     if (result.success && result.data) {
-//       projectTeams.value = result.data;
-//     } else {
-//       projectTeamsErrorMessage.value = result.error || "プロジェクトチームの読み込みに失敗しました";
-//       projectTeams.value = [];
-//     }
-//   } catch (error) {
-//     console.error("プロジェクトチーム読み込みエラー:", error);
-//     projectTeamsErrorMessage.value = "プロジェクトチームの読み込みに失敗しました";
-//     projectTeams.value = [];
-//   } finally {
-//     isProjectTeamsLoading.value = false;
-//   }
-// };
+const loadProjectTeams = async () => {
+  try {
+    isProjectTeamsLoading.value = true;
+    projectTeamsErrorMessage.value = "";
+    const result = await getProjectTeams();
+    if (result.success && result.data) {
+      projectTeams.value = result.data;
+    } else {
+      projectTeamsErrorMessage.value = result.error || "プロジェクトチームの読み込みに失敗しました";
+      projectTeams.value = [];
+    }
+  } catch (error) {
+    console.error("プロジェクトチーム読み込みエラー:", error);
+    projectTeamsErrorMessage.value = "プロジェクトチームの読み込みに失敗しました";
+    projectTeams.value = [];
+  } finally {
+    isProjectTeamsLoading.value = false;
+  }
+};
 
 const loadUserActivities = async () => {
   try {
@@ -549,7 +571,9 @@ const loadNotifications = async () => {
 const loadAlertRules = async () => {
   try {
     alertRulesErrorMessage.value = "";
-    alertRules.value = await listAlertRules();
+    const res = await listAlertRules();
+    // ServiceResult 対応 or 直接配列対応
+    alertRules.value = Array.isArray(res) ? res : (res && (res as any).data ? (res as any).data : []);
   } catch (error) {
     console.error("アラートルール読み込みエラー:", error);
     alertRulesErrorMessage.value = "アラートルールの読み込みに失敗しました";
@@ -561,7 +585,8 @@ const loadAlertRules = async () => {
 const loadNotificationStats = async () => {
   try {
     isNotificationStatsLoading.value = true;
-    notificationStats.value = await getNotificationStats();
+    const res = await getNotificationStats();
+    notificationStats.value = (res && (res as any).data) ? (res as any).data : (res as any);
   } catch (error) {
     console.error("通知統計読み込みエラー:", error);
   } finally {
@@ -588,12 +613,24 @@ const handleSaveUser = async () => {
       const updatedUser = await updateUser(selectedUserProfile.value.id, {
         email: userForm.value.email,
         display_name: userForm.value.display_name,
-        is_active: userForm.value.is_active
+        is_active: userForm.value.is_active,
+        // プロフィール情報も更新
+        first_name: userForm.value.first_name,
+        last_name: userForm.value.last_name,
+        phone: userForm.value.phone,
+        department: userForm.value.department,
+        position: userForm.value.position,
+        avatar_url: userForm.value.avatar_url,
+        bio: userForm.value.bio,
+        timezone: userForm.value.timezone,
+        language: userForm.value.language,
+        work_hours_start: userForm.value.work_hours_start,
+        work_hours_end: userForm.value.work_hours_end,
+        skills: userForm.value.skills,
+        tags: userForm.value.tags
       });
       
       if (updatedUser) {
-        // プロフィール情報も更新（将来実装予定）
-        // await updateUserProfile(selectedUserProfile.value.id, userForm.value);
         await loadUsers();
         await loadTeamStats();
         closeUserProfileModal();
@@ -608,29 +645,33 @@ const handleSaveUser = async () => {
   }
 };
 
-const handleEditUser = (user: User) => {
-  selectedUserProfile.value = user;
+const handleEditUser = (user?: User) => {
+  // 引数がある場合は指定ユーザー、ない場合は現在選択されているユーザー
+  const targetUser = user || selectedUserProfile.value;
+  if (!targetUser) return;
+  
+  selectedUserProfile.value = targetUser;
   userModalMode.value = "edit";
   userForm.value = {
     // 基本情報
-    email: user.email,
-    display_name: user.display_name,
+    email: targetUser.email,
+    display_name: targetUser.display_name,
     password_hash: "",
-    is_active: user.is_active || true,
+    is_active: targetUser.is_active || true,
     // プロフィール情報
-    first_name: user.first_name || "",
-    last_name: user.last_name || "",
-    phone: user.phone || "",
-    department: user.department || "",
-    position: user.position || "",
-    avatar_url: user.avatar_url || "",
-    bio: user.bio || "",
-    timezone: user.timezone || "Asia/Tokyo",
-    language: user.language || "ja",
-    work_hours_start: user.work_hours_start || "09:00",
-    work_hours_end: user.work_hours_end || "18:00",
-    skills: user.skills || [],
-    tags: user.tags || []
+    first_name: targetUser.first_name || "",
+    last_name: targetUser.last_name || "",
+    phone: targetUser.phone || "",
+    department: targetUser.department || "",
+    position: targetUser.position || "",
+    avatar_url: targetUser.avatar_url || "",
+    bio: targetUser.bio || "",
+    timezone: targetUser.timezone || "Asia/Tokyo",
+    language: targetUser.language || "ja",
+    work_hours_start: targetUser.work_hours_start || "09:00",
+    work_hours_end: targetUser.work_hours_end || "18:00",
+    skills: targetUser.skills || [],
+    tags: targetUser.tags || []
   };
   showUserProfileModal.value = true;
 };
@@ -653,6 +694,23 @@ const handleEditUser = (user: User) => {
 //   }
 // };
 
+// プロジェクトメンバー追加
+const handleAddProjectMember = async () => {
+  try {
+    const ok = await addProjectMember(memberForm.value.project_id, memberForm.value.user_id, memberForm.value.role);
+    if (ok) {
+      await loadProjectTeams();
+      closeMemberModal();
+      showSuccess("プロジェクトメンバーが正常に追加されました");
+    } else {
+      showError("プロジェクトメンバーの追加に失敗しました");
+    }
+  } catch (error) {
+    console.error("プロジェクトメンバー追加エラー:", error);
+    showError("追加中にエラーが発生しました");
+  }
+};
+
 // TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
 // const handleUpdateMemberRole = async (userId: number, taskId: number, newRole: TeamRole) => {
 //   try {
@@ -669,6 +727,22 @@ const handleEditUser = (user: User) => {
 //     alert("チームメンバー役割更新中にエラーが発生しました");
 //   }
 // };
+
+// プロジェクトメンバー役割更新
+const handleUpdateProjectMemberRole = async (projectId: number, userId: number, newRole: TeamRole) => {
+  try {
+    const ok = await updateProjectMemberRole(projectId, userId, newRole);
+    if (ok) {
+      await loadProjectTeams();
+      showSuccess("プロジェクトメンバーの役割が更新されました");
+    } else {
+      showError("役割更新に失敗しました");
+    }
+  } catch (error) {
+    console.error("プロジェクトメンバー役割更新エラー:", error);
+    showError("役割更新中にエラーが発生しました");
+  }
+};
 //
 // const handleRemoveTeamMember = async (userId: number, taskId: number) => {
 //   if (!confirm("このチームメンバーを削除しますか？")) return;
@@ -687,6 +761,24 @@ const handleEditUser = (user: User) => {
 //     alert("チームメンバー削除中にエラーが発生しました");
 //   }
 // };
+
+// プロジェクトメンバー削除
+const handleRemoveProjectMember = async (projectId: number, userId: number) => {
+  const confirmed = await confirmDialog({ message: "このメンバーを削除しますか？", type: "danger" });
+  if (!confirmed) return;
+  try {
+    const ok = await removeProjectMember(projectId, userId);
+    if (ok) {
+      await loadProjectTeams();
+      showSuccess("プロジェクトメンバーを削除しました");
+    } else {
+      showError("プロジェクトメンバーの削除に失敗しました");
+    }
+  } catch (error) {
+    console.error("プロジェクトメンバー削除エラー:", error);
+    showError("削除中にエラーが発生しました");
+  }
+};
 
 // 通知管理
 const handleCreateNotification = async () => {
@@ -708,8 +800,8 @@ const handleCreateNotification = async () => {
 
 const handleResendNotification = async (id: number) => {
   try {
-    const success = await resendNotificationAction(id);
-    if (success) {
+    const _r = await resendNotificationAction(id) as any;
+    if (!!_r) {
       await loadNotifications();
       await loadNotificationStats();
       showSuccess("通知の再送信が完了しました");
@@ -730,8 +822,8 @@ const handleDeleteNotification = async (id: number) => {
   if (!confirmed) return;
   
   try {
-    const success = await deleteNotificationAction(id);
-    if (success) {
+    const _r = await deleteNotificationAction(id) as any;
+    if (!!_r) {
       await loadNotifications();
       await loadNotificationStats();
       showSuccess("通知が正常に削除されました");
@@ -794,8 +886,8 @@ const handleDeleteAlertRule = async (id: number) => {
   if (!confirmed) return;
   
   try {
-    const success = await deleteAlertRuleAction(id);
-    if (success) {
+    const _r = await deleteAlertRuleAction(id) as any;
+    if (!!_r) {
       await loadAlertRules();
       showSuccess("アラートルールが正常に削除されました");
     } else {
@@ -1011,10 +1103,13 @@ const handleBulkDeleteUsers = async () => {
     let failCount = 0;
     
     for (const userId of selectedUsers.value) {
-      // TODO: deleteUser 関数を実装してDBから削除
-      // 現在は機能無効化（DB削除は未実装）
-      console.log(`ユーザー削除（仮実装）: ${userId}`);
-      successCount++;
+      // ユーザー削除（関連する task_members を含む）
+      const ok = await deleteUser(userId);
+      if (ok) {
+        successCount++;
+      } else {
+        failCount++;
+      }
     }
     
     if (successCount > 0) {
@@ -1024,9 +1119,37 @@ const handleBulkDeleteUsers = async () => {
       updateBulkActionsVisibility();
       showSuccess(`${successCount}名のユーザーが削除されました`);
     }
+    if (failCount > 0) {
+      showError(`${failCount}名のユーザーの削除に失敗しました`);
+    }
   } catch (error) {
     console.error("一括ユーザー削除エラー:", error);
     showError("一括削除中にエラーが発生しました");
+  }
+};
+
+// 単一ユーザー削除
+// 目的: 行アクションから特定ユーザーを削除する
+const handleDeleteUser = async (userId: number) => {
+  const confirmed = await confirmDialog({
+    message: "このユーザーを削除しますか？この操作は取り消せません。",
+    type: "danger"
+  });
+  if (!confirmed) return;
+  try {
+    const ok = await deleteUser(userId);
+    if (ok) {
+      await loadUsers();
+      await loadTeamStats();
+      selectedUsers.value.delete(userId);
+      updateBulkActionsVisibility();
+      showSuccess("ユーザーが削除されました");
+    } else {
+      showError("ユーザーの削除に失敗しました");
+    }
+  } catch (e) {
+    console.error("ユーザー削除エラー:", e);
+    showError("ユーザー削除中にエラーが発生しました");
   }
 };
 
@@ -1208,20 +1331,23 @@ const closeUserProfileModal = () => {
 };
 
 // TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
-// const openMemberModal = () => {
-//   editingMember.value = null;
-//   memberForm.value = {
-//     user_id: 0,
-//     task_id: 0,
-//     role: "CONTRIBUTOR"
-//   };
-//   showMemberModal.value = true;
-// };
-//
-// const closeMemberModal = () => {
-//   showMemberModal.value = false;
-//   editingMember.value = null;
-// };
+const showMemberModal = ref(false);
+const editingMember = ref<TeamMemberWithUser | null>(null);
+const openMemberModal = () => {
+  editingMember.value = null;
+  const firstProjectId = projectTeams.value[0]?.project_id || 0;
+  memberForm.value = {
+    project_id: firstProjectId,
+    user_id: 0,
+    role: "CONTRIBUTOR"
+  };
+  showMemberModal.value = true;
+};
+
+const closeMemberModal = () => {
+  showMemberModal.value = false;
+  editingMember.value = null;
+};
 
 const openNotificationModal = () => {
   editingNotification.value = null;
@@ -1431,17 +1557,16 @@ const getHeaderActions = () => {
         // ユーザー作成モーダルを開く
         openUserModal();
       }
+    },
+    {
+      label: 'チームメンバー追加',
+      icon: 'group_add',
+      variant: 'outline-primary',
+      onClick: () => {
+        // プロジェクトメンバー追加モーダルを開く
+        openMemberModal();
+      }
     }
-    // TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
-    // {
-    //   label: 'チームメンバー追加',
-    //   icon: 'group_add',
-    //   variant: 'outline-primary',
-    //   onClick: () => {
-    //     // チームメンバー追加モーダルを開く
-    //     showMemberModal.value = true;
-    //   }
-    // }
   ];
 };
 
@@ -1484,21 +1609,63 @@ const getHeaderActions = () => {
 
 
 
+// プロフィールモーダルを開くイベントハンドラ（グローバルイベント受信）
+const handleOpenProfileEvent = async (event: CustomEvent<{ authId: string }>) => {
+  const { authId } = event.detail;
+  
+  try {
+    // auth_id で users テーブルからユーザー情報を取得
+    const result = await getUserByAuthId(authId);
+    
+    if (result.success && result.data) {
+      // プロフィールモーダルを開く
+      await handleViewUserProfile(result.data);
+    } else {
+      console.warn("ユーザー情報の取得に失敗しました:", result.error);
+      showError("ユーザー情報の取得に失敗しました");
+    }
+  } catch (error) {
+    console.error("プロフィール表示エラー:", error);
+    showError("プロフィール表示中にエラーが発生しました");
+  }
+};
+
 // 初期化
 onMounted(async () => {
   console.log("チーム管理ページが初期化されました");
   await Promise.all([
     loadUsers(),
-    // TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
-    // loadMembers(),
-    // TODO: プロジェクト別チーム情報機能（project_members テーブル作成後に有効化）
-    // tmLoadProjectTeams(),
+    // プロジェクトチーム情報
+    loadProjectTeams(),
     loadTeamStats(),
     loadUserActivities(),
     loadNotifications(),
     loadAlertRules(),
     loadNotificationStats()
   ]);
+  
+  // グローバルイベントリスナーを登録（NavigationBarからのプロフィール表示要求を受け取る）
+  window.addEventListener('open-profile-modal', handleOpenProfileEvent as EventListener);
+});
+
+// Keep-Alive: ページが再度アクティブになったときにデータを更新
+onActivated(async () => {
+  console.log("TeamManagement ページが再アクティブ化されました");
+  // 詳細ページから戻ってきたときに最新のデータを表示
+  await Promise.all([
+    loadUsers(),
+    loadTeamStats(),
+    loadUserActivities(),
+    loadNotifications(),
+    loadAlertRules(),
+    loadNotificationStats(),
+    loadProjectTeams()
+  ]);
+});
+
+// クリーンアップ（イベントリスナーを削除）
+onUnmounted(() => {
+  window.removeEventListener('open-profile-modal', handleOpenProfileEvent as EventListener);
 });
 
 const {
@@ -1532,17 +1699,20 @@ const {
     </div>
 
     <!-- フィルタリング・アクションパネル（ユーザー管理専用） -->
-    <div class="mb-4">
-      <TeamFilterPanel
-        v-model:search-query="userSearchQuery"
-        v-model:status-filter="userStatusFilter"
-        v-model:role-filter="roleFilter"
-        @clear-filters="clearUserFilters"
-      />
+    <div class="row mb-4">
+      <div class="col-12">
+        <TeamFilterPanel
+          v-model:search-query="userSearchQuery"
+          v-model:status-filter="userStatusFilter"
+          v-model:role-filter="roleFilter"
+          @clear-filters="clearUserFilters"
+        />
+      </div>
     </div>
 
     <!-- ユーザー一覧 -->
-    <div class="mb-4">
+    <div class="row mb-4">
+      <div class="col-12">
       <UserManagementTable
         :users="users"
         :filtered-users="filteredUsers"
@@ -1553,12 +1723,14 @@ const {
         @select-all-users="handleSelectAllUsers"
         @view-profile="handleViewUserProfile"
         @edit-user="handleEditUser"
+        @delete-user="handleDeleteUser"
         @create-user="openUserModal"
         @bulk-activate-users="handleBulkActivateUsers"
         @bulk-deactivate-users="handleBulkDeactivateUsers"
         @bulk-delete-users="handleBulkDeleteUsers"
         @clear-selections="clearAllSelections"
       />
+      </div>
     </div>
 
     <!-- 一括操作パネル: UserManagementTable コンポーネントに統合されました -->
@@ -1779,15 +1951,15 @@ const {
                 <template #cell-subject="{ item }">
                   <div class="d-flex flex-column justify-content-center">
                     <h6 class="mb-0 text-sm">{{ item.subject }}</h6>
-                    <p class="text-xs text-secondary mb-0">{{ item.body_text?.substring(0, 50) }}...</p>
+                    <p class="text-xs text-secondary mb-0">{{ String((item as any).body_text || '').substring(0, 50) }}...</p>
                   </div>
                 </template>
 
                 <!-- ステータスセル：色付きバッジ表示 -->
                 <template #cell-status="{ item }">
                   <div class="text-center">
-                    <span :class="`badge ${getNotificationStatusColor(item.status)}`">
-                      {{ getNotificationStatusLabel(item.status) }}
+                    <span :class="`badge ${getNotificationStatusColor((item as any).status)}`">
+                      {{ getNotificationStatusLabel((item as any).status) }}
                     </span>
                   </div>
                 </template>
@@ -1796,7 +1968,7 @@ const {
                 <template #cell-created_at="{ value }">
                   <div class="text-center">
                     <span class="text-secondary text-xs font-weight-normal">
-                      {{ new Date(value).toLocaleString('ja-JP') }}
+                      {{ new Date(String(value)).toLocaleString('ja-JP') }}
                     </span>
                   </div>
                 </template>
@@ -1806,20 +1978,20 @@ const {
                   <div class="btn-group" role="group">
                     <button 
                       class="btn btn-sm bg-gradient-info mb-0" 
-                      @click="openEditNotificationModalById(item.id)"
+                      @click="openEditNotificationModalById((item as any).id)"
                     >
                       編集
                     </button>
                     <button 
-                      v-if="item.status === 'FAILED'" 
+                      v-if="(item as any).status === 'FAILED'" 
                       class="btn btn-sm bg-gradient-warning mb-0" 
-                      @click="handleResendNotification(item.id)"
+                      @click="handleResendNotification((item as any).id)"
                     >
                       再送信
                     </button>
                     <button 
                       class="btn btn-sm bg-gradient-danger mb-0" 
-                      @click="handleDeleteNotification(item.id)"
+                      @click="handleDeleteNotification((item as any).id)"
                     >
                       削除
                     </button>
@@ -1910,8 +2082,9 @@ const {
     </div>
 
 
-    <!-- TODO: プロジェクトメンバー管理機能（project_members テーブル作成後に有効化）
+    <!-- プロジェクトメンバー追加モーダル -->
     <ModalShell
+      v-if="showMemberModal"
       :show="showMemberModal"
       title="チームメンバー追加"
       @close="closeMemberModal"
@@ -1924,29 +2097,32 @@ const {
         {
           label: '追加',
           variant: 'primary',
-          onClick: handleAddTeamMember
+          onClick: handleAddProjectMember
         }
       ]"
     >
       <form>
+        <!-- プロジェクト選択 -->
+        <div class="mb-3">
+          <label class="form-label">プロジェクト</label>
+          <select class="form-control" v-model.number="memberForm.project_id" required>
+            <option :value="0" disabled>プロジェクトを選択...</option>
+            <option v-for="p in projectTeams" :key="p.project_id" :value="p.project_id">
+              {{ p.project_name }}
+            </option>
+          </select>
+        </div>
+        <!-- ユーザー選択（簡易: ID入力） -->
         <div class="mb-3">
           <label class="form-label">ユーザーID</label>
           <input 
             type="number" 
             class="form-control" 
-            v-model="memberForm.user_id"
+            v-model.number="memberForm.user_id"
             required
           >
         </div>
-        <div class="mb-3">
-          <label class="form-label">タスクID</label>
-          <input 
-            type="number" 
-            class="form-control" 
-            v-model="memberForm.task_id"
-            required
-          >
-        </div>
+        <!-- 役割選択 -->
         <div class="mb-3">
           <label class="form-label">役割</label>
           <select class="form-control" v-model="memberForm.role">
@@ -1957,7 +2133,6 @@ const {
         </div>
       </form>
     </ModalShell>
-    -->
 
     <!-- 通知作成・編集モーダル（コンポーネント） -->
     <NotificationModal 
@@ -2000,6 +2175,7 @@ const {
       :is-activity-logs-loading="isActivityLogsLoading"
       @close="closeUserProfileModal"
       @save="handleSaveUser"
+      @edit="handleEditUser"
       @avatar-upload="handleAvatarUpload"
       @update:user-form="userForm = $event"
     />

@@ -56,10 +56,28 @@ export async function login(
         throw new Error("ユーザー情報の取得に失敗しました");
       }
 
-      // NOTE: 現在は Supabase Auth のみを使用
+      // users テーブルからプロフィール情報を取得（auth_id で紐付け）
+      let userProfile: Users | undefined = undefined;
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("auth_id", data.user.id)
+          .single();
+        
+        if (!profileError && profileData) {
+          userProfile = profileData as Users;
+          console.log("users テーブルからプロフィール取得完了:", userProfile.id);
+        } else {
+          console.warn("users テーブルからプロフィール取得失敗:", profileError?.message);
+        }
+      } catch (e) {
+        console.warn("プロフィール取得中のエラー:", e);
+      }
+
       console.log("ログイン成功:", data.user.email);
 
-      return mapSupabaseUserToAuthUser(data.user, undefined);
+      return mapSupabaseUserToAuthUser(data.user, userProfile);
     },
     "ログインに失敗しました"
   );
@@ -97,11 +115,34 @@ export async function signUp(
         throw new Error("ユーザー登録に失敗しました");
       }
 
-      // NOTE: users テーブルは BIGINT id を使用しているが、
-      // Supabase Auth は UUID (string) を使用しているため、
-      // 現時点では Supabase Auth のみを使用
-      // TODO: users テーブルのスキーマを UUID に変更するか、別途マッピングテーブルを作成
-      
+      // users テーブルとの統合: auth_id で Supabase Auth と紐付け
+      // auth_id: Supabase Auth の UUID を保存
+      try {
+        const { error: usersInsertError } = await supabase
+          .from("users")
+          .insert([
+            {
+              auth_id: data.user.id, // Supabase Auth の UUID
+              email: credentials.email,
+              display_name: credentials.displayName,
+              password_hash: "AUTH_SUPABASE_MANAGED", // ダミー値: 認証は Supabase Auth 側で管理
+              is_active: true,
+            },
+          ]);
+        if (usersInsertError) {
+          // 失敗しても会員登録自体は成功として扱う（後続の管理画面での表示にのみ影響）
+          console.warn(
+            "users テーブルへの作成に失敗（統合）:",
+            usersInsertError.message
+          );
+        } else {
+          console.log("users テーブルにレコード作成完了（auth_id:", data.user.id, ")");
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn("users テーブル作成中に予期せぬエラー（統合）:", msg);
+      }
+
       console.log("会員登録成功:", data.user.email);
       
       return mapSupabaseUserToAuthUser(data.user, undefined);
@@ -144,7 +185,20 @@ export async function getCurrentSession(): Promise<AuthResult<SessionInfo | null
         return null;
       }
 
-      const authUser = mapSupabaseUserToAuthUser(data.session.user, undefined);
+      // users テーブルからプロフィール取得（auth_id で紐付け）
+      let userProfile: Users | undefined = undefined;
+      try {
+        const { data: profileData } = await supabase
+          .from("users")
+          .select("*")
+          .eq("auth_id", data.session.user.id)
+          .single();
+        if (profileData) userProfile = profileData as Users;
+      } catch (e) {
+        // プロフィール未取得でも続行
+      }
+
+      const authUser = mapSupabaseUserToAuthUser(data.session.user, userProfile);
 
       return {
         accessToken: data.session.access_token,
@@ -173,7 +227,20 @@ export async function getCurrentUser(): Promise<AuthResult<AuthUser | null>> {
         return null;
       }
 
-      return mapSupabaseUserToAuthUser(data.user, undefined);
+      // users テーブルからプロフィール取得（auth_id で紐付け）
+      let userProfile: Users | undefined = undefined;
+      try {
+        const { data: profileData } = await supabase
+          .from("users")
+          .select("*")
+          .eq("auth_id", data.user.id)
+          .single();
+        if (profileData) userProfile = profileData as Users;
+      } catch (e) {
+        // プロフィール未取得でも続行
+      }
+
+      return mapSupabaseUserToAuthUser(data.user, userProfile);
     },
     "ユーザー情報の取得に失敗しました"
   );
@@ -273,7 +340,20 @@ export function onAuthStateChange(
     console.log("認証状態変更:", event, session?.user?.email);
 
     if (session?.user) {
-      const authUser = mapSupabaseUserToAuthUser(session.user, undefined);
+      // users テーブルからプロフィール取得（auth_id で紐付け）
+      let userProfile: Users | undefined = undefined;
+      try {
+        const { data: profileData } = await supabase
+          .from("users")
+          .select("*")
+          .eq("auth_id", session.user.id)
+          .single();
+        if (profileData) userProfile = profileData as Users;
+      } catch (e) {
+        // プロフィール未取得でも続行
+      }
+
+      const authUser = mapSupabaseUserToAuthUser(session.user, userProfile);
       callback(authUser);
     } else {
       callback(null);

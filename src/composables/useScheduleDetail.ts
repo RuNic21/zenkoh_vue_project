@@ -1,12 +1,14 @@
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useScheduleStore } from "@/store/schedule";
 import { listUsers } from "@/services/dbServices";
+import { getTaskById } from "@/services/taskService";
+import { taskToScheduleItem } from "@/utils/taskAdapter";
 import type { ScheduleItem, ScheduleStatus, SchedulePriority, ScheduleAttachment, ScheduleComment } from "@/types/schedule";
 
 // スケジュール詳細の状態とロジックを集約する composable
-export function useScheduleDetail() {
+export function useScheduleDetail(routeId?: string | number) {
   const store = useScheduleStore();
-  const isLoading = store.isLoading;
+  const isLoading = ref(false);
   const errorMessage = ref("");
 
   const scheduleDetail = computed<ScheduleItem>(() => {
@@ -38,6 +40,45 @@ export function useScheduleDetail() {
     } as ScheduleItem;
   });
 
+  // 指定されたタスクIDでDBから直接ロード
+  const loadTaskById = async (taskId: string | number) => {
+    try {
+      const id = Number(taskId);
+      if (!id || isNaN(id)) {
+        errorMessage.value = "タスクIDが無効です";
+        return;
+      }
+
+      isLoading.value = true;
+      errorMessage.value = "";
+
+      // DBから直接タスクデータを取得
+      const result = await getTaskById(id);
+      if (result.success && result.data) {
+        // DBのタスクデータをScheduleItemに変換
+        const scheduleItem = taskToScheduleItem(result.data);
+        
+        // 既存スケジュールに追加または更新
+        const existingIndex = store.schedules.value.findIndex(s => s.id === scheduleItem.id);
+        if (existingIndex >= 0) {
+          store.schedules.value[existingIndex] = scheduleItem;
+        } else {
+          store.schedules.value.push(scheduleItem);
+        }
+        
+        // 選択状態に設定
+        store.selectSchedule(scheduleItem.id);
+      } else {
+        errorMessage.value = result.error || "タスクの読み込みに失敗しました";
+      }
+    } catch (error) {
+      console.error("タスクの読み込みに失敗:", error);
+      errorMessage.value = "タスクの読み込みに失敗しました";
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
   // 編集フォーム
   const isEditMode = ref(false);
   const editForm = ref<ScheduleItem>({ ...scheduleDetail.value });
@@ -66,7 +107,7 @@ export function useScheduleDetail() {
         availableUsers.value = result.data.map((user) => ({
           id: user.id,
           name: user.display_name,
-          avatar: user.avatar_url || "",
+          avatar: "", // avatar_url フィールドは users テーブルにまだ存在しない
         }));
       }
     } catch (e) {
@@ -98,17 +139,25 @@ export function useScheduleDetail() {
     // ScheduleCommentの正しい型でコメントを作成
     const comment: ScheduleComment = {
       id: Date.now(),
-      user: "ユーザー",
-      text: text.trim(),
-      createdAt: new Date().toISOString(),
+      author: "ユーザー", // author フィールドを使用
+      content: text.trim(), // content フィールドを使用
+      timestamp: new Date().toISOString(), // timestamp フィールドを使用
     };
     
     editForm.value.comments.push(comment);
     newComment.value = "";
   };
 
+  // コンポーネントマウント時に自動的にタスクをロード（routeIdが渡された場合）
   onMounted(async () => {
-    await loadUsers();
+    if (routeId) {
+      await Promise.all([
+        loadTaskById(routeId),
+        loadUsers()
+      ]);
+    } else {
+      await loadUsers();
+    }
   });
 
   return {
@@ -132,6 +181,8 @@ export function useScheduleDetail() {
     addTag,
     removeTag,
     addComment,
+    loadUsers, // ユーザーデータ読み込み関数を公開
+    loadTaskById, // タスク読み込み関数を公開
   };
 }
 

@@ -1,7 +1,7 @@
 // 認証状態管理 Composable
 // 目的: アプリケーション全体で認証状態を共有・管理
 
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import * as authService from "@/services/authService";
 import type {
@@ -206,26 +206,18 @@ export function useAuth() {
     return true;
   };
 
-  // 認証状態変更の監視を設定（一度だけ）
-  onMounted(() => {
+  /**
+   * 認証状態変更の監視を開始
+   * コンポーネント内でのみ使用可能（onMounted を使用）
+   */
+  const startAuthStateListener = () => {
     if (!unsubscribeAuthStateChange) {
       unsubscribeAuthStateChange = authService.onAuthStateChange((user) => {
         globalAuthState.value.user = user;
         globalAuthState.value.isAuthenticated = !!user;
       });
     }
-
-    // 初回マウント時に認証状態を確認
-    if (globalAuthState.value.isLoading && !globalAuthState.value.user) {
-      initializeAuth();
-    }
-  });
-
-  // クリーンアップ（アプリ全体で一度だけ解除）
-  onUnmounted(() => {
-    // グローバル状態なので、ここでは解除しない
-    // アプリ終了時に解除される
-  });
+  };
 
   return {
     // 状態
@@ -246,15 +238,49 @@ export function useAuth() {
     refreshUser,
     hasRole,
     requireAuth,
+    startAuthStateListener, // 認証状態変更監視を開始
   };
 }
 
 /**
  * アプリケーション起動時に一度だけ呼び出す初期化関数
+ * コンポーネント外部から呼び出される場合は直接 authService を使用
  */
 export async function initializeAuthSystem() {
-  const { initializeAuth } = useAuth();
-  await initializeAuth();
+  try {
+    globalAuthState.value.isLoading = true;
+    globalAuthState.value.error = null;
+
+    const result = await authService.getCurrentSession();
+
+    if (result.success && result.data) {
+      globalAuthState.value.user = result.data.user;
+      globalAuthState.value.session = {
+        access_token: result.data.accessToken,
+        refresh_token: result.data.refreshToken,
+      } as any;
+      globalAuthState.value.isAuthenticated = true;
+    } else {
+      globalAuthState.value.user = null;
+      globalAuthState.value.session = null;
+      globalAuthState.value.isAuthenticated = false;
+    }
+
+    // 認証状態変更の監視を開始
+    if (!unsubscribeAuthStateChange) {
+      unsubscribeAuthStateChange = authService.onAuthStateChange((user) => {
+        globalAuthState.value.user = user;
+        globalAuthState.value.isAuthenticated = !!user;
+      });
+    }
+  } catch (e) {
+    console.error("認証初期化エラー:", e);
+    globalAuthState.value.user = null;
+    globalAuthState.value.session = null;
+    globalAuthState.value.isAuthenticated = false;
+  } finally {
+    globalAuthState.value.isLoading = false;
+  }
 }
 
 /**

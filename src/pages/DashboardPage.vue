@@ -1,12 +1,18 @@
 <script setup lang="ts">
 // ダッシュボードページ: プロジェクト進捗一覧、統計情報、フィルタリング
-import { ref, onMounted } from "vue";
+// Keep-Alive 캐싱을 위한 컴포넌트 이름 설정
+defineOptions({
+  name: 'DashboardPage'
+});
+
+import { ref, onMounted, onActivated } from "vue";
 import { useRouter } from "vue-router";
 import { useScheduleStore } from "@/store/schedule";
 import DashboardFilters from "@/components/dashboard/DashboardFilters.vue";
 import ProjectProgressTable from "@/components/dashboard/ProjectProgressTable.vue";
 import TaskProgressTable from "@/components/dashboard/TaskProgressTable.vue";
 import RecentActivities from "@/components/dashboard/RecentActivities.vue";
+import RecentNotifications from "@/components/dashboard/RecentNotifications.vue";
 import ProjectTasksModal from "@/components/dashboard/ProjectTasksModal.vue";
 import { useDashboard } from "@/composables/useDashboard";
 import { useMessage } from "@/composables/useMessage";
@@ -48,8 +54,8 @@ const selectedProjectTasks = ref<any[]>([]);
 const showTaskModal = ref(false);
 const selectedProjectForTasks = ref<any>(null);
 
-// プロジェクト詳細ページへ遷移
-const handleViewProjectDetail = async (project: ProjectProgressRow) => {
+// プロジェクトのタスク一覧モーダルを開く（詳細ページ遷移ではなくモーダル表示）
+const handleOpenProjectTasksModal = async (project: ProjectProgressRow) => {
   try {
     const { getProjectTasks } = await import("@/services/dashboardService");
     selectedProjectForTasks.value = project;
@@ -241,6 +247,17 @@ onMounted(async () => {
   await loadRecentTasks();
   await loadActivityFeed();
 });
+
+// Keep-Alive: ページが再度アクティブになったときにデータを更新
+onActivated(async () => {
+  console.log("Dashboard ページが再アクティブ化されました");
+  // 詳細ページから戻ってきたときに最新のデータを表示
+  await Promise.all([
+    loadDashboardFromDb(),
+    loadRecentTasks(),
+    loadActivityFeed()
+  ]);
+});
 </script>
 
 <template>
@@ -267,7 +284,7 @@ onMounted(async () => {
 
     <!-- フィルタリング・クイックアクションパネル -->
     <div class="row mb-4">
-      <div class="col-lg-8 col-md-12">
+      <div class="col-12">
         <DashboardFilters 
           :search-query="searchQuery"
           :priority-filter="priorityFilter"
@@ -285,18 +302,26 @@ onMounted(async () => {
     </div>
 
     <!-- プロジェクト別進捗の一覧表示 -->
-    <div class="row">
+    <div class="row mb-4">
       <div class="col-12">
         <ProjectProgressTable 
           :rows="filteredProjects"
-          @viewDetail="handleViewProjectDetail"
+          @viewDetail="handleOpenProjectTasksModal"
         />
       </div>
     </div>
 
     <!-- タスク別進捗の一覧表示 -->
-    <div class="row mt-4">
+    <div class="row mb-4">
       <div class="col-12">
+        <!-- タスク読み込み/エラー表示 -->
+        <div v-if="isTaskLoading" class="alert alert-secondary" role="alert">
+          タスクを読み込み中です...
+        </div>
+        <div v-if="!isTaskLoading && taskErrorMessage" class="alert alert-danger" role="alert">
+          {{ taskErrorMessage }}
+        </div>
+
         <TaskProgressTable 
           :rows="filteredTasks"
           @viewDetail="handleViewTaskDetail"
@@ -304,10 +329,17 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- 最近の活動フィード -->
-    <div class="row mt-4">
+    <!-- 最近の通知 -->
+    <div class="row mb-4">
       <div class="col-12">
-        <RecentActivities :activities="recentActivities" :is-loading="isActivityLoading" />
+        <RecentNotifications />
+      </div>
+    </div>
+
+    <!-- 最近の活動 -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <RecentActivities :activities="recentActivities" :isLoading="isActivityLoading" />
       </div>
     </div>
 

@@ -2,7 +2,7 @@
 // レポートページコンポーネント
 // 目的: プロジェクト・タスク・ユーザーの統計レポートを表示・生成
 
-import { ref, computed } from "vue";
+import { ref, computed, onActivated } from "vue";
 import { useReportPage } from "@/composables/useReportPage";
 import type { 
   ReportData, 
@@ -97,6 +97,13 @@ const resetFilters = () => {
   filter.priority = [];
   includeArchived.value = false;
 };
+
+// Keep-Alive: ページが再度アクティブになったときにデータを更新
+onActivated(async () => {
+  console.log("ReportPage ページが再アクティブ化されました");
+  // 詳細ページから戻ってきたときに最新のデータで再生成
+  await generateReportData();
+});
 
 // レポートエクスポート（CSV）
 const exportToCSV = () => {
@@ -269,7 +276,7 @@ const closeProjectDetailModal = () => {
       </div>
 
       <!-- 詳細テーブル -->
-      <div class="row">
+      <div class="row mb-4">
         <!-- プロジェクト進捗テーブル -->
         <div class="col-12">
           <div class="card">

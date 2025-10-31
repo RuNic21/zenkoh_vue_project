@@ -18,10 +18,18 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 async function clearTable(tableName) {
   console.log(`[削除中] ${tableName} テーブルのデータを削除しています...`);
   
-  const { error } = await supabase
-    .from(tableName)
-    .delete()
-    .neq("id", 0); // すべてのレコードを削除（id=0は存在しないため）
+  // task_members と project_members は複合主キーなので id カラムがない
+  // それぞれのテーブルに合わせた削除条件を使用
+  let query;
+  if (tableName === "task_members") {
+    query = supabase.from(tableName).delete().gte("task_id", 0);
+  } else if (tableName === "project_members") {
+    query = supabase.from(tableName).delete().gte("project_id", 0);
+  } else {
+    query = supabase.from(tableName).delete().neq("id", 0);
+  }
+  
+  const { error } = await query;
   
   if (error) {
     console.error(`[エラー] ${tableName} の削除に失敗:`, error.message);
@@ -43,6 +51,7 @@ async function main() {
     "board_columns",    // boards を参照
     "boards",           // projects を参照
     "tasks",            // projects を参照
+    "project_members",  // projects, users を参照
     "projects",         // 他のテーブルから参照される
     "users"             // 他のテーブルから参照される
   ];

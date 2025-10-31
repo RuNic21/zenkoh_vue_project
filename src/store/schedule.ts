@@ -35,10 +35,12 @@
 
 import { ref, computed } from "vue";
 import type { ScheduleItem } from "../types/schedule";
-import { listTasksWithProject, createTask, updateTask, deleteTask } from "../services/taskService";
+import { listTasksWithProject, createTask, updateTask, deleteTask, getTaskById } from "../services/taskService";
 import { listUsers } from "../services/dbServices";
 import { listProjects } from "../services/projectService";
 import { tasksToScheduleItems, scheduleItemToTaskInsert, scheduleItemToTaskUpdate, findUserIdByName } from "../utils/taskAdapter";
+import { triggerTaskAssignedNotification } from "../utils/notificationTrigger";
+import { getUserInfo } from "../utils/userHelper";
 import type { TaskWithProject } from "../types/task";
 import type { Users } from "../types/db/users";
 import type { Project } from "../types/project";
@@ -140,8 +142,16 @@ export const useScheduleStore = () => ({
     try {
       isLoading.value = true;
       errorMessage.value = "";
+      
+      // 更新前のタスク情報を取得（割り当て先変更検知用）
+      const previousTaskResult = await getTaskById(item.id);
+      const previousAssigneeId = previousTaskResult.success && previousTaskResult.data 
+        ? previousTaskResult.data.primary_assignee_id 
+        : null;
+      
       // ScheduleItem を TaskUpdate に変換
       let taskUpdate = scheduleItemToTaskUpdate(item);
+      let newAssigneeId: number | null | undefined = undefined;
 
       // 主担当（表示名 → ユーザーID）に変換して保存
       // 注意: users 取得に失敗した場合はスキップ（他フィールドのみ保存）
@@ -151,6 +161,7 @@ export const useScheduleStore = () => ({
           const assigneeUserId = findUserIdByName(item.assignee || "", usersRes.data);
           if (assigneeUserId) {
             taskUpdate = { ...taskUpdate, primary_assignee_id: assigneeUserId };
+            newAssigneeId = assigneeUserId;
           }
         }
       } catch (e) {
@@ -162,6 +173,34 @@ export const useScheduleStore = () => ({
       const result = await updateTask(item.id, taskUpdate);
       
       if (result.success && result.data) {
+        // 割り当て先が変更された場合、通知を送信
+        if (newAssigneeId !== undefined && newAssigneeId !== previousAssigneeId && newAssigneeId !== null) {
+          try {
+            // 新しい割り当て先のユーザー情報を取得
+            const assigneeInfo = await getUserInfo(newAssigneeId);
+            
+            // プロジェクト名を取得
+            const projectsResult = await listProjects();
+            const projects = projectsResult.success && projectsResult.data ? projectsResult.data : [];
+            const project = projects.find(p => p.id === result.data.project_id);
+            const projectName = project?.name || "不明なプロジェクト";
+            
+            if (assigneeInfo && assigneeInfo.email) {
+              // タスク割り当て通知を送信
+              await triggerTaskAssignedNotification(
+                result.data,
+                assigneeInfo.name,
+                assigneeInfo.email,
+                projectName
+              );
+              console.log("✅ タスク再割り当て通知を送信しました");
+            }
+          } catch (notificationError) {
+            // 通知送信失敗してもタスク更新は成功として扱う
+            console.warn("⚠️ タスク再割り当て通知の送信に失敗:", notificationError);
+          }
+        }
+        
         // サーバーで確定した値から ScheduleItem を再構築し、ストアを正とする
         try {
           const usersRes = await listUsers();

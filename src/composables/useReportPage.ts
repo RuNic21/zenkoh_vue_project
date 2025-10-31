@@ -8,6 +8,7 @@ import {
   analyzeDependencies
 } from "@/services/reportService";
 import { listProjects } from "@/services/projectService";
+import { listUsers } from "@/services/dbServices";
 import type { 
   ReportData, 
   ReportFilter, 
@@ -117,6 +118,7 @@ export function useReportPage() {
 
   const loadProjectsAndUsers = async () => {
     try {
+      // プロジェクト一覧を取得
       const projRes = await listProjects();
       if (projRes.success && projRes.data) {
         availableProjects.value = projRes.data.map((project) => ({ 
@@ -124,8 +126,18 @@ export function useReportPage() {
           name: project.name 
         }));
       }
-      // TODO: ユーザー一覧取得サービスを実装後に接続
-      // availableUsers.value = await loadUsers();
+      
+      // ユーザー一覧を取得
+      const usersRes = await listUsers();
+      if (usersRes.success && usersRes.data) {
+        availableUsers.value = usersRes.data.map((user) => ({
+          id: user.id,
+          display_name: user.display_name
+        }));
+        console.log("ユーザー一覧取得完了:", availableUsers.value.length, "件");
+      } else {
+        console.error("ユーザー一覧取得に失敗:", usersRes.error);
+      }
     } catch (e) {
       console.error("候補データの読み込みに失敗", e);
     }

@@ -42,10 +42,13 @@ export async function handleServiceCall<T>(
 }
 
 // Supabaseエラーを日本語メッセージに変換
-export function translateSupabaseError(error: any): string {
+export function translateSupabaseError(error: unknown): string {
   if (!error) return "不明なエラーが発生しました";
   
-  const errorMessage = error.message || String(error);
+  // エラーオブジェクトの型チェック
+  const errorMessage = error && typeof error === "object" && "message" in error 
+    ? String((error as { message: unknown }).message) 
+    : String(error);
   
   // よくあるSupabaseエラーメッセージを日本語に変換
   const errorTranslations: Record<string, string> = {

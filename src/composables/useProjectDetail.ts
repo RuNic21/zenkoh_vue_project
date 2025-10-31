@@ -34,7 +34,7 @@ export function useProjectDetail(projectId?: string | number) {
   // ロード処理
   const loadUsers = async () => {
     try {
-      const result = (await listUsers()) as any;
+      const result = await listUsers();
       if (result.success && result.data) {
         users.value = result.data;
       }

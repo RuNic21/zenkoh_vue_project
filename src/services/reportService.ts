@@ -14,7 +14,20 @@ import type {
   ChartData,
   ChartDataset
 } from "../types/report";
+import type { Project } from "../types/project";
+import type { Task } from "../types/task";
 import { handleServiceCall, createSuccessResult, createErrorResult, translateSupabaseError, type ServiceResult } from "../utils/errorHandler";
+
+// Project with User 型（JOIN時）
+interface ProjectWithUser extends Omit<Project, "users"> {
+  users?: { display_name: string };
+}
+
+// Task with relations 型（JOIN時）
+interface TaskWithRelations extends Omit<Task, "projects" | "users"> {
+  projects?: { name: string };
+  users?: { display_name: string };
+}
 
 // プロジェクト進捗レポート生成
 export async function generateProjectProgressReport(
@@ -100,10 +113,11 @@ export async function generateProjectProgressReport(
         status = "未開始";
       }
 
+      const projectWithUser = project as ProjectWithUser;
       projectReports.push({
         projectId: project.id,
         projectName: project.name,
-        ownerName: (project.users as any)?.display_name || "-",
+        ownerName: projectWithUser.users?.display_name || "-",
         startDate: project.start_date,
         endDate: project.end_date,
         totalTasks,
@@ -512,4 +526,305 @@ export function generatePriorityChartData(priorityReport: PriorityReport[]): Cha
       borderWidth: 1
     }]
   };
+}
+
+// ==================== Phase 1: 高度な可視化機能 ====================
+
+// 間トチャート用データ生成
+export async function generateGanttData(
+  options: ReportOptions = {}
+): Promise<ServiceResult<import("../types/report").GanttTaskData[]>> {
+  return handleServiceCall(
+    async () => {
+      // タスク一覧を取得（プロジェクト・ユーザー・親タスク情報を含む）
+      let query = supabase
+        .from("tasks")
+        .select(`
+          id,
+          title,
+          planned_start,
+          planned_end,
+          progress_percent,
+          status,
+          priority,
+          parent_task_id,
+          project_id,
+          primary_assignee_id,
+          projects!tasks_project_id_fkey(name),
+          users!tasks_primary_assignee_id_fkey(display_name)
+        `)
+        .not("planned_start", "is", null)
+        .not("planned_end", "is", null);
+
+      // フィルタリング
+      if (options.projectIds && options.projectIds.length > 0) {
+        query = query.in("project_id", options.projectIds);
+      }
+
+      if (options.userIds && options.userIds.length > 0) {
+        query = query.in("primary_assignee_id", options.userIds);
+      }
+
+      if (!options.includeArchived) {
+        query = query.eq("is_archived", false);
+      }
+
+      const { data: tasks, error } = await query;
+
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
+
+      if (!tasks || tasks.length === 0) {
+        return [];
+      }
+
+      // 間トチャートデータに変換
+      const ganttData: import("../types/report").GanttTaskData[] = tasks.map(task => ({
+        id: String(task.id),
+        name: task.title || "無題のタスク",
+        start: task.planned_start || "",
+        end: task.planned_end || "",
+        progress: task.progress_percent || 0,
+        dependencies: task.parent_task_id ? String(task.parent_task_id) : undefined,
+        projectId: task.project_id,
+        projectName: (task as TaskWithRelations).projects?.name || "プロジェクト未割当",
+        assigneeName: (task as TaskWithRelations).users?.display_name || "担当者未割当",
+        status: task.status || "NOT_STARTED",
+        priority: task.priority || "MEDIUM"
+      }));
+
+      return ganttData;
+    },
+    "間トチャートデータの生成に失敗しました"
+  );
+}
+
+// 依存性グラフデータ生成
+export async function generateDependencyGraphData(
+  options: ReportOptions = {}
+): Promise<ServiceResult<import("../types/report").DependencyGraphData>> {
+  return handleServiceCall(
+    async () => {
+      // タスク一覧を取得（親タスク情報を含む）
+      let query = supabase
+        .from("tasks")
+        .select(`
+          id,
+          title,
+          status,
+          priority,
+          progress_percent,
+          parent_task_id,
+          project_id,
+          projects!tasks_project_id_fkey(name)
+        `);
+
+      // フィルタリング
+      if (options.projectIds && options.projectIds.length > 0) {
+        query = query.in("project_id", options.projectIds);
+      }
+
+      if (options.userIds && options.userIds.length > 0) {
+        query = query.in("primary_assignee_id", options.userIds);
+      }
+
+      if (!options.includeArchived) {
+        query = query.eq("is_archived", false);
+      }
+
+      const { data: tasks, error } = await query;
+
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
+
+      if (!tasks || tasks.length === 0) {
+        return { nodes: [], edges: [] };
+      }
+
+      // ステータスに応じた色を返すヘルパー関数
+      const getStatusColor = (status: string): string => {
+        switch (status) {
+          case "DONE": return "#28a745"; // 緑
+          case "IN_PROGRESS": return "#007bff"; // 青
+          case "BLOCKED": return "#ffc107"; // 黄色
+          case "CANCELLED": return "#dc3545"; // 赤
+          default: return "#6c757d"; // グレー（未開始）
+        }
+      };
+
+      // ノードを生成
+      const nodes: import("../types/report").DependencyNode[] = tasks.map(task => {
+        const taskWithRelations = task as TaskWithRelations;
+        return {
+          id: String(task.id),
+          label: task.title || "無題のタスク",
+          title: `プロジェクト: ${taskWithRelations.projects?.name || "未割当"}\nステータス: ${task.status}\n進捗: ${task.progress_percent}%`,
+          group: taskWithRelations.projects?.name || "未割当",
+          color: getStatusColor(task.status),
+          status: task.status || "NOT_STARTED",
+          priority: task.priority || "MEDIUM",
+          progress: task.progress_percent || 0
+        };
+      });
+
+      // エッジを生成（親タスクとの依存関係）
+      const edges: import("../types/report").DependencyEdge[] = tasks
+        .filter(task => task.parent_task_id !== null)
+        .map(task => ({
+          from: String(task.parent_task_id),
+          to: String(task.id),
+          arrows: "to" as const,
+          label: "依存",
+          color: "#999999"
+        }));
+
+      return { nodes, edges };
+    },
+    "依存性グラフデータの生成に失敗しました"
+  );
+}
+
+// 依存性分析を実行
+export async function analyzeDependencies(
+  options: ReportOptions = {}
+): Promise<ServiceResult<import("../types/report").DependencyAnalysis>> {
+  return handleServiceCall(
+    async () => {
+      // タスク一覧を取得
+      let query = supabase
+        .from("tasks")
+        .select("id, parent_task_id, status");
+
+      // フィルタリング
+      if (options.projectIds && options.projectIds.length > 0) {
+        query = query.in("project_id", options.projectIds);
+      }
+
+      if (!options.includeArchived) {
+        query = query.eq("is_archived", false);
+      }
+
+      const { data: tasks, error } = await query;
+
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
+
+      if (!tasks || tasks.length === 0) {
+        return {
+          totalTasks: 0,
+          tasksWithDependencies: 0,
+          criticalPath: [],
+          blockedTasks: [],
+          circularDependencies: [],
+          maxDepth: 0
+        };
+      }
+
+      const totalTasks = tasks.length;
+      const tasksWithDependencies = tasks.filter(t => t.parent_task_id !== null).length;
+      const blockedTasks = tasks.filter(t => t.status === "BLOCKED").map(t => String(t.id));
+
+      // 依存関係マップを構築
+      const dependencyMap = new Map<number, number[]>();
+      tasks.forEach(task => {
+        if (task.parent_task_id) {
+          if (!dependencyMap.has(task.parent_task_id)) {
+            dependencyMap.set(task.parent_task_id, []);
+          }
+          dependencyMap.get(task.parent_task_id)!.push(task.id);
+        }
+      });
+
+      // 循環依存を検出
+      const circularDependencies: string[][] = [];
+      const visited = new Set<number>();
+      const recursionStack = new Set<number>();
+
+      const detectCycle = (taskId: number, path: number[]): void => {
+        visited.add(taskId);
+        recursionStack.add(taskId);
+        path.push(taskId);
+
+        const children = dependencyMap.get(taskId) || [];
+        for (const childId of children) {
+          if (!visited.has(childId)) {
+            detectCycle(childId, [...path]);
+          } else if (recursionStack.has(childId)) {
+            // 循環依存を発見
+            const cycleStart = path.indexOf(childId);
+            if (cycleStart !== -1) {
+              circularDependencies.push(path.slice(cycleStart).map(String));
+            }
+          }
+        }
+
+        recursionStack.delete(taskId);
+      };
+
+      tasks.forEach(task => {
+        if (!visited.has(task.id)) {
+          detectCycle(task.id, []);
+        }
+      });
+
+      // 最大依存深度を計算
+      let maxDepth = 0;
+      const calculateDepth = (taskId: number, depth: number): number => {
+        const children = dependencyMap.get(taskId) || [];
+        if (children.length === 0) {
+          return depth;
+        }
+        let maxChildDepth = depth;
+        children.forEach(childId => {
+          maxChildDepth = Math.max(maxChildDepth, calculateDepth(childId, depth + 1));
+        });
+        return maxChildDepth;
+      };
+
+      tasks.forEach(task => {
+        if (!task.parent_task_id) {
+          maxDepth = Math.max(maxDepth, calculateDepth(task.id, 1));
+        }
+      });
+
+      // クリティカルパスを簡易計算（最も深い依存チェーン）
+      let criticalPath: string[] = [];
+      const findLongestPath = (taskId: number, path: number[]): number[] => {
+        const children = dependencyMap.get(taskId) || [];
+        if (children.length === 0) {
+          return path;
+        }
+        let longestPath = path;
+        children.forEach(childId => {
+          const childPath = findLongestPath(childId, [...path, childId]);
+          if (childPath.length > longestPath.length) {
+            longestPath = childPath;
+          }
+        });
+        return longestPath;
+      };
+
+      tasks.forEach(task => {
+        if (!task.parent_task_id) {
+          const path = findLongestPath(task.id, [task.id]);
+          if (path.length > criticalPath.length) {
+            criticalPath = path.map(String);
+          }
+        }
+      });
+
+      return {
+        totalTasks,
+        tasksWithDependencies,
+        criticalPath,
+        blockedTasks,
+        circularDependencies,
+        maxDepth
+      };
+    },
+    "依存性分析に失敗しました"
+  );
 }

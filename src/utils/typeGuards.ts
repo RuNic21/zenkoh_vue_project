@@ -5,7 +5,7 @@
 
 // サービスレスポンス成功の型ガード
 export const isServiceSuccess = <T>(
-  result: any
+  result: unknown
 ): result is { success: true; data: T } => {
   return (
     result !== null &&
@@ -19,7 +19,7 @@ export const isServiceSuccess = <T>(
 
 // サービスレスポンス失敗の型ガード
 export const isServiceError = (
-  result: any
+  result: unknown
 ): result is { success: false; error: string } => {
   return (
     result !== null &&
@@ -31,7 +31,7 @@ export const isServiceError = (
 };
 
 // 配列の型ガード
-export const isArray = <T>(value: any): value is T[] => {
+export const isArray = <T>(value: unknown): value is T[] => {
   return Array.isArray(value);
 };
 
@@ -41,17 +41,17 @@ export const isDefined = <T>(value: T | null | undefined): value is T => {
 };
 
 // 文字列チェック（空文字列除外）
-export const isNonEmptyString = (value: any): value is string => {
+export const isNonEmptyString = (value: unknown): value is string => {
   return typeof value === "string" && value.trim().length > 0;
 };
 
 // 数値チェック（NaN除外）
-export const isValidNumber = (value: any): value is number => {
+export const isValidNumber = (value: unknown): value is number => {
   return typeof value === "number" && !isNaN(value) && isFinite(value);
 };
 
 // 日付文字列チェック
-export const isValidDateString = (value: any): value is string => {
+export const isValidDateString = (value: unknown): value is string => {
   if (typeof value !== "string") return false;
   const date = new Date(value);
   return !isNaN(date.getTime());

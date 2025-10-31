@@ -33,7 +33,7 @@ export function throttle<T extends (...args: any[]) => any>(
 // メモ化された計算プロパティ（依存関係が変更された時のみ再計算）
 export function useMemoizedComputed<T>(
   getter: () => T,
-  deps: Ref<any>[]
+  deps: Ref<unknown>[]
 ): Ref<T> {
   const result = ref<T>(getter()) as Ref<T>;
   
@@ -125,8 +125,8 @@ export class PerformanceMonitor {
     }
   }
   
-  static getAllStats(): Record<string, any> {
-    const stats: Record<string, any> = {};
+  static getAllStats(): Record<string, { average: number; min: number; max: number; count: number } | null> {
+    const stats: Record<string, { average: number; min: number; max: number; count: number } | null> = {};
     for (const [name] of this.measurements) {
       stats[name] = this.getStats(name);
     }

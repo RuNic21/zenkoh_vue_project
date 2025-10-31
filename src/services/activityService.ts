@@ -29,6 +29,8 @@
 
 import { supabase } from "./supabaseClient";
 import { listUsers } from "./dbServices";
+import type { Notifications } from "../types/db/notifications";
+import type { Users } from "../types/db/users";
 import { handleServiceCall, createSuccessResult, createErrorResult, translateSupabaseError, type ServiceResult } from "../utils/errorHandler";
 
 // 活動ログの型定義
@@ -42,6 +44,12 @@ export interface ActivityLog {
   taskId?: number;
   projectName?: string;
   taskName?: string;
+}
+
+// Notifications テーブルに projects と tasks の関連情報を含む型
+interface NotificationWithRelations extends Notifications {
+  projects?: { name: string };
+  tasks?: { task_name: string };
 }
 
 // notifications テーブルから活動データを取得
@@ -81,10 +89,10 @@ export async function fetchRecentActivities(limit: number = 10): Promise<Service
           timestamp: new Date(notification.created_at),
           projectId: notification.project_id,
           taskId: notification.task_id,
-          projectName: (notification.projects as any)?.name,
-          taskName: (notification.tasks as any)?.task_name
+          projectName: notification.projects?.name,
+          taskName: notification.tasks?.task_name
         };
-      });
+      }) as ActivityLog[];
 
       return activities;
     },
@@ -121,7 +129,7 @@ function determineActivityType(subject: string, bodyText: string): ActivityLog['
 }
 
 // 活動タイプに基づいて説明文を生成
-function generateActivityDescription(type: ActivityLog['type'], notification: any): string {
+function generateActivityDescription(type: ActivityLog['type'], notification: NotificationWithRelations): string {
   const projectName = notification.projects?.name || 'プロジェクト';
   const taskName = notification.tasks?.task_name || 'タスク';
 
@@ -193,7 +201,7 @@ export async function logProjectCreated(projectId: number, projectName: string, 
   // 実際のユーザー情報を取得してから通知を作成
   const usersResult = await listUsers();
   const users = usersResult.success && usersResult.data ? usersResult.data : [];
-  const adminUser = users.find((user: any) => user.display_name === ownerName) || users[0];
+  const adminUser = users.find((user: Users) => user.display_name === ownerName) || users[0];
   const toEmail = adminUser ? adminUser.email : 'system@zenkoh.com';
   
   await createActivityNotification(

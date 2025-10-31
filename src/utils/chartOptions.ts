@@ -1,8 +1,29 @@
 // チャートオプションビルダー
 // 目的: チャートタイプに応じたデフォルトオプションを提供
 
-export function buildChartOptions(type: 'bar' | 'doughnut' | 'line' | 'pie', title?: string, showLegend = true) {
-  const base: any = {
+// Chart.js のオプション型定義
+interface ChartOptions {
+  responsive: boolean;
+  maintainAspectRatio: boolean;
+  plugins: {
+    legend: { display: boolean; position: string };
+    title: { display: boolean; text?: string; font: { size: number; weight: string } };
+    tooltip: {
+      backgroundColor: string;
+      titleColor: string;
+      bodyColor: string;
+      borderColor: string;
+      borderWidth: number;
+    };
+  };
+  scales?: {
+    x?: { beginAtZero: boolean };
+    y?: { beginAtZero: boolean };
+  };
+}
+
+export function buildChartOptions(type: 'bar' | 'doughnut' | 'line' | 'pie', title?: string, showLegend = true): ChartOptions {
+  const base: ChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {

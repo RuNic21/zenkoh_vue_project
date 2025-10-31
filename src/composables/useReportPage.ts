@@ -1,7 +1,21 @@
 import { ref, computed, reactive, onMounted } from "vue";
-import { generateReport, generateTaskStatusChartData, generatePriorityChartData } from "@/services/reportService";
+import { 
+  generateReport, 
+  generateTaskStatusChartData, 
+  generatePriorityChartData,
+  generateGanttData,
+  generateDependencyGraphData,
+  analyzeDependencies
+} from "@/services/reportService";
 import { listProjects } from "@/services/projectService";
-import type { ReportData, ReportFilter, ReportOptions } from "@/types/report";
+import type { 
+  ReportData, 
+  ReportFilter, 
+  ReportOptions,
+  GanttTaskData,
+  DependencyGraphData,
+  DependencyAnalysis
+} from "@/types/report";
 import { getStatusColor, getDeadlineColor } from "@/utils/chartColors";
 
 // レポートページの主要状態とロジックを集約
@@ -137,9 +151,81 @@ export function useReportPage() {
     }
   };
 
+  // ==================== Phase 1: 高度な可視化機能 ====================
+
+  // ガントチャートデータ
+  const ganttData = ref<GanttTaskData[]>([]);
+  const isLoadingGantt = ref(false);
+
+  // 依存関係グラフデータ
+  const dependencyGraphData = ref<DependencyGraphData>({ nodes: [], edges: [] });
+  const dependencyAnalysis = ref<DependencyAnalysis | null>(null);
+  const isLoadingDependency = ref(false);
+
+  // ガントチャートデータ生成
+  const loadGanttData = async () => {
+    try {
+      isLoadingGantt.value = true;
+      const result = await generateGanttData(reportOptions.value);
+      if (result.success && result.data) {
+        ganttData.value = result.data;
+      } else {
+        ganttData.value = [];
+        console.error("ガントチャートデータ生成失敗:", result.error);
+      }
+    } catch (e) {
+      console.error("ガントチャートデータ読み込み失敗", e);
+      ganttData.value = [];
+    } finally {
+      isLoadingGantt.value = false;
+    }
+  };
+
+  // 依存関係グラフデータ生成
+  const loadDependencyGraphData = async () => {
+    try {
+      isLoadingDependency.value = true;
+      
+      // グラフデータと分析結果を並列ロード
+      const [graphResult, analysisResult] = await Promise.all([
+        generateDependencyGraphData(reportOptions.value),
+        analyzeDependencies(reportOptions.value)
+      ]);
+
+      if (graphResult.success && graphResult.data) {
+        dependencyGraphData.value = graphResult.data;
+      } else {
+        dependencyGraphData.value = { nodes: [], edges: [] };
+        console.error("依存関係グラフデータ生成失敗:", graphResult.error);
+      }
+
+      if (analysisResult.success && analysisResult.data) {
+        dependencyAnalysis.value = analysisResult.data;
+      } else {
+        dependencyAnalysis.value = null;
+        console.error("依存性分析失敗:", analysisResult.error);
+      }
+    } catch (e) {
+      console.error("依存関係グラフデータ読み込み失敗", e);
+      dependencyGraphData.value = { nodes: [], edges: [] };
+      dependencyAnalysis.value = null;
+    } finally {
+      isLoadingDependency.value = false;
+    }
+  };
+
+  // 全ての高度な可視化データ読み込み
+  const loadAdvancedVisualizationData = async () => {
+    await Promise.all([
+      loadGanttData(),
+      loadDependencyGraphData()
+    ]);
+  };
+
   onMounted(async () => {
     await loadProjectsAndUsers();
     await generateReportData();
+    await loadAdvancedVisualizationData();
   });
 
   return {
@@ -161,6 +247,15 @@ export function useReportPage() {
     // actions
     loadProjectsAndUsers,
     generateReportData,
+    // Phase 1: 高度な可視化
+    ganttData,
+    isLoadingGantt,
+    dependencyGraphData,
+    dependencyAnalysis,
+    isLoadingDependency,
+    loadGanttData,
+    loadDependencyGraphData,
+    loadAdvancedVisualizationData,
   };
 }
 

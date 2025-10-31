@@ -88,6 +88,17 @@ const getRelativeTime = (dateString: string): string => {
   
   return date.toLocaleDateString("ja-JP");
 };
+
+// プロフィールモーダルを開く（グローバルイベントで通知）
+const handleOpenProfile = () => {
+  if (user.value?.id) {
+    window.dispatchEvent(new CustomEvent('open-profile-modal', { 
+      detail: { authId: user.value.id } 
+    }));
+  } else {
+    console.warn("ユーザー情報が取得できませんでした");
+  }
+};
 </script>
 
 <template>
@@ -246,7 +257,7 @@ const getRelativeTime = (dateString: string): string => {
               aria-labelledby="userMenuButton"
             >
               <li class="mb-2">
-                <a class="dropdown-item border-radius-md" href="javascript:;">
+                <a class="dropdown-item border-radius-md" href="javascript:;" @click="handleOpenProfile">
                   <div class="d-flex align-items-center">
                     <i class="material-symbols-rounded me-2">person</i>
                     <span>プロフィール</span>

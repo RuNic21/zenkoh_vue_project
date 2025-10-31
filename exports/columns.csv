@@ -1,0 +1,112 @@
+table_schema,table_name,column_name,is_nullable,data_type,udt_name,column_default,is_identity
+public,alert_rules,created_by,YES,bigint,int8,,NO
+public,task_members,task_id,NO,bigint,int8,,NO
+public,task_members,user_id,NO,bigint,int8,,NO
+public,task_members,joined_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,task_members,created_by,YES,bigint,int8,,NO
+public,task_members,updated_by,YES,bigint,int8,,NO
+public,tasks,id,NO,bigint,int8,nextval('tasks_id_seq'::regclass),NO
+public,tasks,project_id,NO,bigint,int8,,NO
+public,tasks,parent_task_id,YES,bigint,int8,,NO
+public,tasks,primary_assignee_id,YES,bigint,int8,,NO
+public,tasks,planned_start,YES,timestamp with time zone,timestamptz,,NO
+public,tasks,planned_end,YES,timestamp with time zone,timestamptz,,NO
+public,tasks,actual_start,YES,timestamp with time zone,timestamptz,,NO
+public,tasks,actual_end,YES,timestamp with time zone,timestamptz,,NO
+public,tasks,progress_percent,NO,smallint,int2,0,NO
+public,tasks,current_column_id,YES,bigint,int8,,NO
+public,tasks,sort_order,YES,integer,int4,,NO
+public,tasks,is_archived,NO,boolean,bool,false,NO
+public,tasks,created_by,YES,bigint,int8,,NO
+public,tasks,updated_by,YES,bigint,int8,,NO
+public,tasks,created_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,tasks,updated_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,alert_rules,id,NO,bigint,int8,nextval('alert_rules_id_seq'::regclass),NO
+public,alert_rules,project_id,NO,bigint,int8,,NO
+public,alert_rules,params_json,YES,jsonb,jsonb,,NO
+public,alert_rules,is_enabled,NO,boolean,bool,true,NO
+public,alert_rules,created_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,alert_rules,updated_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,users,id,NO,bigint,int8,nextval('users_id_seq'::regclass),NO
+public,alert_rules,updated_by,YES,bigint,int8,,NO
+public,notifications,id,NO,bigint,int8,nextval('notifications_id_seq'::regclass),NO
+public,notifications,project_id,NO,bigint,int8,,NO
+public,notifications,task_id,YES,bigint,int8,,NO
+public,notifications,alert_rule_id,YES,bigint,int8,,NO
+public,notifications,send_after,NO,timestamp with time zone,timestamptz,now(),NO
+public,notifications,sent_at,YES,timestamp with time zone,timestamptz,,NO
+public,notifications,created_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,notifications,template_id,YES,bigint,int8,,NO
+public,notifications,metadata_json,YES,jsonb,jsonb,,NO
+public,notifications,retry_count,NO,integer,int4,0,NO
+public,notifications,created_by,YES,bigint,int8,,NO
+public,notifications,updated_by,YES,bigint,int8,,NO
+public,users,is_active,NO,boolean,bool,true,NO
+public,users,created_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,users,updated_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,users,skills,YES,jsonb,jsonb,'[]'::jsonb,NO
+public,users,tags,YES,jsonb,jsonb,'[]'::jsonb,NO
+public,users,last_login_at,YES,timestamp with time zone,timestamptz,,NO
+public,users,login_count,NO,integer,int4,0,NO
+public,projects,id,NO,bigint,int8,nextval('projects_id_seq'::regclass),NO
+public,projects,start_date,YES,date,date,,NO
+public,projects,end_date,YES,date,date,,NO
+public,projects,owner_user_id,YES,bigint,int8,,NO
+public,projects,is_archived,NO,boolean,bool,false,NO
+public,projects,created_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,projects,updated_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,project_members,project_id,NO,bigint,int8,,NO
+public,project_members,user_id,NO,bigint,int8,,NO
+public,project_members,joined_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,boards,id,NO,bigint,int8,nextval('boards_id_seq'::regclass),NO
+public,boards,project_id,NO,bigint,int8,,NO
+public,boards,is_default,NO,boolean,bool,true,NO
+public,boards,created_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,boards,updated_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,board_columns,id,NO,bigint,int8,nextval('board_columns_id_seq'::regclass),NO
+public,board_columns,board_id,NO,bigint,int8,,NO
+public,board_columns,wip_limit,YES,integer,int4,,NO
+public,board_columns,sort_order,NO,integer,int4,,NO
+public,board_columns,created_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,board_columns,updated_at,NO,timestamp with time zone,timestamptz,now(),NO
+public,users,position,YES,text,text,,NO
+public,users,display_name,NO,text,text,,NO
+public,users,password_hash,NO,text,text,,NO
+public,alert_rules,notify_email,YES,text,text,,NO
+public,board_columns,name,NO,text,text,,NO
+public,notifications,status,NO,text,text,'QUEUED'::text,NO
+public,users,first_name,YES,text,text,,NO
+public,users,last_name,YES,text,text,,NO
+public,users,phone,YES,text,text,,NO
+public,users,department,YES,text,text,,NO
+public,users,email,NO,text,text,,NO
+public,users,avatar_url,YES,text,text,,NO
+public,users,bio,YES,text,text,,NO
+public,users,timezone,YES,text,text,'Asia/Tokyo'::text,NO
+public,users,language,YES,text,text,'ja'::text,NO
+public,users,work_hours_start,YES,text,text,,NO
+public,users,work_hours_end,YES,text,text,,NO
+public,notifications,last_error,YES,text,text,,NO
+public,tasks,wbs_code,YES,text,text,,NO
+public,project_members,role,NO,text,text,,NO
+public,tasks,task_name,NO,text,text,,NO
+public,tasks,description,YES,text,text,,NO
+public,alert_rules,rule_type,NO,text,text,,NO
+public,boards,name,NO,text,text,,NO
+public,tasks,status,NO,text,text,'NOT_STARTED'::text,NO
+public,tasks,priority,NO,text,text,'MEDIUM'::text,NO
+public,projects,name,NO,text,text,,NO
+public,projects,description,YES,text,text,,NO
+public,task_members,role,NO,text,text,'CONTRIBUTOR'::text,NO
+public,notifications,to_email,NO,text,text,,NO
+public,notifications,subject,NO,text,text,,NO
+public,notifications,body_text,NO,text,text,,NO
+public,alert_rules,name,NO,text,text,,NO
+public,information_schema_columns,column_name,YES,name,name,,NO
+public,information_schema_columns,is_nullable,YES,character varying,varchar,,NO
+public,information_schema_columns,data_type,YES,character varying,varchar,,NO
+public,information_schema_columns,udt_name,YES,name,name,,NO
+public,information_schema_columns,is_identity,YES,character varying,varchar,,NO
+public,information_schema_columns,table_schema,YES,name,name,,NO
+public,information_schema_columns,table_name,YES,name,name,,NO
+public,information_schema_columns,column_default,YES,character varying,varchar,,NO

@@ -97,17 +97,40 @@ CREATE TABLE tasks (
 ```sql
 CREATE TABLE users (
   id BIGINT PRIMARY KEY,
+  auth_id UUID UNIQUE,                   -- Supabase Auth UUID
   email TEXT NOT NULL UNIQUE,
   display_name TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT true,
+  -- プロフィール
+  first_name TEXT,
+  last_name TEXT,
+  phone TEXT,
+  department TEXT,
+  position TEXT,
+  avatar_url TEXT,
+  bio TEXT,
+  -- ロケール
+  timezone TEXT DEFAULT 'Asia/Tokyo',
+  language TEXT DEFAULT 'ja',
+  -- 勤務時間
+  work_hours_start TEXT,
+  work_hours_end TEXT,
+  -- スキル/タグ
+  skills JSONB DEFAULT '[]',
+  tags JSONB DEFAULT '[]',
+  -- アクティビティメタ
+  last_login_at TIMESTAMPTZ,
+  login_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
 ```
 
-**役割**: システムユーザー情報管理
-- **主要フィールド**: `email`, `display_name`, `password_hash`, `is_active`
+**役割**: システムユーザー情報管理（認証連携/プロフィール/ロケール/勤務時間/スキル・タグ含む）
+- **主要フィールド**: `auth_id`, `email`, `display_name`, `password_hash`, `is_active`, `department`, `position`, `skills`, `tags`
+- **認証統合**: `auth_id` は Supabase Auth の UUID と紐付け
+- **スキーマ拡張**: プロフィール情報、ロケール設定、勤務時間、スキル・タグ管理に対応
 
 ### 2. カンバンボードシステム
 
@@ -152,6 +175,7 @@ CREATE TABLE task_members (
   task_id BIGINT NOT NULL REFERENCES tasks(id),
   user_id BIGINT NOT NULL REFERENCES users(id),
   role TEXT NOT NULL,
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (task_id, user_id)
 );
 ```
@@ -159,6 +183,21 @@ CREATE TABLE task_members (
 **役割**: タスクの多重担当者および役割管理
 - **主要フィールド**: `role` (例: "assignee", "reviewer", "observer")
 - **関係**: tasks (タスク), users (メンバー)
+
+#### 👥 PROJECT_MEMBERS (プロジェクトメンバー)
+```sql
+CREATE TABLE project_members (
+  project_id BIGINT NOT NULL REFERENCES projects(id),
+  user_id BIGINT NOT NULL REFERENCES users(id),
+  role TEXT NOT NULL,
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (project_id, user_id)
+);
+```
+
+**役割**: プロジェクト単位のメンバー/権限管理
+- **関係**: projects, users
+- `getProjectTeams` は本テーブルを基に集計
 
 ### 4. 通知システム
 
@@ -172,6 +211,8 @@ CREATE TABLE alert_rules (
   params_json JSONB,
   is_enabled BOOLEAN NOT NULL DEFAULT true,
   notify_email TEXT,
+  created_by BIGINT REFERENCES users(id),
+  updated_by BIGINT REFERENCES users(id),
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
@@ -195,6 +236,11 @@ CREATE TABLE notifications (
   send_after TIMESTAMPTZ NOT NULL,
   sent_at TIMESTAMPTZ,
   last_error TEXT,
+  template_id BIGINT,
+  metadata_json JSONB,
+  retry_count INTEGER NOT NULL DEFAULT 0,
+  created_by BIGINT REFERENCES users(id),
+  updated_by BIGINT REFERENCES users(id),
   created_at TIMESTAMPTZ NOT NULL
 );
 ```
@@ -217,7 +263,7 @@ TASKS (状態変更) → ALERT_RULES (ルール確認) → NOTIFICATIONS (通知
 
 ### 3. 協業ワークフロー
 ```
-TASKS (primary_assignee) + TASK_MEMBERS (追加メンバー) → 協業進行
+PROJECT_MEMBERS (プロジェクトメンバー) + TASKS/TASK_MEMBERS（タスク担当） → 協業進行
 ```
 
 ## 🛠️ 開発者ガイド
@@ -244,6 +290,13 @@ TASKS (primary_assignee) + TASK_MEMBERS (追加メンバー) → 協業進行
 - **アダプター**: `src/utils/taskAdapter.ts` (DB ↔ UI変換)
 - **UI型**: `src/types/schedule.ts` (画面表示用)
 - **ストア**: `src/store/schedule.ts` (Vueコンポーネント用状態管理)
+
+## ⚙️ パフォーマンス最適化（インデックス）
+
+- tasks: `idx_tasks_project_active`, `idx_tasks_status`, `idx_tasks_assignee`, `idx_tasks_updated_at`
+- boards: `idx_boards_project`
+- board_columns: `idx_board_columns_board`
+- alert_rules: `idx_alert_rules_project`, `idx_alert_rules_enabled`
 
 ## 📝 サンプルデータ
 

@@ -18,7 +18,7 @@ export async function getUserInfo(userId: number | null | undefined): Promise<{
   try {
     const { data, error } = await supabase
       .from("users")
-      .select("username, email")
+      .select("display_name, email")
       .eq("id", userId)
       .single();
 
@@ -28,7 +28,7 @@ export async function getUserInfo(userId: number | null | undefined): Promise<{
     }
 
     return {
-      name: data.username || "不明なユーザー",
+      name: data.display_name || "不明なユーザー",
       email: data.email || ""
     };
   } catch (e) {
@@ -53,7 +53,7 @@ export async function getUserInfoBatch(userIds: number[]): Promise<Map<number, {
   try {
     const { data, error } = await supabase
       .from("users")
-      .select("id, username, email")
+      .select("id, display_name, email")
       .in("id", userIds);
 
     if (error || !data) {
@@ -63,7 +63,7 @@ export async function getUserInfoBatch(userIds: number[]): Promise<Map<number, {
 
     data.forEach((user) => {
       resultMap.set(user.id, {
-        name: user.username || "不明なユーザー",
+        name: user.display_name || "不明なユーザー",
         email: user.email || ""
       });
     });
@@ -98,7 +98,7 @@ export async function getCurrentUserInfo(): Promise<{
     // users テーブルから追加情報を取得
     const { data: userData, error: userError } = await supabase
       .from("users")
-      .select("id, username")
+      .select("id, display_name")
       .eq("email", email)
       .single();
 
@@ -106,14 +106,14 @@ export async function getCurrentUserInfo(): Promise<{
       console.warn("ユーザーテーブルからの情報取得に失敗:", userError);
       return {
         id: 0,
-        name: user.user_metadata?.name || email.split("@")[0] || "不明なユーザー",
+        name: user.user_metadata?.display_name || email.split("@")[0] || "不明なユーザー",
         email
       };
     }
 
     return {
       id: userData.id,
-      name: userData.username || email.split("@")[0] || "不明なユーザー",
+      name: userData.display_name || email.split("@")[0] || "不明なユーザー",
       email
     };
   } catch (e) {

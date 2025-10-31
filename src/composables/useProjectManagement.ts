@@ -411,7 +411,7 @@ export function useProjectManagement() {
               // プロジェクト更新通知を送信
               await triggerProjectUpdatedNotification(
                 result.data,
-                owner.display_name || owner.username,
+                owner.display_name || "プロジェクトオーナー",
                 owner.email,
                 updateDescription,
                 currentUser.name

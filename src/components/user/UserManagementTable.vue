@@ -28,6 +28,7 @@ interface Emits {
   (e: 'select-all-users', checked: boolean): void;
   (e: 'view-profile', user: User): void;
   (e: 'edit-user', user: User): void;
+  (e: 'delete-user', userId: number): void;
   (e: 'create-user'): void;
   (e: 'bulk-activate-users'): void;
   (e: 'bulk-deactivate-users'): void;
@@ -124,6 +125,11 @@ const handleViewProfile = (user: User) => {
 
 const handleEditUser = (user: User) => {
   emit('edit-user', user);
+};
+
+const handleDeleteUser = (user: User) => {
+  // 単一削除イベントを親へ通知
+  emit('delete-user', user.id);
 };
 
 const handleCreateUser = () => {
@@ -325,6 +331,13 @@ const handleClearSelections = () => {
                   title="編集"
                 >
                   <i class="material-symbols-rounded text-sm">edit</i>
+                </button>
+                <button 
+                  class="btn btn-sm bg-gradient-danger mb-0" 
+                  @click="handleDeleteUser(item as unknown as User)"
+                  title="削除"
+                >
+                  <i class="material-symbols-rounded text-sm">delete</i>
                 </button>
               </div>
             </template>

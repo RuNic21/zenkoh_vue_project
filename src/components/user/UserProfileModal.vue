@@ -87,6 +87,7 @@ interface Emits {
   (e: 'save', form: UserForm): void;
   (e: 'avatar-upload', event: Event): void;
   (e: 'update:user-form', form: UserForm): void;
+  (e: 'edit'): void; // viewモードから編集モードへ切り替え
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -156,6 +157,11 @@ const handleClose = () => {
 // 保存
 const handleSave = () => {
   emit('save', props.userForm);
+};
+
+// 編集モードに切り替え（viewモードから編集へ）
+const handleEdit = () => {
+  emit('edit');
 };
 </script>
 
@@ -538,6 +544,17 @@ const handleSave = () => {
           <button type="button" class="btn btn-secondary" @click="handleClose">
             {{ isEditable ? 'キャンセル' : '閉じる' }}
           </button>
+          <!-- viewモード: 編集ボタンを表示 -->
+          <button 
+            v-if="mode === 'view'" 
+            type="button" 
+            class="btn bg-gradient-primary" 
+            @click="handleEdit"
+          >
+            <i class="material-symbols-rounded me-1">edit</i>
+            編集
+          </button>
+          <!-- edit/createモード: 保存ボタンを表示 -->
           <button 
             v-if="isEditable" 
             type="button" 

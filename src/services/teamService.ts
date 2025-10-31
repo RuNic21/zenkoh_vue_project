@@ -24,6 +24,7 @@ const USERS_TABLE = "users";
 const TASK_MEMBERS_TABLE = "task_members";
 const TASKS_TABLE = "tasks";
 const PROJECTS_TABLE = "projects";
+const PROJECT_MEMBERS_TABLE = "project_members"; // プロジェクトメンバー管理テーブル
 
 // ===== ユーザー管理 =====
 
@@ -63,20 +64,49 @@ export async function getUserById(id: number): Promise<ServiceResult<User | null
   );
 }
 
+// auth_id (Supabase Auth UUID) でユーザーを取得
+export async function getUserByAuthId(authId: string): Promise<ServiceResult<User | null>> {
+  return handleServiceCall(
+    async () => {
+      const res = await selectRows<User>(USERS_TABLE, "*", { auth_id: authId });
+      if (!res.ok) {
+        throw new Error(res.error || "ユーザー取得に失敗しました");
+      }
+      return (res.data && res.data[0]) ?? null;
+    },
+    "ユーザー取得に失敗しました"
+  );
+}
+
 // ユーザー作成
-export async function createUser(payload: {
+export async function createUser(payload: Partial<User> & {
   email: string;
   display_name: string;
   password_hash: string;
-  is_active?: boolean;
 }): Promise<ServiceResult<User | null>> {
   return handleServiceCall(
     async () => {
       const { data, error } = await supabase
         .from(USERS_TABLE)
         .insert([{ 
-          is_active: true, 
-          ...payload 
+          is_active: payload.is_active ?? true, 
+          email: payload.email,
+          display_name: payload.display_name,
+          password_hash: payload.password_hash,
+          // プロフィール情報
+          first_name: payload.first_name,
+          last_name: payload.last_name,
+          phone: payload.phone,
+          department: payload.department,
+          position: payload.position,
+          avatar_url: payload.avatar_url,
+          bio: payload.bio,
+          timezone: payload.timezone,
+          language: payload.language,
+          work_hours_start: payload.work_hours_start,
+          work_hours_end: payload.work_hours_end,
+          skills: payload.skills ? JSON.parse(JSON.stringify(payload.skills)) : undefined,
+          tags: payload.tags ? JSON.parse(JSON.stringify(payload.tags)) : undefined
         }])
         .select("*")
         .single();
@@ -91,15 +121,29 @@ export async function createUser(payload: {
 }
 
 // ユーザー更新
-export async function updateUser(id: number, payload: {
-  email?: string;
-  display_name?: string;
-  is_active?: boolean;
-}): Promise<User | null> {
+export async function updateUser(id: number, payload: Partial<User>): Promise<User | null> {
   try {
     const { data, error } = await supabase
       .from(USERS_TABLE)
-      .update({ ...payload })
+      .update({ 
+        email: payload.email,
+        display_name: payload.display_name,
+        is_active: payload.is_active,
+        // プロフィール情報
+        first_name: payload.first_name,
+        last_name: payload.last_name,
+        phone: payload.phone,
+        department: payload.department,
+        position: payload.position,
+        avatar_url: payload.avatar_url,
+        bio: payload.bio,
+        timezone: payload.timezone,
+        language: payload.language,
+        work_hours_start: payload.work_hours_start,
+        work_hours_end: payload.work_hours_end,
+        skills: payload.skills ? JSON.parse(JSON.stringify(payload.skills)) : undefined,
+        tags: payload.tags ? JSON.parse(JSON.stringify(payload.tags)) : undefined
+      })
       .eq("id", id)
       .select("*")
       .single();
@@ -113,6 +157,38 @@ export async function updateUser(id: number, payload: {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("ユーザー更新時に予期せぬエラー:", msg);
     return null;
+  }
+}
+
+// ユーザー削除
+// 目的: ユーザーおよび関連する task_members のレコードを安全に削除する
+// 注意: 外部キー制約により削除が失敗する可能性に備え、関連レコードを先に削除
+export async function deleteUser(id: number): Promise<boolean> {
+  try {
+    // 1) 関連する task_members を削除
+    const { error: tmError } = await supabase
+      .from(TASK_MEMBERS_TABLE)
+      .delete()
+      .eq("user_id", id);
+    if (tmError) {
+      console.error("関連チームメンバー削除に失敗:", tmError.message);
+      return false;
+    }
+
+    // 2) ユーザー本体を削除
+    const { error: userError } = await supabase
+      .from(USERS_TABLE)
+      .delete()
+      .eq("id", id);
+    if (userError) {
+      console.error("ユーザー削除に失敗:", userError.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("ユーザー削除時に予期せぬエラー:", msg);
+    return false;
   }
 }
 
@@ -231,21 +307,19 @@ export async function getProjectTeams(): Promise<ServiceResult<ProjectTeam[]>> {
     const projectTeams: ProjectTeam[] = [];
     
     for (const project of projects || []) {
-      // プロジェクトのタスクを取得
-      const { data: tasks, error: tasksError } = await supabase
-        .from(TASKS_TABLE)
-        .select("id")
-        .eq("project_id", project.id)
-        .eq("is_archived", false);
-      
-      if (tasksError) {
-        console.warn(`プロジェクト${project.id}のタスク取得に失敗:`, tasksError.message);
-        continue;
-      }
-      
-      const taskIds = (tasks || []).map(t => t.id);
-      
-      if (taskIds.length === 0) {
+      // プロジェクトメンバーを project_members から取得（ユーザー情報JOIN）
+      const { data: members, error: membersError } = await supabase
+        .from(PROJECT_MEMBERS_TABLE)
+        .select(`
+          user_id,
+          role,
+          joined_at,
+          user:users(*)
+        `)
+        .eq("project_id", project.id);
+
+      if (membersError) {
+        console.warn(`プロジェクト${project.id}のメンバー取得に失敗:`, membersError.message);
         projectTeams.push({
           project_id: project.id,
           project_name: project.name,
@@ -255,33 +329,16 @@ export async function getProjectTeams(): Promise<ServiceResult<ProjectTeam[]>> {
         });
         continue;
       }
-      
-      // タスクのチームメンバーを取得
-      const { data: members, error: membersError } = await supabase
-        .from(TASK_MEMBERS_TABLE)
-        .select(`
-          *,
-          user:users(*)
-        `)
-        .in("task_id", taskIds);
-      
-      if (membersError) {
-        console.warn(`プロジェクト${project.id}のメンバー取得に失敗:`, membersError.message);
-        continue;
-      }
-      
-      const uniqueMembers = new Map<number, TeamMemberWithUser>();
-      
-      // 重複を除去（同じユーザーが複数のタスクに参加している場合）
-      (members || []).forEach(member => {
-        if (member.user && !uniqueMembers.has(member.user_id)) {
-          uniqueMembers.set(member.user_id, member as TeamMemberWithUser);
-        }
-      });
-      
-      const memberList = Array.from(uniqueMembers.values());
+
+      const memberList: TeamMemberWithUser[] = (members || []).map((m: any) => ({
+        user_id: m.user_id,
+        task_id: 0, // プロジェクトメンバーには task_id の概念がないため 0 を設定（UIで未使用）
+        role: m.role,
+        user: m.user as User,
+      }));
+
       const activeMembers = memberList.filter(m => m.user?.is_active).length;
-      
+
       projectTeams.push({
         project_id: project.id,
         project_name: project.name,
@@ -601,15 +658,22 @@ export async function searchUsers(
     
     // フィルター適用（利用可能なフィールドのみ）
     if (filters) {
-      // TODO: usersテーブルにdepartment, positionフィールドが存在しないため無効化
-      /*
+      // 部署フィルター（完全一致）。NULL安全のため値が指定された場合のみ適用
       if (filters.department) {
         supabaseQuery = supabaseQuery.eq("department", filters.department);
       }
+      // 役職フィルター（完全一致）。NULL安全のため値が指定された場合のみ適用
       if (filters.position) {
         supabaseQuery = supabaseQuery.eq("position", filters.position);
       }
-      */
+      // スキルフィルター（部分一致/ANY含有）。JSONB 配列に対して OR 条件でゆるく検索
+      if (filters.skills && filters.skills.length > 0) {
+        // Supabaseのjsonb演算がクライアントクエリで限定的なため、簡易的に ilike を併用
+        const skillConds = filters.skills.map((s) => `skills::text.ilike.%${s}%`).join(",");
+        if (skillConds) {
+          supabaseQuery = supabaseQuery.or(skillConds);
+        }
+      }
       if (filters.is_active !== undefined) {
         supabaseQuery = supabaseQuery.eq("is_active", filters.is_active);
       }
@@ -627,6 +691,101 @@ export async function searchUsers(
     const msg = e instanceof Error ? e.message : String(e);
     console.error("ユーザー検索でエラー:", msg);
     return [];
+  }
+}
+
+// ===== プロジェクトメンバー CRUD =====
+// 用途: TeamManagement の将来 UI 連携を想定し、サービス層のみ先行実装
+
+/**
+ * プロジェクトメンバー一覧を取得する
+ * @param projectId 対象プロジェクトID
+ */
+export async function listProjectMembers(projectId: number): Promise<Array<{ user_id: number; role: string; joined_at: string; user: User }>> {
+  try {
+    const { data, error } = await supabase
+      .from(PROJECT_MEMBERS_TABLE)
+      .select(`
+        user_id,
+        role,
+        joined_at,
+        user:users(*)
+      `)
+      .eq("project_id", projectId)
+      .order("joined_at", { ascending: true });
+    if (error) {
+      console.error("プロジェクトメンバー取得に失敗:", error.message);
+      return [];
+    }
+    return (data as any[]) as Array<{ user_id: number; role: string; joined_at: string; user: User }>;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("プロジェクトメンバー取得でエラー:", msg);
+    return [];
+  }
+}
+
+/**
+ * プロジェクトメンバーを追加する
+ */
+export async function addProjectMember(projectId: number, userId: number, role: "OWNER" | "CONTRIBUTOR" | "REVIEWER"): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from(PROJECT_MEMBERS_TABLE)
+      .insert([{ project_id: projectId, user_id: userId, role }]);
+    if (error) {
+      console.error("プロジェクトメンバー追加に失敗:", error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("プロジェクトメンバー追加でエラー:", msg);
+    return false;
+  }
+}
+
+/**
+ * プロジェクトメンバーの役割を更新する
+ */
+export async function updateProjectMemberRole(projectId: number, userId: number, role: "OWNER" | "CONTRIBUTOR" | "REVIEWER"): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from(PROJECT_MEMBERS_TABLE)
+      .update({ role })
+      .eq("project_id", projectId)
+      .eq("user_id", userId);
+    if (error) {
+      console.error("プロジェクトメンバー役割更新に失敗:", error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("プロジェクトメンバー役割更新でエラー:", msg);
+    return false;
+  }
+}
+
+/**
+ * プロジェクトメンバーを削除する
+ */
+export async function removeProjectMember(projectId: number, userId: number): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from(PROJECT_MEMBERS_TABLE)
+      .delete()
+      .eq("project_id", projectId)
+      .eq("user_id", userId);
+    if (error) {
+      console.error("プロジェクトメンバー削除に失敗:", error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("プロジェクトメンバー削除でエラー:", msg);
+    return false;
   }
 }
 

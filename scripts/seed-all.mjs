@@ -64,25 +64,92 @@ async function main() {
     }
   }
 
-  // users
+  // users（プロフィール情報、スキル、タグを含む）
+  const userIds = [];
+  const departments = ["開発部", "営業部", "企画部", "デザイン部", "総務部"];
+  const positions = ["マネージャー", "シニアエンジニア", "エンジニア", "アシスタント", "リーダー"];
+  const skillSets = [
+    ["JavaScript", "Vue.js", "React"],
+    ["Python", "Django", "FastAPI"],
+    ["Design", "Figma", "Photoshop"],
+    ["Project Management", "Agile", "Scrum"],
+    ["Marketing", "SEO", "Analytics"]
+  ];
+  
   for (let u = 0; u < 5; u++) {
-    await supabase
+    const { data: user } = await supabase
       .from("users")
-      .insert([{ email: `user${u+1}@example.com`, display_name: `ユーザー${u+1}`, password_hash: "x", is_active: true }]);
+      .insert([{ 
+        email: `user${u+1}@example.com`, 
+        display_name: `ユーザー${u+1}`,
+        first_name: `太郎${u+1}`,
+        last_name: `山田`,
+        password_hash: "x", 
+        is_active: true,
+        department: departments[u % departments.length],
+        position: positions[u % positions.length],
+        phone: `090-1234-${5678 + u}`,
+        bio: `${departments[u % departments.length]}所属の${positions[u % positions.length]}です。`,
+        timezone: "Asia/Tokyo",
+        language: "ja",
+        work_hours_start: "09:00",
+        work_hours_end: "18:00",
+        skills: JSON.stringify(skillSets[u % skillSets.length]),
+        tags: JSON.stringify([`チーム${Math.floor(u / 2) + 1}`, "フルタイム"])
+      }])
+      .select("id")
+      .single();
+    if (user) userIds.push(user.id);
   }
 
-  // メンバー割当と通知生成（失敗は無視）
+  // project_members（プロジェクトメンバーシップ）
   const { data: usersList } = await supabase.from("users").select("id").order("id", { ascending: false }).limit(10);
+  for (const pj of projects) {
+    if (usersList && usersList.length > 0) {
+      // プロジェクトオーナーを設定
+      const owner = usersList[0];
+      await supabase
+        .from("projects")
+        .update({ owner_user_id: owner.id })
+        .eq("id", pj.id);
+      
+      // プロジェクトメンバーを追加（オーナー + 2~3名）
+      const memberRoles = ["OWNER", "CONTRIBUTOR", "REVIEWER"];
+      const memberCount = Math.min(randInt(2, 4), usersList.length);
+      
+      for (let i = 0; i < memberCount; i++) {
+        const user = usersList[i];
+        const role = i === 0 ? "OWNER" : memberRoles[randInt(1, memberRoles.length - 1)];
+        await supabase
+          .from("project_members")
+          .insert([{ project_id: pj.id, user_id: user.id, role }]);
+      }
+    }
+  }
+
+  // タスクメンバー割当と通知生成（失敗は無視）
   for (const pj of projects) {
     const { data: tasks } = await supabase.from("tasks").select("id").eq("project_id", pj.id).order("id", { ascending: false }).limit(10);
     const { data: rules } = await supabase.from("alert_rules").select("id").eq("project_id", pj.id).limit(1);
     const ruleId = rules && rules[0]?.id;
     if (tasks && usersList) {
       for (const tk of tasks) {
+        // タスクに担当者を設定
+        const primaryUser = usersList[randInt(0, usersList.length - 1)];
+        if (primaryUser) {
+          await supabase
+            .from("tasks")
+            .update({ primary_assignee_id: primaryUser.id })
+            .eq("id", tk.id);
+        }
+        
+        // タスクメンバーを追加
         const u1 = usersList[randInt(0, usersList.length - 1)];
         const u2 = usersList[randInt(0, usersList.length - 1)];
         if (u1) await supabase.from("task_members").insert([{ task_id: tk.id, user_id: u1.id, role: "CONTRIBUTOR" }]);
         if (u2 && u2.id !== u1?.id) await supabase.from("task_members").insert([{ task_id: tk.id, user_id: u2.id, role: "VIEWER" }]);
+        
+        // 通知を生成
         if (ruleId) {
           const { error } = await supabase
             .from("notifications")

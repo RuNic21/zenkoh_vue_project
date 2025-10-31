@@ -17,6 +17,14 @@ import StatCards from "../components/common/StatCards.vue";
 import ProjectSummary from "@/components/project/ProjectSummary.vue";
 import TaskDetailModal from "@/components/task/TaskDetailModal.vue";
 import OptimizedDataTable from "@/components/table/OptimizedDataTable.vue";
+// プロジェクトメンバー管理サービス
+import { 
+  listProjectMembers,
+  addProjectMember,
+  updateProjectMemberRole,
+  removeProjectMember
+} from "@/services/teamService";
+import type { Task } from "@/types/task";
 
 // Router
 const route = useRoute();
@@ -49,6 +57,109 @@ const {
   notStartedTasksCount,     // 未開始タスク数
   loadProjectDetail,        // プロジェクト読み込み関数
 } = useProjectDetail(route.params.id as string);
+
+// ===== プロジェクトメンバー管理（project_members） =====
+// 目的: プロジェクト詳細ページ内でメンバー一覧・追加・役割変更・削除を提供
+const projectMembers = ref<Array<{ user_id: number; role: "OWNER"|"CONTRIBUTOR"|"REVIEWER"; joined_at: string; user: any }>>([]);
+const isProjectMembersLoading = ref(false);
+const projectMembersErrorMessage = ref("");
+
+// 追加用フォーム（シンプル版: ユーザーID + 役割）
+const memberForm = ref<{ user_id: number; role: "OWNER"|"CONTRIBUTOR"|"REVIEWER" }>({
+  user_id: 0,
+  role: "CONTRIBUTOR"
+});
+
+// 一覧読み込み
+const loadProjectMembers = async () => {
+  try {
+    isProjectMembersLoading.value = true;
+    projectMembersErrorMessage.value = "";
+    const pid = Number(route.params.id);
+    if (!pid) {
+      projectMembers.value = [];
+      return;
+    }
+    const rows = await listProjectMembers(pid);
+    projectMembers.value = (rows || []).map((m: any) => ({
+      user_id: m.user_id,
+      role: (m.role as "OWNER"|"CONTRIBUTOR"|"REVIEWER"),
+      joined_at: m.joined_at,
+      user: m.user
+    }));
+  } catch (e) {
+    console.error("プロジェクトメンバー読み込みエラー:", e);
+    projectMembersErrorMessage.value = "プロジェクトメンバーの読み込みに失敗しました";
+    projectMembers.value = [];
+  } finally {
+    isProjectMembersLoading.value = false;
+  }
+};
+
+// メンバー追加
+const handleAddProjectMember = async () => {
+  try {
+    const pid = Number(route.params.id);
+    if (!pid || !memberForm.value.user_id) return;
+    const ok = await addProjectMember(pid, memberForm.value.user_id, memberForm.value.role);
+    if (ok) {
+      await loadProjectMembers();
+      memberForm.value = { user_id: 0, role: "CONTRIBUTOR" };
+      alert("メンバーを追加しました");
+    } else {
+      alert("メンバーの追加に失敗しました");
+    }
+  } catch (e) {
+    console.error("メンバー追加エラー:", e);
+    alert("メンバー追加中にエラーが発生しました");
+  }
+};
+
+// 役割変更
+const handleUpdateProjectMemberRole = async (userId: number, newRole: "OWNER"|"CONTRIBUTOR"|"REVIEWER") => {
+  try {
+    const pid = Number(route.params.id);
+    if (!pid) return;
+    const ok = await updateProjectMemberRole(pid, userId, newRole);
+    if (ok) {
+      await loadProjectMembers();
+      alert("役割を更新しました");
+    } else {
+      alert("役割の更新に失敗しました");
+    }
+  } catch (e) {
+    console.error("役割更新エラー:", e);
+    alert("役割更新中にエラーが発生しました");
+  }
+};
+
+// メンバー削除
+const handleRemoveProjectMember = async (userId: number) => {
+  try {
+    const pid = Number(route.params.id);
+    if (!pid) return;
+    if (!confirm("このメンバーを削除しますか？")) return;
+    const ok = await removeProjectMember(pid, userId);
+    if (ok) {
+      await loadProjectMembers();
+      alert("メンバーを削除しました");
+    } else {
+      alert("メンバーの削除に失敗しました");
+    }
+  } catch (e) {
+    console.error("メンバー削除エラー:", e);
+    alert("削除中にエラーが発生しました");
+  }
+};
+
+// 初期ロード
+loadProjectMembers();
+
+// 追加可能なユーザー一覧（既にメンバーに追加されているユーザーを除外）
+const availableUsers = computed(() => {
+  const memberUserIds = new Set(projectMembers.value.map(m => m.user_id));
+  return users.value.filter(u => !memberUserIds.has(u.id));
+});
 
 // 共有ストアから選択中プロジェクトを取得
 const store = useScheduleStore();
@@ -228,7 +339,7 @@ console.log("プロジェクト詳細ページが読み込まれました");
         </div>
       </div>
 
-      <div class="row mb-4">
+      <div class="row">
         <!-- メインコンテンツ -->
         <div class="col-lg-8">
           <!-- 基本情報カード -->
@@ -300,8 +411,95 @@ console.log("プロジェクト詳細ページが読み込まれました");
             </div>
           </div>
 
-          <!-- タスク一覧 -->
+          <!-- プロジェクトメンバー -->
           <div class="card mb-4">
+            <CardHeader title="プロジェクトメンバー" subtitle="このプロジェクトに所属するメンバーを管理します" />
+            <div class="card-body">
+              <div v-if="projectMembersErrorMessage" class="alert alert-danger" role="alert">{{ projectMembersErrorMessage }}</div>
+
+              <!-- 追加フォーム（シンプル） -->
+              <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-5">
+                  <label class="form-label">ユーザー</label>
+                  <select class="form-select" v-model.number="memberForm.user_id">
+                    <option :value="0" disabled>ユーザーを選択...</option>
+                    <option 
+                      v-for="user in availableUsers" 
+                      :key="user.id" 
+                      :value="user.id"
+                    >
+                      {{ user.display_name }} ({{ user.email }})
+                    </option>
+                  </select>
+                  <small v-if="availableUsers.length === 0" class="text-muted">追加可能なユーザーがありません</small>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">役割</label>
+                  <select class="form-select" v-model="memberForm.role">
+                    <option value="OWNER">オーナー</option>
+                    <option value="CONTRIBUTOR">貢献者</option>
+                    <option value="REVIEWER">レビューアー</option>
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <button 
+                    class="btn bg-gradient-primary w-100" 
+                    @click="handleAddProjectMember"
+                    :disabled="memberForm.user_id === 0 || availableUsers.length === 0"
+                  >
+                    追加
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="isProjectMembersLoading" class="text-center py-3">
+                <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+              </div>
+              <div v-else class="table-responsive">
+                <table class="table align-items-center mb-0">
+                  <thead>
+                    <tr>
+                      <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">ユーザー</th>
+                      <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">役割</th>
+                      <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">参加日</th>
+                      <th class="text-center text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="m in projectMembers" :key="m.user_id">
+                      <td>
+                        <div class="d-flex px-2 py-1">
+                          <div class="d-flex flex-column justify-content-center">
+                            <h6 class="mb-0 text-sm">{{ m.user?.display_name || ('ユーザー#' + m.user_id) }}</h6>
+                            <p class="text-xs text-secondary mb-0">{{ m.user?.email || '' }}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td class="align-middle text-center">
+                        <select class="form-select form-select-sm w-auto d-inline-block" :value="m.role" @change="handleUpdateProjectMemberRole(m.user_id, ($event.target as HTMLSelectElement).value as any)">
+                          <option value="OWNER">オーナー</option>
+                          <option value="CONTRIBUTOR">貢献者</option>
+                          <option value="REVIEWER">レビューアー</option>
+                        </select>
+                      </td>
+                      <td class="align-middle text-center">
+                        <span class="text-secondary text-xs font-weight-normal">{{ new Date(m.joined_at).toLocaleDateString('ja-JP') }}</span>
+                      </td>
+                      <td class="align-middle text-center">
+                        <button class="btn btn-sm bg-gradient-danger mb-0" @click="handleRemoveProjectMember(m.user_id)">削除</button>
+                      </td>
+                    </tr>
+                    <tr v-if="projectMembers.length === 0">
+                      <td colspan="4" class="text-center text-secondary py-3">メンバーがいません</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- タスク一覧 -->
+          <div class="card">
             <CardHeader title="タスク一覧" subtitle="このプロジェクトに関連するタスクを管理できます" />
             <div class="card-body">
               <OptimizedDataTable
@@ -333,12 +531,12 @@ console.log("プロジェクト詳細ページが読み込まれました");
 
                 <!-- ステータスセル: バッジ表示 -->
                 <template #cell-status="{ item }">
-                  <StatusBadge :status="item.status" />
+                  <StatusBadge :status="(item.status as string)" />
                 </template>
 
                 <!-- 優先度セル: バッジ表示 -->
                 <template #cell-priority="{ item }">
-                  <PriorityBadge :priority="item.priority" />
+                  <PriorityBadge :priority="(item.priority as string)" />
                 </template>
 
                 <!-- 進捗セル: プログレスバー + パーセンテージ -->
@@ -358,7 +556,7 @@ console.log("プロジェクト詳細ページが読み込まれました");
                 <template #cell-actions="{ item }">
                   <button 
                     class="btn btn-sm btn-outline-primary"
-                    @click.stop="showTaskDetail(item)"
+                    @click.stop="showTaskDetail(item as unknown as Task)"
                   >
                     <i class="material-symbols-rounded me-1" style="font-size: 14px;">visibility</i>
                     詳細

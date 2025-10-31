@@ -54,8 +54,8 @@ const selectedProjectTasks = ref<any[]>([]);
 const showTaskModal = ref(false);
 const selectedProjectForTasks = ref<any>(null);
 
-// プロジェクト詳細ページへ遷移
-const handleViewProjectDetail = async (project: ProjectProgressRow) => {
+// プロジェクトのタスク一覧モーダルを開く（詳細ページ遷移ではなくモーダル表示）
+const handleOpenProjectTasksModal = async (project: ProjectProgressRow) => {
   try {
     const { getProjectTasks } = await import("@/services/dashboardService");
     selectedProjectForTasks.value = project;
@@ -284,7 +284,7 @@ onActivated(async () => {
 
     <!-- フィルタリング・クイックアクションパネル -->
     <div class="row mb-4">
-      <div class="col-lg-8 col-md-12">
+      <div class="col-12">
         <DashboardFilters 
           :search-query="searchQuery"
           :priority-filter="priorityFilter"
@@ -302,11 +302,11 @@ onActivated(async () => {
     </div>
 
     <!-- プロジェクト別進捗の一覧表示 -->
-    <div class="row">
+    <div class="row mb-4">
       <div class="col-12">
         <ProjectProgressTable 
           :rows="filteredProjects"
-          @viewDetail="handleViewProjectDetail"
+          @viewDetail="handleOpenProjectTasksModal"
         />
       </div>
     </div>
@@ -314,6 +314,14 @@ onActivated(async () => {
     <!-- タスク別進捗の一覧表示 -->
     <div class="row mb-4">
       <div class="col-12">
+        <!-- タスク読み込み/エラー表示 -->
+        <div v-if="isTaskLoading" class="alert alert-secondary" role="alert">
+          タスクを読み込み中です...
+        </div>
+        <div v-if="!isTaskLoading && taskErrorMessage" class="alert alert-danger" role="alert">
+          {{ taskErrorMessage }}
+        </div>
+
         <TaskProgressTable 
           :rows="filteredTasks"
           @viewDetail="handleViewTaskDetail"
@@ -325,6 +333,13 @@ onActivated(async () => {
     <div class="row mb-4">
       <div class="col-12">
         <RecentNotifications />
+      </div>
+    </div>
+
+    <!-- 最近の活動 -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <RecentActivities :activities="recentActivities" :isLoading="isActivityLoading" />
       </div>
     </div>
 

@@ -80,7 +80,7 @@ const sendTestNotification = async () => {
     console.log("   - プロジェクト:", project);
     
     const variables = {
-      user_name: recipient.display_name || recipient.username,
+      user_name: recipient.display_name || "ユーザー",
       task_name: testForm.value.taskName,
       project_name: project.name,
       due_date: new Date().toLocaleDateString("ja-JP"),
@@ -190,7 +190,7 @@ onMounted(() => {
                     <select class="form-select" v-model.number="testForm.recipientUserId">
                       <option :value="null">選択してください</option>
                       <option v-for="user in users" :key="user.id" :value="user.id">
-                        {{ user.display_name || user.username }} ({{ user.email }})
+                        {{ user.display_name || "ユーザー" }} ({{ user.email }})
                       </option>
                     </select>
                   </div>

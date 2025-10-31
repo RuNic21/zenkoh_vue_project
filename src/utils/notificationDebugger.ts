@@ -90,7 +90,7 @@ export async function checkUsersTable(): Promise<void> {
     
     const { data, error } = await supabase
       .from("users")
-      .select("id, username, email, display_name")
+      .select("id, email, display_name")
       .limit(10);
     
     if (error) {

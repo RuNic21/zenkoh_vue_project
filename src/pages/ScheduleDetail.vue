@@ -2,11 +2,13 @@
 import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useScheduleDetail } from "@/composables/useScheduleDetail";
+import { getCurrentUserInfo } from "@/utils/userHelper";
 import { useScheduleStore } from "../store/schedule";
 import { useMessage, useConfirm } from "@/composables/useMessage";
 import type { ScheduleItem, ScheduleStatus, SchedulePriority, ScheduleAttachment, ScheduleComment } from "../types/schedule";
 import { listUsers } from "../services/dbServices";
 import type { Users } from "../types/db/users";
+import type { TaskStatusHistory } from "../types/taskStatusHistory";
 
 // Router
 const route = useRoute();
@@ -179,6 +181,13 @@ const onAddComment = () => {
   addComment(newComment.value);
 };
 
+// 現在のユーザーID（users.id, 数値）を取得して保持
+const currentUserId = ref<number | null>(null);
+onMounted(async () => {
+  const info = await getCurrentUserInfo();
+  currentUserId.value = info?.id ?? null;
+});
+
 // 編集モードの切り替え
 const toggleEditMode = () => {
   isEditMode.value = !isEditMode.value;
@@ -289,7 +298,7 @@ const executeQuickAction = async (action: any) => {
   try {
     editForm.value.status = action.status;
     await saveChanges();
-    
+    store.saveStatusHistory(scheduleDetail.value.id, action.status);
     // 状態変更履歴に追加
     statusHistory.value.unshift({
       from: scheduleDetail.value.status,
@@ -540,11 +549,11 @@ const getHeaderActions = () => {
           </div>
         </div>
 
-        <!-- コメントセクション（共通コンポーネントに分離） -->
+        <!-- コメントセクション（DB連携モード） -->
         <CommentsSection
-          :comments="scheduleDetail.comments"
           v-model="newComment"
-          @add="onAddComment"
+          :task-id="scheduleDetail.id"
+          :author-user-id="currentUserId || undefined"
         />
       </div>
 

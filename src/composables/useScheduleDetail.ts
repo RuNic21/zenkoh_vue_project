@@ -4,6 +4,8 @@ import { listUsers } from "@/services/dbServices";
 import { getTaskById } from "@/services/taskService";
 import { taskToScheduleItem } from "@/utils/taskAdapter";
 import type { ScheduleItem, ScheduleStatus, SchedulePriority, ScheduleAttachment, ScheduleComment } from "@/types/schedule";
+import { listTaskStatusHistory, mapTaskStatusHistoryToViewItems } from "@/services/taskStatusHistoryService";
+import type { TaskStatusHistoryViewItem } from "@/types/taskStatusHistory";
 
 // スケジュール詳細の状態とロジックを集約する composable
 export function useScheduleDetail(routeId?: string | number) {
@@ -95,8 +97,17 @@ export function useScheduleDetail(routeId?: string | number) {
   const showTagModal = ref(false);
   const showFileModal = ref(false);
 
-  // 状態履歴
-  const statusHistory = ref<Array<{ from: string; to: string; user: string; timestamp: string; reason: string }>>([]);
+  // 状態履歴（DBから取得したものをUI表示用に変換）
+  const statusHistory = ref<TaskStatusHistoryViewItem[]>([]);
+  const loadStatusHistory = async (taskId: number) => {
+    try {
+      const rows = await listTaskStatusHistory(taskId);
+      statusHistory.value = mapTaskStatusHistoryToViewItems(rows);
+    } catch (e) {
+      console.warn("状態変更履歴の読み込みに失敗:", e);
+      statusHistory.value = [];
+    }
+  };
 
   // ユーザー
   const availableUsers = ref<Array<{ id: number; name: string; avatar: string }>>([]);
@@ -151,10 +162,11 @@ export function useScheduleDetail(routeId?: string | number) {
   // コンポーネントマウント時に自動的にタスクをロード（routeIdが渡された場合）
   onMounted(async () => {
     if (routeId) {
-      await Promise.all([
-        loadTaskById(routeId),
-        loadUsers()
-      ]);
+      await Promise.all([loadTaskById(routeId), loadUsers()]);
+      const idNum = Number(routeId);
+      if (!Number.isNaN(idNum) && idNum > 0) {
+        await loadStatusHistory(idNum);
+      }
     } else {
       await loadUsers();
     }
@@ -183,6 +195,7 @@ export function useScheduleDetail(routeId?: string | number) {
     addComment,
     loadUsers, // ユーザーデータ読み込み関数を公開
     loadTaskById, // タスク読み込み関数を公開
+    loadStatusHistory, // 状態履歴読み込み関数を公開
   };
 }
 

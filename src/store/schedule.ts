@@ -44,6 +44,8 @@ import { getUserInfo } from "../utils/userHelper";
 import type { TaskWithProject } from "../types/task";
 import type { Users } from "../types/db/users";
 import type { Project } from "../types/project";
+import type { ScheduleStatus } from "../types/schedule";
+import { saveTaskStatusHistory } from "../services/taskStatusHistoryService";
 
 // スケジュールデータ（DB から取得）
 const schedules = ref<ScheduleItem[]>([]);
@@ -304,6 +306,15 @@ export const useScheduleStore = () => ({
     } finally {
       isLoading.value = false;
     }
+  },
+
+  /**
+   * 状態変更履歴を保存（task_status_history へ INSERT）
+   * @param taskId 対象タスクID
+   * @param toStatus 変更後ステータス
+   */
+  async saveStatusHistory(taskId: number, toStatus: ScheduleStatus) {
+    await saveTaskStatusHistory(taskId, toStatus);
   },
 });
 

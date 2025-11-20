@@ -23,6 +23,9 @@ const globalAuthState = ref<AuthState>({
 // 認証状態変更監視の購読解除関数
 let unsubscribeAuthStateChange: (() => void) | null = null;
 
+// 認証初期化の進行状況を追跡（重複初期化を防ぐ）
+let authInitializationPromise: Promise<void> | null = null;
+
 /**
  * 認証管理 Composable
  * アプリケーション全体で認証状態を共有
@@ -242,42 +245,72 @@ export function useAuth() {
 }
 
 /**
+ * 現在の認証スナップショットを取得
+ * @returns AuthState の現在値
+ */
+export function getAuthStateSnapshot(): AuthState {
+  return globalAuthState.value;
+}
+
+/**
  * アプリケーション起動時に一度だけ呼び出す初期化関数
  * コンポーネント外部から呼び出される場合は直接 authService を使用
+ * 重複呼び出しを防ぎ、既に初期化中の場合は既存のPromiseを返す
  */
 export async function initializeAuthSystem() {
-  try {
-    globalAuthState.value.isLoading = true;
-    globalAuthState.value.error = null;
+  // 既に初期化が完了している場合は何もしない
+  if (!globalAuthState.value.isLoading && authInitializationPromise === null) {
+    return;
+  }
 
-    const result = await authService.getCurrentSession();
+  // 既に初期化中であれば、既存のPromiseを返す
+  if (authInitializationPromise) {
+    return authInitializationPromise;
+  }
 
-    if (result.success && result.data) {
-      globalAuthState.value.user = result.data.user;
-      // SessionInfo から Supabase Session 型への変換は、実際の Session オブジェクトを返すように修正する必要がある
-      globalAuthState.value.session = null; // TODO: 実際のセッションオブジェクトを保存する実装に変更
-      globalAuthState.value.isAuthenticated = true;
-    } else {
+  // 初期化を開始
+  authInitializationPromise = (async () => {
+    try {
+      // 既に初期化が完了している場合は何もしない
+      if (!globalAuthState.value.isLoading) {
+        return;
+      }
+
+      globalAuthState.value.isLoading = true;
+      globalAuthState.value.error = null;
+
+      const result = await authService.getCurrentSession();
+
+      if (result.success && result.data) {
+        globalAuthState.value.user = result.data.user;
+        // SessionInfo から Supabase Session 型への変換は、実際の Session オブジェクトを返すように修正する必要がある
+        globalAuthState.value.session = null; // TODO: 実際のセッションオブジェクトを保存する実装に変更
+        globalAuthState.value.isAuthenticated = true;
+      } else {
+        globalAuthState.value.user = null;
+        globalAuthState.value.session = null;
+        globalAuthState.value.isAuthenticated = false;
+      }
+
+      // 認証状態変更の監視を開始
+      if (!unsubscribeAuthStateChange) {
+        unsubscribeAuthStateChange = authService.onAuthStateChange((user) => {
+          globalAuthState.value.user = user;
+          globalAuthState.value.isAuthenticated = !!user;
+        });
+      }
+    } catch (e) {
+      console.error("認証初期化エラー:", e);
       globalAuthState.value.user = null;
       globalAuthState.value.session = null;
       globalAuthState.value.isAuthenticated = false;
+    } finally {
+      globalAuthState.value.isLoading = false;
+      authInitializationPromise = null; // 初期化完了後、Promiseをクリア
     }
+  })();
 
-    // 認証状態変更の監視を開始
-    if (!unsubscribeAuthStateChange) {
-      unsubscribeAuthStateChange = authService.onAuthStateChange((user) => {
-        globalAuthState.value.user = user;
-        globalAuthState.value.isAuthenticated = !!user;
-      });
-    }
-  } catch (e) {
-    console.error("認証初期化エラー:", e);
-    globalAuthState.value.user = null;
-    globalAuthState.value.session = null;
-    globalAuthState.value.isAuthenticated = false;
-  } finally {
-    globalAuthState.value.isLoading = false;
-  }
+  return authInitializationPromise;
 }
 
 /**

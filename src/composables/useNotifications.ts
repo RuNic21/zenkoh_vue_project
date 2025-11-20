@@ -167,23 +167,70 @@ export function useNotifications() {
   };
 
   /**
+   * 自動更新タイマーをスケジューリング
+   * setInterval ではなく setTimeout を用いて重複実行を防止
+   */
+  const scheduleAutoRefresh = () => {
+    if (refreshTimer !== null) {
+      return;
+    }
+
+    refreshTimer = window.setTimeout(async () => {
+      refreshTimer = null;
+
+      // タブが可視状態のときのみ取得
+      if (!document.hidden) {
+        await fetchNotifications();
+      }
+
+      // 再度スケジューリング
+      scheduleAutoRefresh();
+    }, NOTIFICATION_CHECK_INTERVAL);
+  };
+
+  /**
    * 自動更新を開始
    */
   const startAutoRefresh = () => {
-    if (refreshTimer) return;
-    
-    refreshTimer = window.setInterval(() => {
-      fetchNotifications();
-    }, NOTIFICATION_CHECK_INTERVAL);
+    if (refreshTimer !== null) {
+      return;
+    }
+
+    scheduleAutoRefresh();
   };
 
   /**
    * 自動更新を停止
    */
   const stopAutoRefresh = () => {
-    if (refreshTimer) {
-      clearInterval(refreshTimer);
+    if (refreshTimer !== null) {
+      clearTimeout(refreshTimer);
       refreshTimer = null;
+    }
+  };
+
+  // リフレッシュ中の重複実行を防ぐためのフラグ
+  let isRefreshing = false;
+
+  /**
+   * タブの表示/非表示を監視して、表示されたときに通知を更新
+   */
+  const handleVisibilityChange = () => {
+    if (!document.hidden) {
+      // タブが再表示されたとき、最新状態に即座に更新（重複実行を防ぐ）
+      if (!isRefreshing) {
+        isRefreshing = true;
+        refresh().finally(() => {
+          isRefreshing = false;
+        });
+      }
+      // タイマーが止まっている場合は再開
+      if (refreshTimer === null) {
+        scheduleAutoRefresh();
+      }
+    } else {
+      // 非表示時は無駄なタイマーを止める
+      stopAutoRefresh();
     }
   };
 
@@ -195,6 +242,9 @@ export function useNotifications() {
   onMounted(() => {
     refresh();
     startAutoRefresh();
+
+    // タブの表示/非表示を監視
+    document.addEventListener("visibilitychange", handleVisibilityChange);
   });
 
   /**
@@ -202,6 +252,8 @@ export function useNotifications() {
    */
   onUnmounted(() => {
     stopAutoRefresh();
+    // イベントリスナーを削除
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
   });
 
   return {

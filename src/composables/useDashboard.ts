@@ -17,6 +17,10 @@ export function useDashboard() {
   const isTaskLoading = ref(false);
   const dashboardErrorMessage = ref("");
   const taskErrorMessage = ref("");
+  
+  // データロード中の重複実行を防ぐためのフラグ
+  let isDashboardLoadingInProgress = false;
+  let isTaskLoadingInProgress = false;
 
   // 検索/フィルタ
   const searchQuery = ref("");
@@ -154,43 +158,114 @@ export function useDashboard() {
 
   // ダッシュボードデータ読み込み
   const loadDashboardFromDb = async (): Promise<void> => {
+    // 既に読み込み中の場合は重複実行を防ぐ
+    if (isDashboardLoadingInProgress) {
+      console.log("ダッシュボードデータは既に読み込み中です");
+      return;
+    }
+
     try {
+      isDashboardLoadingInProgress = true;
       isDashboardLoading.value = true;
       dashboardErrorMessage.value = "";
-      const result = await fetchProjectProgress(10);
+      
+      console.log("ダッシュボードデータの読み込みを開始...");
+      
+      // タイムアウトを設定（20秒に短縮）
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          console.error("ダッシュボードデータの読み込みがタイムアウトしました（20秒）");
+          reject(new Error("タイムアウト: データの読み込みに時間がかかりすぎています（20秒）"));
+        }, 20000);
+      });
+      
+      const result = await Promise.race([
+        fetchProjectProgress(10),
+        timeoutPromise
+      ]);
+      
+      console.log("ダッシュボードデータの読み込みが完了:", result.success ? "成功" : "失敗");
+      
       if (result.success && result.data) {
         projectProgressList.value = result.data;
+        console.log(`プロジェクト数: ${result.data.length}`);
       } else {
         projectProgressList.value = [];
         dashboardErrorMessage.value = result.error || "ダッシュボードの読み込みに失敗しました。しばらくしてから再試行してください。";
+        console.error("ダッシュボードの読み込みに失敗:", result.error);
       }
     } catch (e) {
-      console.error("ダッシュボードの読み込みに失敗", e);
+      console.error("ダッシュボードの読み込みに失敗:", e);
       projectProgressList.value = [];
-      dashboardErrorMessage.value = "ダッシュボードの読み込みに失敗しました。しばらくしてから再試行してください。";
+      const errorMessage = e instanceof Error ? e.message : "ダッシュボードの読み込みに失敗しました。しばらくしてから再試行してください。";
+      dashboardErrorMessage.value = errorMessage;
     } finally {
+      console.log("ダッシュボードデータの読み込み処理を終了");
       isDashboardLoading.value = false;
+      isDashboardLoadingInProgress = false;
     }
   };
 
   // タスク進捗データ読み込み
   const loadRecentTasks = async (): Promise<void> => {
+    // 既に読み込み中の場合は重複実行を防ぐ
+    if (isTaskLoadingInProgress) {
+      console.log("タスクデータは既に読み込み中です");
+      return;
+    }
+
     try {
+      isTaskLoadingInProgress = true;
       isTaskLoading.value = true;
       taskErrorMessage.value = "";
-      const result = await fetchRecentTasks(10);
+      
+      console.log("タスクデータの読み込みを開始...");
+      console.log("fetchRecentTasks API を呼び出します...");
+      
+      // タイムアウトを設定（10秒に短縮）
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          console.error("タスクデータの読み込みがタイムアウトしました（10秒）");
+          reject(new Error("タイムアウト: データの読み込みに時間がかかりすぎています（10秒）"));
+        }, 10000);
+      });
+      
+      // API呼び出し前にタイムスタンプを記録
+      const startTime = Date.now();
+      console.log(`API呼び出し開始時刻: ${new Date(startTime).toISOString()}`);
+      
+      const fetchPromise = fetchRecentTasks(10);
+      console.log("fetchRecentTasks Promise を作成しました");
+      
+      const result = await Promise.race([
+        fetchPromise,
+        timeoutPromise
+      ]);
+      
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      console.log(`API呼び出し完了時刻: ${new Date(endTime).toISOString()}`);
+      console.log(`API呼び出し所要時間: ${duration}ms`);
+      console.log("タスクデータの読み込みが完了:", result.success ? "成功" : "失敗");
+      
       if (result.success && result.data) {
         taskProgressList.value = result.data;
+        console.log(`タスク数: ${result.data.length}`);
       } else {
         taskProgressList.value = [];
         taskErrorMessage.value = result.error || "タスクの読み込みに失敗しました。";
+        console.error("タスクの読み込みに失敗:", result.error);
       }
     } catch (e) {
-      console.error("タスクの読み込みに失敗", e);
+      console.error("タスクの読み込み中にエラーが発生:", e);
+      console.error("エラーの詳細:", e instanceof Error ? e.stack : String(e));
       taskProgressList.value = [];
-      taskErrorMessage.value = "タスクの読み込みに失敗しました。";
+      const errorMessage = e instanceof Error ? e.message : "タスクの読み込みに失敗しました。";
+      taskErrorMessage.value = errorMessage;
     } finally {
+      console.log("タスクデータの読み込み処理を終了");
       isTaskLoading.value = false;
+      isTaskLoadingInProgress = false;
     }
   };
 

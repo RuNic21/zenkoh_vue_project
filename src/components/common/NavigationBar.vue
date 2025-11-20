@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // ナビゲーションバーコンポーネント: ページタイトル・検索・通知・設定を表示
-import { computed } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, onUnmounted, onActivated } from "vue";
 import { useAuth } from "@/composables/useAuth";
 import { useNotifications } from "@/composables/useNotifications";
 import { MAX_NOTIFICATION_BADGE_COUNT } from "@/constants/notification";
+import router from "@/router";
 
 // Props 定義
 interface Props {
@@ -12,8 +12,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const router = useRouter();
-
 // 認証状態を取得
 const { user, displayName, isAuthenticated, logout } = useAuth();
 
@@ -25,6 +23,69 @@ const {
   markAsRead,
   markAllAsRead
 } = useNotifications();
+
+// Bootstrap Dropdown を初期化する関数
+const initializeBootstrapDropdowns = () => {
+  // Bootstrap 5 の Dropdown を手動で初期化
+  // window.bootstrap またはグローバルに読み込まれた Bootstrap を使用
+  const Bootstrap = (window as any).bootstrap || (window as any).Bootstrap;
+  
+  if (typeof window !== "undefined" && Bootstrap && Bootstrap.Dropdown) {
+    const dropdownElementList = document.querySelectorAll("[data-bs-toggle=\"dropdown\"]");
+    dropdownElementList.forEach((element) => {
+      try {
+        // 既存のインスタンスがある場合は破棄
+        const existingInstance = Bootstrap.Dropdown.getInstance(element);
+        if (existingInstance) {
+          existingInstance.dispose();
+        }
+        // 新しいインスタンスを作成
+        new Bootstrap.Dropdown(element);
+      } catch (error) {
+        console.warn("Bootstrap Dropdown の初期化に失敗:", error);
+      }
+    });
+  } else {
+    // Bootstrap がまだ読み込まれていない場合は、少し待ってから再試行
+    setTimeout(() => {
+      initializeBootstrapDropdowns();
+    }, 200);
+  }
+};
+
+// タブが表示されたときに Bootstrap を再初期化
+const handleVisibilityChange = () => {
+  if (!document.hidden) {
+    // タブが再表示されたとき、Bootstrap ドロップダウンを再初期化
+    setTimeout(() => {
+      initializeBootstrapDropdowns();
+    }, 100);
+  }
+};
+
+// コンポーネントマウント時に Bootstrap を初期化
+onMounted(() => {
+  // DOM が完全に読み込まれた後に初期化
+  setTimeout(() => {
+    initializeBootstrapDropdowns();
+  }, 100);
+  
+  // タブの表示/非表示を監視
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+});
+
+// Keep-alive で再利用される場合の処理（NavigationBar は keep-alive に含まれていないが、念のため追加）
+onActivated(() => {
+  // コンポーネントが再アクティブになったときに Bootstrap を再初期化
+  setTimeout(() => {
+    initializeBootstrapDropdowns();
+  }, 100);
+});
+
+// コンポーネントアンマウント時にクリーンアップ
+onUnmounted(() => {
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
+});
 
 // ページ名から表示テキストを取得
 const pageDisplayName = computed(() => {

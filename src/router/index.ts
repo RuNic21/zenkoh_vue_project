@@ -2,6 +2,7 @@
 // 目的: アプリケーション全体のルーティングを管理
 
 import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router";
+import { getAuthStateSnapshot, initializeAuthSystem } from "@/composables/useAuth";
 
 // ページコンポーネントをインポート（Lazy Loading対応）
 const DashboardPage = () => import("@/pages/DashboardPage.vue");
@@ -144,18 +145,27 @@ router.beforeEach(async (to, from, next) => {
     document.title = "Zenkoh Project Scheduler";
   }
 
+  let authState = getAuthStateSnapshot();
+
+  // 認証状態がまだ初期化されていない場合は、初期化を待つ
+  if (authState.isLoading) {
+    try {
+      // 初期化がまだ完了していない場合は、初期化を実行
+      await initializeAuthSystem();
+      authState = getAuthStateSnapshot();
+    } catch (error) {
+      console.error("認証初期化エラー（ルーター）:", error);
+      // エラーが発生しても続行（認証不要ページはアクセス可能）
+    }
+  }
+
   // 認証チェック
   if (to.meta.requiresAuth) {
-    // 認証サービスから現在のセッションを取得
-    const { getCurrentSession } = await import("@/services/authService");
-    const result = await getCurrentSession();
-
-    if (!result.success || !result.data) {
-      // 認証されていない場合、ログインページへリダイレクト
+    if (!authState.isAuthenticated) {
       console.log("認証が必要です。ログインページへリダイレクトします");
       next({
         name: "login",
-        query: { redirect: to.fullPath }, // 元のページをクエリパラメータで保存
+        query: { redirect: to.fullPath },
       });
       return;
     }
@@ -163,10 +173,7 @@ router.beforeEach(async (to, from, next) => {
 
   // ログイン済みユーザーがログインページにアクセスした場合、ダッシュボードへリダイレクト
   if (to.name === "login" || to.name === "signup") {
-    const { getCurrentSession } = await import("@/services/authService");
-    const result = await getCurrentSession();
-
-    if (result.success && result.data) {
+    if (authState.isAuthenticated) {
       console.log("すでにログイン済みです。ダッシュボードへリダイレクトします");
       next({ name: "dashboard" });
       return;

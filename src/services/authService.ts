@@ -2,6 +2,7 @@
 // 目的: ログイン、ログアウト、会員登録、セッション管理を提供
 
 import { supabase } from "./supabaseClient";
+import type { User } from "@supabase/supabase-js";
 import type {
   LoginCredentials,
   SignUpCredentials,
@@ -16,9 +17,12 @@ import { handleServiceCall } from "@/utils/errorHandler";
 
 /**
  * Supabase User を AuthUser に変換
+ * @param supabaseUser Supabase 認証ユーザー
+ * @param userProfile users テーブルのプロフィール情報（オプション）
+ * @returns AuthUser 型のユーザー情報
  */
 function mapSupabaseUserToAuthUser(
-  supabaseUser: any,
+  supabaseUser: User,
   userProfile?: Users
 ): AuthUser {
   return {

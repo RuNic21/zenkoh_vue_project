@@ -16,6 +16,8 @@ import type {
   UserSkill,
   UserTag
 } from "../types/team";
+import type { Tasks } from "../types/db/tasks";
+import type { ProjectMembers } from "../types/db/project_members";
 import { supabase, selectRows, type SelectFilter, type WhereCondition } from "./supabaseClient";
 import { handleServiceCall, createSuccessResult, createErrorResult, translateSupabaseError, type ServiceResult } from "../utils/errorHandler";
 
@@ -330,11 +332,15 @@ export async function getProjectTeams(): Promise<ServiceResult<ProjectTeam[]>> {
         continue;
       }
 
-      const memberList: TeamMemberWithUser[] = (members || []).map((m: any) => ({
+      // ProjectMembers with User 型の members をマッピング
+      interface ProjectMemberWithUser extends ProjectMembers {
+        user: User;
+      }
+      const memberList: TeamMemberWithUser[] = (members || []).map((m: ProjectMemberWithUser) => ({
         user_id: m.user_id,
         task_id: 0, // プロジェクトメンバーには task_id の概念がないため 0 を設定（UIで未使用）
         role: m.role,
-        user: m.user as User,
+        user: m.user,
       }));
 
       const activeMembers = memberList.filter(m => m.user?.is_active).length;
@@ -443,15 +449,15 @@ export async function getUserActivityStats(): Promise<UserActivity[]> {
         continue;
       }
       
-      const tasks = (taskMembers || []).map(tm => tm.task).filter(Boolean);
+      const tasks = (taskMembers || []).map(tm => tm.task).filter((t): t is Tasks => t !== null && t !== undefined);
       const totalTasks = tasks.length;
-      const completedTasks = tasks.filter((t: any) => t.status === "DONE").length;
-      const inProgressTasks = tasks.filter((t: any) => t.status === "IN_PROGRESS").length;
+      const completedTasks = tasks.filter((t: Tasks) => t.status === "DONE").length;
+      const inProgressTasks = tasks.filter((t: Tasks) => t.status === "IN_PROGRESS").length;
       const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
       
       // 最後の活動日時を取得
       const lastActivity = tasks.length > 0 
-        ? Math.max(...tasks.map((t: any) => new Date(t.updated_at).getTime()))
+        ? Math.max(...tasks.map((t: Tasks) => new Date(t.updated_at).getTime()))
         : 0;
       
       userActivities.push({
@@ -528,11 +534,11 @@ export async function getUserProfileStats(userId: number): Promise<UserProfileSt
       return null;
     }
     
-    const tasks = (taskMembers || []).map(tm => tm.task).filter(Boolean);
+    const tasks = (taskMembers || []).map(tm => tm.task).filter((t): t is Tasks => t !== null && t !== undefined);
     const totalTasks = tasks.length;
-    const completedTasks = tasks.filter((t: any) => t.status === "DONE").length;
-    const inProgressTasks = tasks.filter((t: any) => t.status === "IN_PROGRESS").length;
-    const overdueTasks = tasks.filter((t: any) => {
+    const completedTasks = tasks.filter((t: Tasks) => t.status === "DONE").length;
+    const inProgressTasks = tasks.filter((t: Tasks) => t.status === "IN_PROGRESS").length;
+    const overdueTasks = tasks.filter((t: Tasks) => {
       if (!t.planned_end) return false;
       return new Date(t.planned_end) < new Date() && t.status !== "DONE";
     }).length;
@@ -540,19 +546,19 @@ export async function getUserProfileStats(userId: number): Promise<UserProfileSt
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
     
     // 平均タスク期間を計算
-    const completedTasksWithDuration = tasks.filter((t: any) => 
+    const completedTasksWithDuration = tasks.filter((t: Tasks) => 
       t.status === "DONE" && t.actual_start && t.actual_end
     );
     const averageTaskDuration = completedTasksWithDuration.length > 0 
-      ? completedTasksWithDuration.reduce((sum: number, t: any) => {
-          const duration = new Date(t.actual_end).getTime() - new Date(t.actual_start).getTime();
+      ? completedTasksWithDuration.reduce((sum: number, t: Tasks) => {
+          const duration = new Date(t.actual_end!).getTime() - new Date(t.actual_start!).getTime();
           return sum + duration;
         }, 0) / completedTasksWithDuration.length / (1000 * 60 * 60 * 24) // 日数に変換
       : 0;
     
     // 最後の活動日時
     const lastActivity = tasks.length > 0 
-      ? Math.max(...tasks.map((t: any) => new Date(t.updated_at).getTime()))
+      ? Math.max(...tasks.map((t: Tasks) => new Date(t.updated_at).getTime()))
       : 0;
     
     // 生産性スコア（完了率 + 進捗率 - 遅延率）
@@ -606,7 +612,7 @@ export async function getUserActivityLogs(
       return [];
     }
     
-    const activities: UserActivityLog[] = (tasks || []).map((task: any, index: number) => ({
+    const activities: UserActivityLog[] = (tasks || []).map((task: Tasks, index: number) => ({
       id: index + 1,
       user_id: userId,
       action: "TASK_UPDATE",
@@ -717,7 +723,11 @@ export async function listProjectMembers(projectId: number): Promise<Array<{ use
       console.error("プロジェクトメンバー取得に失敗:", error.message);
       return [];
     }
-    return (data as any[]) as Array<{ user_id: number; role: string; joined_at: string; user: User }>;
+    // ProjectMembers with User join の結果を適切な型で返す
+    interface ProjectMemberWithUserData extends ProjectMembers {
+      user: User;
+    }
+    return (data || []) as ProjectMemberWithUserData[];
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("プロジェクトメンバー取得でエラー:", msg);

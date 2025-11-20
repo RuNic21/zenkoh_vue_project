@@ -2,7 +2,7 @@
 // レポート用チャートコンポーネント
 // 目的: Chart.js を使用してレポートデータを視覚化
 
-import { ref, onMounted, watch, nextTick } from "vue";
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -118,8 +118,8 @@ const cleanup = () => {
 };
 
 // コンポーネント破棄時のクリーンアップ
-onMounted(() => {
-  return cleanup;
+onBeforeUnmount(() => {
+  cleanup();
 });
 </script>
 

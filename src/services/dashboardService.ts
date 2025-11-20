@@ -30,6 +30,7 @@
 import { supabase } from "./supabaseClient";
 import type { Project } from "../types/project";
 import type { Task } from "../types/task";
+import type { Tasks } from "../types/db/tasks";
 import { handleServiceCall, createSuccessResult, createErrorResult, translateSupabaseError, type ServiceResult } from "../utils/errorHandler";
 
 // プロジェクト統計情報の型定義
@@ -395,7 +396,12 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
         const projectUpdateTime = new Date(project.updated_at).getTime();
         const latestUpdateTime = Math.max(latestTaskUpdate, projectUpdateTime);
 
-        const row: any = {
+        // プロジェクトとユーザー情報を持つ型定義
+        interface ProjectWithUser extends Project {
+          users?: { display_name: string };
+        }
+        
+        const row: ProjectProgressRow & { _latestUpdateTime: number } = {
           id: project.id,
           name: project.name,
           description: project.description,
@@ -412,7 +418,7 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
           average_progress: averageProgress,
           overdue_tasks: overdueTasks,
           // App.vueで使用する追加プロパティ
-          owner: (project as any).users?.display_name || "-",
+          owner: (project as ProjectWithUser).users?.display_name || "-",
           status: status,
           progress: averageProgress,
           dueDate: project.end_date,
@@ -424,16 +430,19 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
 
       // プロジェクト＋タスクの最新更新時間でソート（降順）
       projectProgressRows.sort((a, b) => {
-        const aTime = (a as any)._latestUpdateTime || 0;
-        const bTime = (b as any)._latestUpdateTime || 0;
+        const aTime = "_latestUpdateTime" in a ? a._latestUpdateTime : 0;
+        const bTime = "_latestUpdateTime" in b ? b._latestUpdateTime : 0;
         return bTime - aTime;
       });
 
-      // ソート用フィールドを削除
-      projectProgressRows.forEach(row => delete (row as any)._latestUpdateTime);
+      // ソート用フィールドを削除して、ProjectProgressRow 型に変換
+      const finalRows: ProjectProgressRow[] = projectProgressRows.map(row => {
+        const { _latestUpdateTime, ...rest } = row;
+        return rest;
+      });
 
       // limit が指定されている場合は先頭N件のみ返す
-      return limit ? projectProgressRows.slice(0, limit) : projectProgressRows;
+      return limit ? finalRows.slice(0, limit) : finalRows;
     },
     "プロジェクト進捗取得に失敗しました"
   );
@@ -491,7 +500,7 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
       const today = new Date();
       today.setHours(0, 0, 0, 0); // 時間をリセットして日付のみで比較
 
-      const taskProgressRows: TaskProgressRow[] = tasks.map((task: any) => {
+      const taskProgressRows: TaskProgressRow[] = tasks.map((task: Tasks) => {
         // 期限切れ判定
         const isOverdue = task.planned_end 
           ? new Date(task.planned_end) < today && task.status !== "DONE"

@@ -1,12 +1,24 @@
 // 通知デバッグヘルパー
 // 目的: 通知が作成されない理由を診断
 
+// デバッグ用の型定義
+interface TaskDataForDebug {
+  primary_assignee_id?: number | null;
+  [key: string]: unknown;
+}
+
+interface AssigneeInfoForDebug {
+  name?: string;
+  email?: string;
+  [key: string]: unknown;
+}
+
 /**
  * 通知作成の条件をチェックしてログ出力
  */
 export function debugNotificationConditions(
-  taskData: any,
-  assigneeInfo: any,
+  taskData: TaskDataForDebug,
+  assigneeInfo: AssigneeInfoForDebug | null,
   projectName: string
 ): void {
   console.group("🔍 通知作成条件チェック");

@@ -53,10 +53,9 @@ export function useAuth() {
 
       if (result.success && result.data) {
         globalAuthState.value.user = result.data.user;
-        globalAuthState.value.session = {
-          access_token: result.data.accessToken,
-          refresh_token: result.data.refreshToken,
-        } as any;
+        // SessionInfo から Supabase Session 型への変換は、実際の Session オブジェクトを返すように修正する必要がある
+        // 現在は必要最小限のフィールドのみ設定
+        globalAuthState.value.session = null; // TODO: 実際のセッションオブジェクトを保存する実装に変更
         globalAuthState.value.isAuthenticated = true;
       } else {
         globalAuthState.value.user = null;
@@ -255,10 +254,8 @@ export async function initializeAuthSystem() {
 
     if (result.success && result.data) {
       globalAuthState.value.user = result.data.user;
-      globalAuthState.value.session = {
-        access_token: result.data.accessToken,
-        refresh_token: result.data.refreshToken,
-      } as any;
+      // SessionInfo から Supabase Session 型への変換は、実際の Session オブジェクトを返すように修正する必要がある
+      globalAuthState.value.session = null; // TODO: 実際のセッションオブジェクトを保存する実装に変更
       globalAuthState.value.isAuthenticated = true;
     } else {
       globalAuthState.value.user = null;

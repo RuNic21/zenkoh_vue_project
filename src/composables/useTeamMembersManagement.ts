@@ -68,7 +68,7 @@ export function useTeamMembersManagement(projectId?: number) {
     try {
       isSearching.value = true;
       const res = await searchUsers(query);
-      candidateUsers.value = res.success && res.data ? (res.data as any[]) : [];
+      candidateUsers.value = res.success && res.data ? res.data : [];
     } catch (e) {
       console.error("ユーザー検索に失敗:", e);
       candidateUsers.value = [];

@@ -7,12 +7,7 @@ import { useReportPage } from "@/composables/useReportPage";
 import type { 
   ReportData, 
   ReportOptions, 
-  ReportFilter,
-  ProjectProgressReport,
-  TaskStatisticsReport,
-  UserWorkloadReport,
-  DeadlineReport,
-  PriorityReport
+  ReportFilter
 } from "../types/report";
 import ReportChartBlock from "@/components/report/ReportChartBlock.vue";
 import LoadingSpinner from "@/components/common/LoadingSpinner.vue";
@@ -20,12 +15,12 @@ import EmptyState from "@/components/common/EmptyState.vue";
 import StatusBadge from "@/components/common/StatusBadge.vue";
 import PriorityBadge from "@/components/common/PriorityBadge.vue";
 import PageHeader from "@/components/common/PageHeader.vue";
-import CardHeader from "@/components/common/CardHeader.vue";
-import ActionBar from "@/components/common/ActionBar.vue";
 import ModalShell from "@/components/common/ModalShell.vue";
-import { toCsv, downloadFile } from "@/utils/exportUtils";
+import { toCsv, downloadFile, exportToExcel, exportToPdf } from "@/utils/exportUtils";
 import StatCards from "@/components/common/StatCards.vue";
 import ReportFilters from "@/components/report/ReportFilters.vue";
+import GanttChart from "@/components/report/GanttChart.vue";
+import DependencyGraph from "@/components/report/DependencyGraph.vue";
 
 // TODO: 高度な分析機能の実装
 // 1. 時間追跡・生産性分析 - 実際の作業時間 vs 計画時間の比較分析
@@ -74,6 +69,15 @@ const {
   userWorkloadChartData,
   deadlineChartData,
   generateReportData,
+  // Phase 1: 高度な可視化
+  ganttData,
+  isLoadingGantt,
+  dependencyGraphData,
+  dependencyAnalysis,
+  isLoadingDependency,
+  loadGanttData,
+  loadDependencyGraphData,
+  loadAdvancedVisualizationData,
 } = useReportPage();
 
 // フィルター候補は composable 初期化時に読み込み済み
@@ -105,6 +109,8 @@ onActivated(async () => {
   await generateReportData();
 });
 
+// ==================== Phase 1: エクスポート機能 ====================
+
 // レポートエクスポート（CSV）
 const exportToCSV = () => {
   if (!reportData.value || !reportData.value.projectProgress || !Array.isArray(reportData.value.projectProgress)) {
@@ -128,6 +134,45 @@ const exportToCSV = () => {
   ];
   const csvContent = toCsv(rows);
   downloadFile(csvContent, `project_report_${new Date().toISOString().split('T')[0]}.csv`);
+};
+
+// Excelエクスポート
+const handleExportToExcel = async () => {
+  if (!reportData.value) {
+    alert("レポートデータがありません");
+    return;
+  }
+
+  try {
+    await exportToExcel(reportData.value, {
+      filename: `report_${new Date().toISOString().split("T")[0]}.xlsx`
+    });
+    alert("Excelエクスポート完了");
+  } catch (error) {
+    console.error("Excelエクスポート失敗:", error);
+    alert("Excelエクスポートに失敗しました");
+  }
+};
+
+// PDFエクスポート
+const handleExportToPdf = async () => {
+  if (!reportData.value) {
+    alert("レポートデータがありません");
+    return;
+  }
+
+  try {
+    await exportToPdf(reportData.value, {
+      filename: `report_${new Date().toISOString().split("T")[0]}.pdf`,
+      title: "プロジェクトレポート",
+      includeTables: true,
+      pageOrientation: "landscape"
+    });
+    alert("PDFエクスポート完了");
+  } catch (error) {
+    console.error("PDFエクスポート失敗:", error);
+    alert("PDFエクスポートに失敗しました");
+  }
 };
 
 // プロジェクトの優先度を取得（進捗率と期限切れタスク数に基づく）
@@ -191,6 +236,49 @@ const closeProjectDetailModal = () => {
           @generate="generateReportData"
           @update:includeArchived="(v:boolean)=> includeArchived = v"
         />
+      </div>
+    </div>
+
+    <!-- Phase 1: エクスポートボタン -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <h6 class="mb-3">
+              <i class="material-symbols-rounded me-2">download</i>
+              レポートエクスポート
+            </h6>
+            <div class="btn-group" role="group">
+              <button
+                type="button"
+                class="btn btn-outline-success"
+                @click="exportToCSV"
+                :disabled="!reportData"
+              >
+                <i class="material-symbols-rounded me-1">table_chart</i>
+                CSV
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-primary"
+                @click="handleExportToExcel"
+                :disabled="!reportData"
+              >
+                <i class="material-symbols-rounded me-1">description</i>
+                Excel
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-danger"
+                @click="handleExportToPdf"
+                :disabled="!reportData"
+              >
+                <i class="material-symbols-rounded me-1">picture_as_pdf</i>
+                PDF
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -272,6 +360,69 @@ const closeProjectDetailModal = () => {
             type="bar"
             :height="400"
           />
+        </div>
+      </div>
+
+      <!-- ==================== Phase 1: 高度な可視化 ==================== -->
+      
+      <!-- ガントチャート -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header pb-0 d-flex justify-content-between align-items-center">
+              <h6>
+                <i class="material-symbols-rounded me-2">calendar_view_month</i>
+                プロジェクトタイムライン（ガントチャート）
+              </h6>
+              <button
+                v-if="!isLoadingGantt"
+                class="btn btn-sm btn-outline-primary"
+                @click="loadGanttData"
+              >
+                <i class="material-symbols-rounded me-1">refresh</i>
+                更新
+              </button>
+            </div>
+            <div class="card-body">
+              <LoadingSpinner v-if="isLoadingGantt" message="ガントチャートを読み込み中..." />
+              <GanttChart
+                v-else
+                :tasks="ganttData"
+                :height="450"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 依存関係グラフ -->
+      <div class="row mb-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header pb-0 d-flex justify-content-between align-items-center">
+              <h6>
+                <i class="material-symbols-rounded me-2">account_tree</i>
+                タスク依存関係グラフ
+              </h6>
+              <button
+                v-if="!isLoadingDependency"
+                class="btn btn-sm btn-outline-primary"
+                @click="loadDependencyGraphData"
+              >
+                <i class="material-symbols-rounded me-1">refresh</i>
+                更新
+              </button>
+            </div>
+            <div class="card-body">
+              <LoadingSpinner v-if="isLoadingDependency" message="依存関係グラフを読み込み中..." />
+              <DependencyGraph
+                v-else
+                :graph-data="dependencyGraphData"
+                :analysis="dependencyAnalysis"
+                :height="500"
+              />
+            </div>
+          </div>
         </div>
       </div>
 

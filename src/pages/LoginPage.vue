@@ -1,13 +1,12 @@
 <script setup lang="ts">
 // ログインページ: ユーザー認証フォーム
 import { ref, onMounted } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import router from "@/router";
 import { useAuth } from "@/composables/useAuth";
 import { useMessage } from "@/composables/useMessage";
 import type { LoginCredentials } from "@/types/auth";
 
-const router = useRouter();
-const route = useRoute();
+const route = router.currentRoute;
 const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
 const { showSuccess, showError } = useMessage();
 
@@ -85,7 +84,7 @@ const handleLogin = async () => {
       showSuccess("ログインに成功しました");
       
       // リダイレクト先を取得（なければダッシュボードへ）
-      const redirect = route.query.redirect as string || "/";
+      const redirect = route.value.query.redirect as string || "/";
       router.push(redirect);
     } else {
       showError(error.value || "ログインに失敗しました");

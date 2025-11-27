@@ -25,6 +25,7 @@
     "debug:count": "node scripts/debug-count.mjs",
     "probe:alert": "node scripts/probe-alert-rule-type.mjs",
     "probe:task:priority": "node scripts/probe-task-priority.mjs",
+    "check:schema": "node scripts/verify-users-schema.mjs",
     "dashboard": "cd material-dashboard-master && npm install && npm start",
     "dashboard:dev": "cd material-dashboard-master && npm run compile-scss",
     "dashboard:watch": "cd material-dashboard-master && npm run watch",

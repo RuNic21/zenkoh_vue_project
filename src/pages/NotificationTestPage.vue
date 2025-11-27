@@ -7,23 +7,50 @@ import { createNotificationFromTemplate, listNotifications, getNotificationStats
 import { listUsers } from "@/services/dbServices";
 import { listProjects } from "@/services/projectService";
 import { checkNotificationsInDatabase, checkUsersTable } from "@/utils/notificationDebugger";
+import { useMessage } from "@/composables/useMessage";
 import type { Users } from "@/types/db/users";
 import type { Project } from "@/types/project";
+import type { Notification, NotificationStats, NotificationStatus } from "@/types/notification";
+
+type TestForm = {
+  templateId: "task_assigned" | "task_due_soon" | "task_overdue" | "project_updated";
+  recipientUserId: number | null;
+  projectId: number | null;
+  taskName: string;
+  priority: string;
+};
 
 const users = ref<Users[]>([]);
 const projects = ref<Project[]>([]);
-const notifications = ref<any[]>([]);
-const stats = ref<any>(null);
+const notifications = ref<Notification[]>([]);
+const stats = ref<NotificationStats | null>(null);
 const isLoading = ref(false);
+const { showSuccess, showError, showInfo } = useMessage();
 
 // テストフォーム
-const testForm = ref({
+const testForm = ref<TestForm>({
   templateId: "task_assigned",
-  recipientUserId: null as number | null,
-  projectId: null as number | null,
+  recipientUserId: null,
+  projectId: null,
   taskName: "テストタスク",
   priority: "高"
 });
+
+// 通知ステータスに応じたクラスを返却
+const getStatusClass = (status: NotificationStatus) => {
+  switch (status) {
+    case "QUEUED":
+      return "bg-gradient-warning";
+    case "SENT":
+      return "bg-gradient-success";
+    case "FAILED":
+      return "bg-gradient-danger";
+    case "CANCELLED":
+      return "bg-gradient-secondary";
+    default:
+      return "bg-gradient-secondary";
+  }
+};
 
 // データ読み込み
 const loadData = async () => {
@@ -62,7 +89,7 @@ const loadData = async () => {
 // テスト通知送信
 const sendTestNotification = async () => {
   if (!testForm.value.recipientUserId || !testForm.value.projectId) {
-    alert("受信者とプロジェクトを選択してください");
+    showError("受信者とプロジェクトを選択してください");
     return;
   }
   
@@ -71,7 +98,7 @@ const sendTestNotification = async () => {
     const project = projects.value.find(p => p.id === testForm.value.projectId);
     
     if (!recipient || !project) {
-      alert("受信者またはプロジェクトが見つかりません");
+      showError("受信者またはプロジェクトが見つかりません");
       return;
     }
     
@@ -97,24 +124,27 @@ const sendTestNotification = async () => {
     
     if (result) {
       console.log("✅ テスト通知が作成されました:", result);
-      alert("✅ 通知が正常に作成されました！");
+      showSuccess("通知が正常に作成されました");
       await loadData();
       await checkNotificationsInDatabase();
     } else {
       console.error("❌ 通知作成に失敗しました");
-      alert("❌ 通知の作成に失敗しました");
+      showError("通知の作成に失敗しました");
     }
   } catch (error) {
     console.error("テスト通知送信エラー:", error);
-    alert("エラー: " + (error instanceof Error ? error.message : String(error)));
+    const message = error instanceof Error ? error.message : String(error);
+    showError(`エラーが発生しました: ${message}`);
   }
 };
 
 // データベースチェック
 const runDatabaseCheck = async () => {
   console.log("🔍 データベースチェック開始");
+  showInfo("データベースチェックを開始します");
   await checkUsersTable();
   await checkNotificationsInDatabase();
+  showSuccess("データベースチェックが完了しました");
 };
 
 onMounted(() => {
@@ -259,12 +289,7 @@ onMounted(() => {
                         <td>{{ notification.to_email }}</td>
                         <td>
                           <span 
-                            class="badge badge-sm"
-                            :class="{
-                              'bg-gradient-warning': notification.status === 'QUEUED',
-                              'bg-gradient-success': notification.status === 'SENT',
-                              'bg-gradient-danger': notification.status === 'FAILED'
-                            }"
+                            :class="['badge', 'badge-sm', getStatusClass(notification.status)]"
                           >
                             {{ notification.status }}
                           </span>

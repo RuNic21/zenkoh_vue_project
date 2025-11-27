@@ -21,6 +21,10 @@ import { handleServiceCall } from "@/utils/errorHandler";
  * @param userProfile users テーブルのプロフィール情報（オプション）
  * @returns AuthUser 型のユーザー情報
  */
+/**
+ * Supabase User を AuthUser に変換
+ * users テーブルのプロフィール情報を統合して返す
+ */
 function mapSupabaseUserToAuthUser(
   supabaseUser: User,
   userProfile?: Users
@@ -29,8 +33,10 @@ function mapSupabaseUserToAuthUser(
     id: supabaseUser.id,
     email: supabaseUser.email || "",
     displayName: userProfile?.display_name || supabaseUser.email?.split("@")[0] || "ユーザー",
-    avatarUrl: undefined, // TODO: avatar_url をusersテーブルに追加後に実装
-    role: "member", // TODO: role をusersテーブルに追加後に実装
+    // users テーブルから avatar_url を取得（存在する場合）
+    avatarUrl: userProfile?.avatar_url || undefined,
+    // users テーブルから role を取得（デフォルトは "member"）
+    role: (userProfile?.role as "admin" | "manager" | "member" | "viewer" | undefined) || "member",
     isActive: userProfile?.is_active ?? true,
     createdAt: supabaseUser.created_at || new Date().toISOString(),
   };
@@ -131,6 +137,7 @@ export async function signUp(
               display_name: credentials.displayName,
               password_hash: "AUTH_SUPABASE_MANAGED", // ダミー値: 認証は Supabase Auth 側で管理
               is_active: true,
+              role: "member", // デフォルト権限: member
             },
           ]);
         if (usersInsertError) {
@@ -149,7 +156,20 @@ export async function signUp(
 
       console.log("会員登録成功:", data.user.email);
       
-      return mapSupabaseUserToAuthUser(data.user, undefined);
+      // 作成した users テーブルのレコードを取得して返す
+      let userProfile: Users | undefined = undefined;
+      try {
+        const { data: profileData } = await supabase
+          .from("users")
+          .select("*")
+          .eq("auth_id", data.user.id)
+          .single();
+        if (profileData) userProfile = profileData as Users;
+      } catch (e) {
+        // プロフィール未取得でも続行
+      }
+      
+      return mapSupabaseUserToAuthUser(data.user, userProfile);
     },
     "会員登録に失敗しました"
   );
@@ -316,17 +336,38 @@ export async function updateEmail(newEmail: string): Promise<AuthResult> {
 
 /**
  * ユーザープロフィール更新
- * NOTE: 現在 users テーブルとの連携は無効化されています
- * TODO: users テーブルスキーマを UUID に変更後に実装
+ * auth_id を使用して users テーブルのレコードを更新
+ * @param userId Supabase Auth の UUID
+ * @param updates 更新するフィールド
+ * @returns 更新後のユーザー情報
  */
 export async function updateUserProfile(
   userId: string,
-  updates: Partial<Users>
+  updates: Partial<Pick<Users, "display_name" | "first_name" | "last_name" | "phone" | "department" | "position" | "avatar_url" | "bio" | "timezone" | "language" | "work_hours_start" | "work_hours_end" | "role" | "is_active">>
 ): Promise<AuthResult<Users>> {
   return handleServiceCall(
     async () => {
-      console.warn("updateUserProfile: users テーブル連携は現在無効化されています");
-      throw new Error("ユーザープロフィール更新機能は準備中です");
+      // auth_id で users テーブルのレコードを検索して更新
+      const { data, error } = await supabase
+        .from("users")
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("auth_id", userId)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (!data) {
+        throw new Error("ユーザープロフィールが見つかりませんでした");
+      }
+
+      console.log("ユーザープロフィール更新成功:", data.id);
+      return data as Users;
     },
     "ユーザープロフィールの更新に失敗しました"
   );

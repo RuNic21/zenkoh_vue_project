@@ -322,55 +322,85 @@ export interface ProjectProgressRow {
 }
 
 // プロジェクト進捗情報を取得（App.vue用）
+// 最適化: N+1 クエリ問題を解決するため、すべてのタスクを一括取得してからメモリでグループ化
 export async function fetchProjectProgress(limit?: number): Promise<ServiceResult<ProjectProgressRow[]>> {
   return handleServiceCall(
     async () => {
+      console.log("[fetchProjectProgress] プロジェクト進捗情報の取得を開始...");
+      const startTime = Date.now();
+
       // プロジェクト一覧を取得（ユーザー情報も含む）
-      // 最初は全プロジェクトを取得してから、タスクの更新時間でソート
-      let query = supabase
+      console.log("[fetchProjectProgress] プロジェクト一覧を取得中...");
+      const projectsQuery = supabase
         .from("projects")
         .select(`
           id, name, description, start_date, end_date, owner_user_id, is_archived, created_at, updated_at,
           users!projects_owner_user_id_fkey(display_name)
         `);
       
-      const { data: projects, error: projectsError } = await query;
+      const { data: projects, error: projectsError } = await projectsQuery;
 
       if (projectsError) {
         throw new Error(translateSupabaseError(projectsError));
       }
 
       if (!projects || projects.length === 0) {
+        console.log("[fetchProjectProgress] プロジェクトが0件のため、空配列を返します");
         return [];
       }
 
-      const projectProgressRows: ProjectProgressRow[] = [];
+      console.log(`[fetchProjectProgress] プロジェクト取得成功: ${projects.length}件`);
 
-      for (const project of projects) {
-        // 各プロジェクトのタスク統計を取得（updated_atも取得して最新更新時間を把握）
-        const { data: tasks, error: tasksError } = await supabase
-          .from("tasks")
-          .select("status, progress_percent, planned_end, is_archived, updated_at")
-          .eq("project_id", project.id)
-          .eq("is_archived", false);
+      // プロジェクトIDのリストを作成
+      const projectIds = projects.map(p => p.id);
+      
+      // すべてのタスクを一括取得（N+1 クエリ問題を解決）
+      console.log("[fetchProjectProgress] すべてのタスクを一括取得中...");
+      const tasksQuery = supabase
+        .from("tasks")
+        .select("project_id, status, progress_percent, planned_end, is_archived, updated_at")
+        .eq("is_archived", false)
+        .in("project_id", projectIds);
 
-        if (tasksError) {
-          console.warn(`プロジェクト ${project.id} のタスク取得エラー:`, tasksError);
-          continue;
+      const { data: allTasks, error: tasksError } = await tasksQuery;
+
+      if (tasksError) {
+        console.warn("[fetchProjectProgress] タスク取得エラー:", tasksError);
+        // タスク取得に失敗してもプロジェクト情報だけは返す
+      }
+
+      // タスクをプロジェクトIDでグループ化
+      const tasksByProjectId = new Map<number, typeof allTasks>();
+      if (allTasks) {
+        for (const task of allTasks) {
+          if (!task.project_id) continue;
+          const projectId = task.project_id;
+          if (!tasksByProjectId.has(projectId)) {
+            tasksByProjectId.set(projectId, []);
+          }
+          tasksByProjectId.get(projectId)!.push(task);
         }
+      }
 
-        const activeTasks = tasks || [];
+      console.log(`[fetchProjectProgress] タスク取得成功: ${allTasks?.length || 0}件（${tasksByProjectId.size}プロジェクトに分散）`);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const projectProgressRows: (ProjectProgressRow & { _latestUpdateTime: number })[] = [];
+
+      // プロジェクトごとに統計を計算
+      for (const project of projects) {
+        const activeTasks = tasksByProjectId.get(project.id) || [];
         const totalTasks = activeTasks.length;
         const completedTasks = activeTasks.filter(t => t.status === "DONE").length;
         const inProgressTasks = activeTasks.filter(t => t.status === "IN_PROGRESS").length;
         const blockedTasks = activeTasks.filter(t => t.status === "BLOCKED").length;
         
         const averageProgress = totalTasks > 0 
-          ? Math.round(activeTasks.reduce((sum, t) => sum + t.progress_percent, 0) / totalTasks)
+          ? Math.round(activeTasks.reduce((sum, t) => sum + (t.progress_percent || 0), 0) / totalTasks)
           : 0;
 
         // 期限切れタスク数
-        const today = new Date();
         const overdueTasks = activeTasks.filter(t => 
           t.planned_end && new Date(t.planned_end) < today && t.status !== "DONE"
         ).length;
@@ -430,8 +460,8 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
 
       // プロジェクト＋タスクの最新更新時間でソート（降順）
       projectProgressRows.sort((a, b) => {
-        const aTime = "_latestUpdateTime" in a ? a._latestUpdateTime : 0;
-        const bTime = "_latestUpdateTime" in b ? b._latestUpdateTime : 0;
+        const aTime = a._latestUpdateTime;
+        const bTime = b._latestUpdateTime;
         return bTime - aTime;
       });
 
@@ -442,7 +472,12 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
       });
 
       // limit が指定されている場合は先頭N件のみ返す
-      return limit ? finalRows.slice(0, limit) : finalRows;
+      const result = limit ? finalRows.slice(0, limit) : finalRows;
+      
+      const duration = Date.now() - startTime;
+      console.log(`[fetchProjectProgress] 処理完了: ${result.length}件（${duration}ms）`);
+      
+      return result;
     },
     "プロジェクト進捗取得に失敗しました"
   );
@@ -485,12 +520,12 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
-      // タイムアウトを設定（10秒 - 接続確認を削除したので元に戻す）
+      // タイムアウトを設定（30秒に延長 - ネットワークが不安定な場合を考慮）
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
-          console.error("[fetchRecentTasks] タイムアウト: 10秒経過しました");
-          reject(new Error("タスク取得がタイムアウトしました（10秒）"));
-        }, 10000);
+          console.error("[fetchRecentTasks] タイムアウト: 30秒経過しました");
+          reject(new Error("タスク取得がタイムアウトしました（30秒）"));
+        }, 30000);
       });
 
       // タスク一覧を取得（まずはタスクのみ、後でプロジェクト・ユーザー情報を個別に取得）
@@ -528,7 +563,7 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
       
       if (tasksResult.type === 'timeout') {
         console.error("[fetchRecentTasks] タイムアウトが発生しました");
-        throw new Error("タスク取得がタイムアウトしました（10秒）");
+        throw new Error("タスク取得がタイムアウトしました（30秒）");
       }
       
       const { data: tasks, error: tasksError } = tasksResult.result;
@@ -564,7 +599,7 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
         try {
           console.log(`[fetchRecentTasks] プロジェクト情報を取得中（ID: ${projectIds.join(', ')}）...`);
           const projectTimeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("プロジェクト情報取得がタイムアウトしました")), 5000);
+            setTimeout(() => reject(new Error("プロジェクト情報取得がタイムアウトしました（15秒）")), 15000);
           });
           
           const projectQuery = supabase
@@ -575,7 +610,7 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
           const projectResult = await Promise.race([
             projectQuery.then(result => ({ type: 'success' as const, result })),
             projectTimeoutPromise.then(() => ({ type: 'timeout' as const }))
-          ]);
+          ]).catch(() => ({ type: 'timeout' as const }));
           
           if (projectResult.type === 'success') {
             const { data: projects, error: projectsError } = projectResult.result;
@@ -588,7 +623,8 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
               console.warn("[fetchRecentTasks] プロジェクト情報の取得に失敗:", projectsError);
             }
           } else {
-            console.warn("[fetchRecentTasks] プロジェクト情報の取得がタイムアウトしました");
+            console.warn("[fetchRecentTasks] プロジェクト情報の取得がタイムアウトしました（15秒）");
+            // タイムアウトしても処理は続行（プロジェクト名は "-" になる）
           }
         } catch (e) {
           console.warn("[fetchRecentTasks] プロジェクト情報の取得中にエラー:", e);
@@ -601,7 +637,7 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
         try {
           console.log(`[fetchRecentTasks] ユーザー情報を取得中（ID: ${userIds.join(', ')}）...`);
           const userTimeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("ユーザー情報取得がタイムアウトしました")), 5000);
+            setTimeout(() => reject(new Error("ユーザー情報取得がタイムアウトしました（15秒）")), 15000);
           });
           
           const userQuery = supabase
@@ -612,7 +648,7 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
           const userResult = await Promise.race([
             userQuery.then(result => ({ type: 'success' as const, result })),
             userTimeoutPromise.then(() => ({ type: 'timeout' as const }))
-          ]);
+          ]).catch(() => ({ type: 'timeout' as const }));
           
           if (userResult.type === 'success') {
             const { data: users, error: usersError } = userResult.result;
@@ -625,7 +661,8 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
               console.warn("[fetchRecentTasks] ユーザー情報の取得に失敗:", usersError);
             }
           } else {
-            console.warn("[fetchRecentTasks] ユーザー情報の取得がタイムアウトしました");
+            console.warn("[fetchRecentTasks] ユーザー情報の取得がタイムアウトしました（15秒）");
+            // タイムアウトしても処理は続行（担当者名は "未割当" になる）
           }
         } catch (e) {
           console.warn("[fetchRecentTasks] ユーザー情報の取得中にエラー:", e);

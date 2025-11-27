@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
+import router from "@/router";
 import { useScheduleDetail } from "@/composables/useScheduleDetail";
 import { getCurrentUserInfo } from "@/utils/userHelper";
 import { useScheduleStore } from "../store/schedule";
@@ -12,7 +13,6 @@ import type { TaskStatusHistory } from "../types/taskStatusHistory";
 
 // Router
 const route = useRoute();
-const router = useRouter();
 
 // 共通コンポーネントのインポート
 import PageHeader from "../components/common/PageHeader.vue";
@@ -29,120 +29,6 @@ import TagManagerModal from "../components/common/TagManagerModal.vue";
 import CommentsSection from "../components/common/CommentsSection.vue";
 
 // スケジュール詳細ページ: 個別スケジュールの詳細表示・編集
-
-// TODO: 現在のスキーマで即座に実装可能な機能
-// 1. 基本情報編集機能の完全実装
-//    - task_name, description フィールドの完全DB連携
-//    - progress_percent フィールドの実装（0-100の範囲制限）
-//    - status フィールドの実装（NOT_STARTED, IN_PROGRESS, BLOCKED, DONE, CANCELLED）
-//    - priority フィールドの実装（LOW, MEDIUM, HIGH, URGENT）
-//
-// 2. 担当者管理システムの完全実装
-//    - primary_assignee_id フィールドでusersテーブルと連携
-//    - changeAssignee()関数でDB保存ロジック実装
-//    - ユーザー名↔ユーザーID変換ロジック実装
-//    - 担当者変更時の権限チェック機能実装
-//
-// 3. スケジュール管理システムの完全実装
-//    - planned_start, planned_end フィールドの実装
-//    - actual_start, actual_end フィールドの実装
-//    - 計画vs実績の比較表示機能実装
-//    - 日付バリデーション機能実装
-//
-// 4. プロジェクト連携システムの実装
-//    - project_id フィールドでprojectsテーブルと連携
-//    - プロジェクト情報の表示（project.name, project.description）
-//    - プロジェクト別フィルタリング機能実装
-//
-// 5. 状態変更履歴システムの実装
-//    - created_at, updated_at, created_by, updated_by フィールド活用
-//    - 状態変更時の履歴記録機能実装
-//    - 変更者情報の表示機能実装
-//    - 履歴の時系列表示機能実装
-//
-// 6. クイックアクションシステムの改善
-//    - executeQuickAction()でactual_start/actual_end自動記録
-//    - 状態変更時の進捗率自動調整機能実装
-//    - アクション実行時の通知機能実装
-//    - カスタムアクション定義機能実装
-//
-// 7. WBSコード管理システムの実装
-//    - wbs_code フィールドの表示・編集機能実装
-//    - WBSコードのバリデーション機能実装
-//    - WBSコードによるソート機能実装
-//
-// 8. 親子タスク関係システムの実装
-//    - parent_task_id フィールドの活用
-//    - 子タスク一覧表示機能実装
-//    - 親タスクへのナビゲーション機能実装
-//    - タスク階層の視覚化機能実装
-
-// TODO: スキーマ拡張が必要な機能（将来実装）
-// 9. タグ管理システム - 現在メモリ上でのみ管理
-//    - tasksテーブルにtags TEXT[]カラム追加が必要
-//    - addTag()/removeTag()関数でDB保存ロジック実装が必要
-//    - taskAdapter.tsでtagsフィールドの変換ロジック実装が必要
-//    - タグの重複チェック機能実装が必要
-//    - タグ使用頻度統計機能実装が必要
-//
-// 10. コメントシステム - 現在メモリ上でのみ管理
-//    - tasksテーブルにcomments JSONBカラム追加が必要
-//    - addComment()関数でDB保存ロジック実装が必要
-//    - コメント削除/編集機能実装が必要
-//    - コメント作成者認証システム実装が必要
-//
-// 11. 添付ファイルシステム - 現在メモリ上でのみ管理
-//    - tasksテーブルにattachments JSONBカラム追加が必要
-//    - handleFileUpload()関数で実際のファイルアップロード実装が必要
-//    - ファイルダウンロード機能実装が必要
-//    - ファイル削除機能実装が必要
-//    - ファイルサイズ制限およびタイプ検証実装が必要
-//
-// 12. メモ/ノートシステム - 現在descriptionフィールドで代用可能
-//    - tasksテーブルにnotes TEXTカラム追加が必要
-//    - メモデータをDBからロード/保存するロジック実装が必要
-//    - メモ履歴機能実装が必要
-//
-// 13. チームメンバー管理システム - task_membersテーブル活用
-//    - task_membersテーブルとの連携実装が必要
-//    - チームメンバー追加/削除機能実装が必要
-//    - メンバー役割管理機能実装が必要
-//    - メンバー別権限管理機能実装が必要
-//
-// 14. 通知システム - notificationsテーブル活用
-//    - alert_rulesテーブルとの連携実装が必要
-//    - タスク状態変更時の通知機能実装が必要
-//    - 期限切れ通知機能実装が必要
-//    - カスタム通知ルール設定機能実装が必要
-//
-// 15. 活動ログシステム - activitiesテーブル活用
-//    - タスク操作のログ記録機能実装が必要
-//    - 活動履歴の表示機能実装が必要
-//    - ログフィルタリング機能実装が必要
-//    - ログエクスポート機能実装が必要
-
-// TODO: データベーススキーマ拡張案
-// 16. スキーマ拡張提案
-//    - tasksテーブルに以下のカラム追加を検討:
-//      * tags TEXT[] - タグ配列
-//      * comments JSONB - コメント配列
-//      * attachments JSONB - 添付ファイル情報
-//      * notes TEXT - メモ/ノート
-//      * status_history JSONB - 状態変更履歴
-//    - インデックス作成: tags, status_history用のGINインデックス
-//    - 制約追加: tags配列の最大長制限
-//
-// 17. サービス層拡張
-//    - taskService.tsに新フィールド処理ロジック追加が必要
-//    - JSONBフィールドのシリアライズ/デシリアライズ処理実装が必要
-//    - バッチ更新機能実装が必要
-//    - 履歴クエリ最適化実装が必要
-//
-// 18. アダプター層拡張
-//    - taskAdapter.tsに新フィールド変換ロジック実装が必要
-//    - ユーザー名↔ユーザーID変換関数実装が必要
-//    - JSONBフィールドの型安全な変換実装が必要
-//    - デフォルト値処理の統一実装が必要
 
 // スケジュール詳細画面のデータ/操作群をcomposable(useScheduleDetail)から取得
 // route params の id を渡してDBから直接ロード
@@ -382,7 +268,7 @@ const getHeaderActions = () => {
             label: '戻る',
             icon: 'arrow_back',
             variant: 'outline-secondary',
-            onClick: () => $router.back()
+            onClick: () => router.back()
           },
           ...getHeaderActions()
         ]"

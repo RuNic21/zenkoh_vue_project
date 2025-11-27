@@ -541,7 +541,7 @@ export async function generateGanttData(
         .from("tasks")
         .select(`
           id,
-          title,
+          task_name,
           planned_start,
           planned_end,
           progress_percent,
@@ -582,7 +582,7 @@ export async function generateGanttData(
       // 間トチャートデータに変換
       const ganttData: import("../types/report").GanttTaskData[] = tasks.map(task => ({
         id: String(task.id),
-        name: task.title || "無題のタスク",
+        name: task.task_name || "無題のタスク",
         start: task.planned_start || "",
         end: task.planned_end || "",
         progress: task.progress_percent || 0,
@@ -611,7 +611,7 @@ export async function generateDependencyGraphData(
         .from("tasks")
         .select(`
           id,
-          title,
+          task_name,
           status,
           priority,
           progress_percent,
@@ -659,7 +659,7 @@ export async function generateDependencyGraphData(
         const taskWithRelations = task as TaskWithRelations;
         return {
           id: String(task.id),
-          label: task.title || "無題のタスク",
+          label: task.task_name || "無題のタスク",
           title: `プロジェクト: ${taskWithRelations.projects?.name || "未割当"}\nステータス: ${task.status}\n進捗: ${task.progress_percent}%`,
           group: taskWithRelations.projects?.name || "未割当",
           color: getStatusColor(task.status),

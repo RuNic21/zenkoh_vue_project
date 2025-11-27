@@ -5,9 +5,9 @@ defineOptions({
   name: 'DashboardPage'
 });
 
-import { ref, onMounted, onActivated } from "vue";
-import { useRouter } from "vue-router";
+import { ref, computed, onMounted, onActivated } from "vue";
 import { useScheduleStore } from "@/store/schedule";
+import router from "@/router";
 import DashboardFilters from "@/components/dashboard/DashboardFilters.vue";
 import ProjectProgressTable from "@/components/dashboard/ProjectProgressTable.vue";
 import TaskProgressTable from "@/components/dashboard/TaskProgressTable.vue";
@@ -16,16 +16,15 @@ import RecentNotifications from "@/components/dashboard/RecentNotifications.vue"
 import ProjectTasksModal from "@/components/dashboard/ProjectTasksModal.vue";
 import { useDashboard } from "@/composables/useDashboard";
 import { useMessage } from "@/composables/useMessage";
-import type { ProjectProgressRow } from "@/services/dashboardService";
-import type { ScheduleItem } from "@/types/schedule";
+import type { ProjectProgressRow, TaskProgressRow } from "@/services/dashboardService";
+import type { ScheduleItem, ScheduleStatus, SchedulePriority } from "@/types/schedule";
+import type { Task } from "@/types/task";
+import StatCards from "@/components/common/StatCards.vue";
 
-const router = useRouter();
 const store = useScheduleStore();
 
 // ダッシュボード用状態とロジックは composable へ集約
 const {
-  projectProgressList,
-  taskProgressList,
   isDashboardLoading,
   isTaskLoading,
   dashboardErrorMessage,
@@ -47,19 +46,44 @@ const {
 } = useDashboard();
 
 // メッセージシステム
-const { showSuccess, showError } = useMessage();
+const { showError } = useMessage();
 
-// タスクモーダル状態
-const selectedProjectTasks = ref<any[]>([]);
+// タスクモーダル状態（型を明示的に指定）
+// ProjectTasksModalが期待するTaskRow型に合わせる
+type TaskRow = {
+  id: number;
+  task_name: string;
+  status: Task["status"];
+  priority: Task["priority"];
+  progress_percent: number;
+  planned_end: string | null;
+  primary_assignee_id: number | null;
+  updated_at: string;
+};
+
+const selectedProjectTasks = ref<TaskRow[]>([]);
 const showTaskModal = ref(false);
-const selectedProjectForTasks = ref<any>(null);
+const selectedProjectForTasks = ref<ProjectProgressRow | null>(null);
 
 // プロジェクトのタスク一覧モーダルを開く（詳細ページ遷移ではなくモーダル表示）
 const handleOpenProjectTasksModal = async (project: ProjectProgressRow) => {
   try {
     const { getProjectTasks } = await import("@/services/dashboardService");
     selectedProjectForTasks.value = project;
-    selectedProjectTasks.value = await getProjectTasks(project.id);
+    const tasks = await getProjectTasks(project.id);
+    
+    // Task型をTaskRow型に変換（ProjectTasksModalの型定義に合わせる）
+    selectedProjectTasks.value = tasks.map(task => ({
+      id: task.id,
+      task_name: task.task_name,
+      status: task.status,
+      priority: task.priority,
+      progress_percent: task.progress_percent,
+      planned_end: task.planned_end ?? null, // nullに変換（必須フィールド）
+      primary_assignee_id: task.primary_assignee_id ?? null,
+      updated_at: task.updated_at
+    }));
+    
     showTaskModal.value = true;
   } catch (error) {
     console.error("プロジェクトタスクの読み込みに失敗:", error);
@@ -68,7 +92,7 @@ const handleOpenProjectTasksModal = async (project: ProjectProgressRow) => {
 };
 
 // タスク詳細表示
-const handleViewTaskDetail = (task: any) => {
+const handleViewTaskDetail = (task: TaskProgressRow) => {
   try {
     // TaskProgressRow を ScheduleItem に変換
     const scheduleItem: ScheduleItem = {
@@ -77,8 +101,8 @@ const handleViewTaskDetail = (task: any) => {
       description: task.description || "",
       startDate: task.planned_start || "",
       endDate: task.planned_end || "",
-      status: task.status || "NOT_STARTED",
-      priority: task.priority || "MEDIUM",
+      status: (task.status as ScheduleStatus) || "NOT_STARTED",
+      priority: (task.priority as SchedulePriority) || "MEDIUM",
       assignee: task.assigneeName || "",
       progress: task.progress_percent || 0,
       category: task.projectName || "",
@@ -121,55 +145,37 @@ const handleViewTaskDetailFromModal = (taskId: number) => {
   }
 };
 
-// クイックアクションパネル
-const quickActions = [
+// 統計情報カード用データ（computedで生成）
+const dashboardStats = computed(() => [
   {
-    label: "新しいプロジェクト作成",
-    icon: "add",
-    color: "bg-gradient-primary",
-    action: () => handleCreateProject()
+    label: "進行中プロジェクト",
+    value: inProgressCount.value,
+    icon: "play_circle",
+    color: "info" as const,
+    footer: `全${filteredProjects.value.length}プロジェクト中`
   },
   {
-    label: "レポート生成",
-    icon: "assessment",
-    color: "bg-gradient-warning",
-    action: () => handleGenerateReport()
+    label: "完了プロジェクト",
+    value: completedCount.value,
+    icon: "check_circle",
+    color: "success" as const,
+    footer: `${completionRate.value}%完了`
+  },
+  {
+    label: "完了率",
+    value: `${completionRate.value}%`,
+    icon: "trending_up",
+    color: "primary" as const,
+    footer: `${completedCount.value}/${filteredProjects.value.length}プロジェクト`
+  },
+  {
+    label: "期限切れ",
+    value: overdueCount.value,
+    icon: "warning",
+    color: overdueCount.value > 0 ? ("danger" as const) : ("secondary" as const),
+    footer: overdueCount.value > 0 ? "要対応" : "問題なし"
   }
-];
-
-// クイックアクション処理メソッド
-const handleCreateProject = async () => {
-  try {
-    const projectName = prompt("新しいプロジェクト名を入力してください:");
-    if (!projectName || projectName.trim() === "") {
-      return;
-    }
-
-    const { createProject } = await import("@/services/projectService");
-    const result = await createProject({
-      name: projectName.trim(),
-      description: "",
-      owner_user_id: null,
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: null,
-      is_archived: false
-    });
-
-    if (result.success && result.data) {
-      const { logProjectCreated } = await import("@/services/activityService");
-      await logProjectCreated(result.data.id, projectName, "システム");
-      
-      showSuccess(`プロジェクト "${projectName}"が正常に作成されました！`);
-      await loadDashboardFromDb();
-      await loadActivityFeed();
-    } else {
-      showError(result.error || "プロジェクトの作成に失敗しました。再試行してください。");
-    }
-  } catch (error) {
-    console.error("プロジェクト作成中のエラー:", error);
-    showError("プロジェクト作成中にエラーが発生しました。");
-  }
-};
+]);
 
 // ダッシュボードデータを再読み込み
 const handleRefreshDashboard = async () => {
@@ -191,10 +197,6 @@ const handleRefreshDashboard = async () => {
     console.error("ダッシュボードデータの更新に失敗:", error);
     showError("データの更新に失敗しました。もう一度お試しください。");
   }
-};
-
-const handleGenerateReport = () => {
-  router.push({ name: "report" });
 };
 
 // 最近の活動フィード
@@ -328,7 +330,14 @@ onActivated(async () => {
       </div>
     </div>
 
-    <!-- フィルタリング・クイックアクションパネル -->
+    <!-- 統計情報カード -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <StatCards :items="dashboardStats" />
+      </div>
+    </div>
+
+    <!-- フィルタリングパネル -->
     <div class="row mb-4">
       <div class="col-12">
         <DashboardFilters 

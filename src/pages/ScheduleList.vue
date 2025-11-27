@@ -9,6 +9,7 @@ import { useScheduleList } from "@/composables/useScheduleList";
 import { getProgressBarClass } from "../utils/uiHelpers";
 import type { ScheduleItem } from "../types/schedule";
 import type { Project } from "../types/project";
+import { useMessage } from "@/composables/useMessage";
 
 // 共通コンポーネントのインポート
 import PageHeader from "../components/common/PageHeader.vue";
@@ -24,46 +25,6 @@ import TaskCreateModal from "../components/task/TaskCreateModal.vue";
 import ProjectListGrid from "../components/project/ProjectListGrid.vue";
 import ProjectDetailHeader from "../components/project/ProjectDetailHeader.vue";
 import ProjectTasksGrid from "../components/task/ProjectTasksGrid.vue";
-
-// TODO: 即座に実装可能な機能（既存スキーマ活用）
-// 1. カードビュー改善（進捗率可視化）
-//    - プロジェクト別進捗率チャート表示
-//    - 個別タスクの進捗率可視化強化
-//    - 状態別色分けの改善
-//    - 進捗率に応じたアニメーション効果
-
-// 2. 高度なフィルタリングシステム
-//    - 日付範囲フィルター（planned_start, planned_end活用）
-//    - 担当者別フィルター（primary_assignee_id活用）
-//    - 優先度複数選択フィルター
-//    - 進捗率範囲フィルター
-//    - WBSコード検索（wbs_codeフィールド活用）
-//    - 親タスク/子タスク関係フィルター
-
-// 3. 担当者別作業量分析
-//    - 担当者別タスク数統計
-//    - 進行中/完了タスクの割合表示
-//    - 作業量可視化チャート
-//    - 担当者別進捗率分析
-
-// TODO: 短期実装（サービス拡張）
-// 4. マイルストーン・スケジュール管理
-//    - planned_start/planned_endベースのタイムラインビュー
-//    - マイルストーン表示機能
-//    - ガントチャートスタイル表示
-//    - 期限接近アラート表示
-
-// 5. データエクスポート機能
-//    - CSV/PDFエクスポート
-//    - プロジェクト別レポート生成
-//    - フィルター済みデータのエクスポート
-//    - カスタムレポートテンプレート
-
-// 6. 高度な検索・ソート機能
-//    - 複数条件検索
-//    - ソートオプション拡張
-//    - 検索履歴保存
-//    - お気に入りフィルター設定
 
 // composable から状態・ロジックを取得
 const {
@@ -94,6 +55,13 @@ const {
   resetFilters,
   loadSchedulesFromDb,  // データ再読み込み関数
 } = useScheduleList();
+
+const { showSuccess } = useMessage();
+
+const handleEmptyStateReset = () => {
+  resetFilters();
+  showSuccess("フィルターをリセットしました");
+};
 
 // Keep-Alive: ページが再度アクティブになったときにデータを更新
 // 詳細ページから戻ってきたときに最新のデータを表示するため
@@ -254,7 +222,7 @@ const filterValues = computed({
             </button>
             <button 
               class="btn bg-gradient-secondary"
-              @click="() => { searchQuery = ''; filterStatus = 'all'; selectedProjectId = null; }"
+              @click="handleEmptyStateReset"
             >
               <i class="material-symbols-rounded me-2">clear</i>
               フィルターをリセット

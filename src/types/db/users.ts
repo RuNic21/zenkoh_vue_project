@@ -1,4 +1,5 @@
 // 自動生成: information_schema.columns のCSVから生成（編集しないこと）
+// 注意: role カラムは 2025-01-XX_add_role_to_users.sql マイグレーションで追加
 export interface Users {
   id: number;
   auth_id?: string | null;
@@ -23,6 +24,7 @@ export interface Users {
   language?: string | null;
   work_hours_start?: string | null;
   work_hours_end?: string | null;
+  role?: "admin" | "manager" | "member" | "viewer" | null; // マイグレーション後に追加
 }
 
 export interface UsersInsert {
@@ -49,6 +51,7 @@ export interface UsersInsert {
   language?: string | null;
   work_hours_start?: string | null;
   work_hours_end?: string | null;
+  role?: "admin" | "manager" | "member" | "viewer" | null; // マイグレーション後に追加
 }
 
 export interface UsersUpdate {
@@ -75,4 +78,5 @@ export interface UsersUpdate {
   language?: string | null;
   work_hours_start?: string | null;
   work_hours_end?: string | null;
+  role?: "admin" | "manager" | "member" | "viewer" | null; // マイグレーション後に追加
 }

@@ -4,6 +4,7 @@
 
 import { ref, computed, onActivated } from "vue";
 import { useReportPage } from "@/composables/useReportPage";
+import { useMessage } from "@/composables/useMessage";
 import type { 
   ReportData, 
   ReportOptions, 
@@ -21,37 +22,6 @@ import StatCards from "@/components/common/StatCards.vue";
 import ReportFilters from "@/components/report/ReportFilters.vue";
 import GanttChart from "@/components/report/GanttChart.vue";
 import DependencyGraph from "@/components/report/DependencyGraph.vue";
-
-// TODO: 高度な分析機能の実装
-// 1. 時間追跡・生産性分析 - 実際の作業時間 vs 計画時間の比較分析
-// 2. バーンダウンチャート - プロジェクト進行に伴う残作業量の推移
-// 3. ヒートマップ分析 - ユーザー別/プロジェクト別の活動パターン可視化
-
-// TODO: 通知・アラート分析機能の実装
-// 1. 通知統計ダッシュボード - notificationsテーブルを活用した送信状況・成功率分析
-// 2. アラートルール効果性分析 - alert_rulesテーブルを活用したルールの効果測定
-// 3. 通知パフォーマンス最適化 - 失敗通知の原因分析・改善提案
-
-// TODO: チーム協力・依存関係分析の実装
-// 1. チーム協力分析 - task_membersテーブルを活用した役割分布・協力パターン分析
-// 2. タスク依存関係分析 - parent_task_idを活用した依存関係・クリティカルパス分析
-// 3. クロスプロジェクト協力分析 - プロジェクト間の協力パターン可視化
-
-// TODO: 高度な可視化機能の実装
-// 1. ガントチャート - planned_start/end、actual_start/endを活用したプロジェクトタイムライン可視化
-// 2. カンバンボード分析 - boards/board_columnsテーブルを活用したWIP制限・ボトルネック分析
-// 3. 依存関係グラフ - タスク間の依存関係を視覚的に表示
-
-// TODO: 予測分析・最適化機能の実装
-// 1. プロジェクト完了予測 - 機械学習ベースの完了日予測・リスク要因分析
-// 2. リソース最適化 - AIベースのワークロード最適化・スキルギャップ分析
-// 3. 品質予測 - 過去のデータを基にした品質指標予測
-
-// TODO: パフォーマンス・UX改善の実装
-// 1. パフォーマンス最適化 - 大容量データ処理のためのインデックス・キャッシュ戦略
-// 2. リアルタイム更新機能 - WebSocketを活用したリアルタイムデータ更新
-// 3. モバイル対応 - レスポンシブチャート・タッチインターフェース対応
-// 4. エクスポート機能拡張 - PDF、Excel、PowerBI連携などの多様なエクスポート形式
 
 // レポート状態は composable に集約
 const {
@@ -79,6 +49,8 @@ const {
   loadDependencyGraphData,
   loadAdvancedVisualizationData,
 } = useReportPage();
+
+const { showError, showSuccess } = useMessage();
 
 // フィルター候補は composable 初期化時に読み込み済み
 
@@ -139,7 +111,7 @@ const exportToCSV = () => {
 // Excelエクスポート
 const handleExportToExcel = async () => {
   if (!reportData.value) {
-    alert("レポートデータがありません");
+    showError("レポートデータがありません");
     return;
   }
 
@@ -147,17 +119,17 @@ const handleExportToExcel = async () => {
     await exportToExcel(reportData.value, {
       filename: `report_${new Date().toISOString().split("T")[0]}.xlsx`
     });
-    alert("Excelエクスポート完了");
+    showSuccess("Excelエクスポートが完了しました");
   } catch (error) {
     console.error("Excelエクスポート失敗:", error);
-    alert("Excelエクスポートに失敗しました");
+    showError("Excelエクスポートに失敗しました");
   }
 };
 
 // PDFエクスポート
 const handleExportToPdf = async () => {
   if (!reportData.value) {
-    alert("レポートデータがありません");
+    showError("レポートデータがありません");
     return;
   }
 
@@ -168,10 +140,10 @@ const handleExportToPdf = async () => {
       includeTables: true,
       pageOrientation: "landscape"
     });
-    alert("PDFエクスポート完了");
+    showSuccess("PDFエクスポートが完了しました");
   } catch (error) {
     console.error("PDFエクスポート失敗:", error);
-    alert("PDFエクスポートに失敗しました");
+    showError("PDFエクスポートに失敗しました");
   }
 };
 

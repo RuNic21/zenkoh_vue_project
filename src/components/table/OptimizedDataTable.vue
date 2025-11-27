@@ -199,17 +199,20 @@ const handleScroll = (event: Event) => {
 
 // ライフサイクル
 onMounted(() => {
-  // パフォーマンス統計の定期出力
-  const statsInterval = setInterval(() => {
-    const stats = PerformanceMonitor.getAllStats();
-    if (Object.keys(stats).length > 0) {
-      console.log('Performance Stats:', stats);
-    }
-  }, 10000); // 10秒ごと
-  
-  onUnmounted(() => {
-    clearInterval(statsInterval);
-  });
+  // パフォーマンス統計の定期出力（開発モードのみ）
+  // 本番環境ではパフォーマンスオーバーヘッドを避けるため無効化
+  if (isDev) {
+    const statsInterval = setInterval(() => {
+      const stats = PerformanceMonitor.getAllStats();
+      if (Object.keys(stats).length > 0) {
+        console.log('Performance Stats:', stats);
+      }
+    }, 10000); // 10秒ごと
+    
+    onUnmounted(() => {
+      clearInterval(statsInterval);
+    });
+  }
 });
 
 // データ変更時の仮想スクロール更新

@@ -1,12 +1,10 @@
 <script setup lang="ts">
 // 会員登録ページ: 新規ユーザー登録フォーム
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import router from "@/router";
 import { useAuth } from "@/composables/useAuth";
 import { useMessage } from "@/composables/useMessage";
 import type { SignUpCredentials } from "@/types/auth";
-
-const router = useRouter();
 const { signUp, isLoading, error, clearError } = useAuth();
 const { showSuccess, showError } = useMessage();
 

@@ -1,14 +1,15 @@
 <script setup lang="ts">
 // プロジェクト詳細ページ: 個別プロジェクトの詳細表示・編集機能
 import { ref, computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
+import router from "@/router";
 import { useScheduleStore } from "../store/schedule";
 import { useProjectDetail } from "@/composables/useProjectDetail";
+import { useMessage } from "@/composables/useMessage";
 import { DEFAULT_PAGE_SIZE } from "@/constants/pagination";
 
 // 共通コンポーネントのインポート
 import PageHeader from "../components/common/PageHeader.vue";
-import ActionBar from "../components/common/ActionBar.vue";
 import StatusBadge from "../components/common/StatusBadge.vue";
 import PriorityBadge from "../components/common/PriorityBadge.vue";
 import LoadingSpinner from "../components/common/LoadingSpinner.vue";
@@ -28,7 +29,6 @@ import type { Task } from "@/types/task";
 
 // Router
 const route = useRoute();
-const router = useRouter();
 
 // プロジェクト詳細の状態・ロジックは composable から取得
 // useProjectDetail から状態や操作関数を取得
@@ -105,13 +105,13 @@ const handleAddProjectMember = async () => {
     if (ok) {
       await loadProjectMembers();
       memberForm.value = { user_id: 0, role: "CONTRIBUTOR" };
-      alert("メンバーを追加しました");
+      showSuccess("メンバーを追加しました");
     } else {
-      alert("メンバーの追加に失敗しました");
+      showError("メンバーの追加に失敗しました");
     }
   } catch (e) {
     console.error("メンバー追加エラー:", e);
-    alert("メンバー追加中にエラーが発生しました");
+    showError("メンバー追加中にエラーが発生しました");
   }
 };
 
@@ -123,13 +123,13 @@ const handleUpdateProjectMemberRole = async (userId: number, newRole: "OWNER"|"C
     const ok = await updateProjectMemberRole(pid, userId, newRole);
     if (ok) {
       await loadProjectMembers();
-      alert("役割を更新しました");
+      showSuccess("役割を更新しました");
     } else {
-      alert("役割の更新に失敗しました");
+      showError("役割の更新に失敗しました");
     }
   } catch (e) {
     console.error("役割更新エラー:", e);
-    alert("役割更新中にエラーが発生しました");
+    showError("役割更新中にエラーが発生しました");
   }
 };
 
@@ -138,17 +138,17 @@ const handleRemoveProjectMember = async (userId: number) => {
   try {
     const pid = Number(route.params.id);
     if (!pid) return;
-    if (!confirm("このメンバーを削除しますか？")) return;
+    if (!window.confirm("このメンバーを削除しますか？")) return;
     const ok = await removeProjectMember(pid, userId);
     if (ok) {
       await loadProjectMembers();
-      alert("メンバーを削除しました");
+      showSuccess("メンバーを削除しました");
     } else {
-      alert("メンバーの削除に失敗しました");
+      showError("メンバーの削除に失敗しました");
     }
   } catch (e) {
     console.error("メンバー削除エラー:", e);
-    alert("削除中にエラーが発生しました");
+    showError("削除中にエラーが発生しました");
   }
 };
 
@@ -163,6 +163,7 @@ const availableUsers = computed(() => {
 
 // 共有ストアから選択中プロジェクトを取得
 const store = useScheduleStore();
+const { showSuccess, showError } = useMessage();
 
 // タスクテーブルのページネーション・ソート状態
 const taskCurrentPage = ref(1);

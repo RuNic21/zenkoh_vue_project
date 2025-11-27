@@ -94,6 +94,7 @@ npm run test:tasks             # タスクテスト
 
 # データ管理
 npm run seed:all               # 全体シードデータ
+npm run demo:reset             # 実演用データをリセット＆投入
 npm run seed:projects          # プロジェクトシード
 npm run seed:tasks             # タスクシード
 npm run export:csv             # CSVエクスポート

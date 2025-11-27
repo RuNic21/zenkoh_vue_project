@@ -22,6 +22,7 @@
     "test:crud": "node scripts/test-crud.mjs",
     "test:crud:all": "node scripts/test-crud-all.mjs",
     "seed:all": "node scripts/seed-all.mjs",
+    "demo:reset": "node scripts/reset-demo-data.mjs",
     "debug:count": "node scripts/debug-count.mjs",
     "probe:alert": "node scripts/probe-alert-rule-type.mjs",
     "probe:task:priority": "node scripts/probe-task-priority.mjs",

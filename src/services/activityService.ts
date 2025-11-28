@@ -1,32 +1,6 @@
 // 活動フィード用サービス（notifications テーブル連携）
 // 目的: プロジェクト・タスクの活動履歴を notifications テーブルから取得し、UI表示用に変換
 
-// TODO: DB連携されていない機能のサービス実装が必要
-// 1. コメント活動ログ
-//    - コメント追加/削除/編集時の活動ログ生成実装が必要
-//    - コメント関連通知システム実装が必要
-//
-// 2. 添付ファイル活動ログ
-//    - ファイルアップロード/ダウンロード/削除時の活動ログ生成実装が必要
-//    - ファイル関連通知システム実装が必要
-//
-// 3. タグ活動ログ
-//    - タグ追加/削除時の活動ログ生成実装が必要
-//    - タグ関連通知システム実装が必要
-//
-// 4. メモ/ノート活動ログ
-//    - メモ編集時の活動ログ生成実装が必要
-//    - メモ関連通知システム実装が必要
-//
-// 5. ユーザー活動追跡
-//    - ユーザー別活動履歴管理実装が必要
-//    - ユーザー活動統計生成実装が必要
-//
-// 6. リアルタイム通知システム
-//    - WebSocketベースリアルタイム通知実装が必要
-//    - 通知設定管理システム実装が必要
-//    - 通知既読/未読状態管理実装が必要
-
 import { supabase } from "./supabaseClient";
 import { listUsers } from "./dbServices";
 import type { Notifications } from "../types/db/notifications";
@@ -47,9 +21,17 @@ export interface ActivityLog {
 }
 
 // Notifications テーブルに projects と tasks の関連情報を含む型
-interface NotificationWithRelations extends Notifications {
-  projects?: { name: string };
-  tasks?: { task_name: string };
+// Supabase の select クエリ結果に合わせて定義
+// 注意: Supabase の join 結果は配列または単一オブジェクトの可能性があるため、型を柔軟に定義
+interface NotificationWithRelations {
+  id: number;
+  project_id: number | null;
+  task_id: number | null;
+  subject: string;
+  body_text: string;
+  created_at: string;
+  projects?: { name: string } | { name: string }[] | null;
+  tasks?: { task_name: string } | { task_name: string }[] | null;
 }
 
 // notifications テーブルから活動データを取得
@@ -77,9 +59,22 @@ export async function fetchRecentActivities(limit: number = 10): Promise<Service
       }
 
       // notifications を ActivityLog に変換
-      const activities: ActivityLog[] = (notifications || []).map(notification => {
+      const activities: ActivityLog[] = (notifications || []).map((notification: any) => {
+        // Supabase の join 結果からプロジェクト名とタスク名を取得
+        // projects と tasks は配列または単一オブジェクトの可能性がある
+        const projectName = Array.isArray(notification.projects) 
+          ? notification.projects[0]?.name 
+          : notification.projects?.name;
+        const taskName = Array.isArray(notification.tasks)
+          ? notification.tasks[0]?.task_name
+          : notification.tasks?.task_name;
+        
         const activityType = determineActivityType(notification.subject, notification.body_text);
-        const description = generateActivityDescription(activityType, notification);
+        const description = generateActivityDescription(activityType, {
+          ...notification,
+          projects: projectName ? { name: projectName } : null,
+          tasks: taskName ? { task_name: taskName } : null
+        } as NotificationWithRelations);
         
         return {
           id: notification.id,
@@ -87,12 +82,12 @@ export async function fetchRecentActivities(limit: number = 10): Promise<Service
           description: description,
           user: extractUserFromNotification(notification.body_text),
           timestamp: new Date(notification.created_at),
-          projectId: notification.project_id,
-          taskId: notification.task_id,
-          projectName: notification.projects?.name,
-          taskName: notification.tasks?.task_name
+          projectId: notification.project_id ?? undefined,
+          taskId: notification.task_id ?? undefined,
+          projectName: projectName,
+          taskName: taskName
         };
-      }) as ActivityLog[];
+      });
 
       return activities;
     },
@@ -130,8 +125,13 @@ function determineActivityType(subject: string, bodyText: string): ActivityLog['
 
 // 活動タイプに基づいて説明文を生成
 function generateActivityDescription(type: ActivityLog['type'], notification: NotificationWithRelations): string {
-  const projectName = notification.projects?.name || 'プロジェクト';
-  const taskName = notification.tasks?.task_name || 'タスク';
+  // projects と tasks が配列または単一オブジェクトの可能性があるため、安全に取得
+  const projectName = Array.isArray(notification.projects)
+    ? notification.projects[0]?.name
+    : notification.projects?.name || 'プロジェクト';
+  const taskName = Array.isArray(notification.tasks)
+    ? notification.tasks[0]?.task_name
+    : notification.tasks?.task_name || 'タスク';
 
   switch (type) {
     case 'project_created':

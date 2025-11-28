@@ -1,7 +1,9 @@
 // Vue Router 設定ファイル
 // 目的: アプリケーション全体のルーティングを管理
 
-import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router";
+/// <reference types="vue-router" />
+import { createRouter, createWebHistory } from "vue-router";
+import type { RouteRecordRaw } from "vue-router";
 import { getAuthStateSnapshot, initializeAuthSystem } from "@/composables/useAuth";
 
 // ページコンポーネントをインポート（Lazy Loading対応）
@@ -12,7 +14,6 @@ const ProjectManagement = () => import("@/pages/ProjectManagement.vue");
 const ProjectDetail = () => import("@/pages/ProjectDetail.vue");
 const TeamManagement = () => import("@/pages/TeamManagement.vue");
 const ReportPage = () => import("@/pages/ReportPage.vue");
-const NotificationTestPage = () => import("@/pages/NotificationTestPage.vue");
 // 認証ページ
 const LoginPage = () => import("@/pages/LoginPage.vue");
 const SignUpPage = () => import("@/pages/SignUpPage.vue");
@@ -102,15 +103,6 @@ const routes: RouteRecordRaw[] = [
     component: ReportPage,
     meta: {
       title: "レポート",
-      requiresAuth: true,
-    },
-  },
-  {
-    path: "/notification-test",
-    name: "notification-test",
-    component: NotificationTestPage,
-    meta: {
-      title: "通知テスト",
       requiresAuth: true,
     },
   },

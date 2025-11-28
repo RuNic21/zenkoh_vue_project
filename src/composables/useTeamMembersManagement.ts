@@ -1,9 +1,10 @@
 import { ref, onMounted } from "vue";
-import type { TeamMemberWithUser, TeamRole } from "@/types/team";
+import type { TeamMemberWithUser, TeamRole, TeamMemberInsert, TeamMemberUpdate } from "@/types/team";
 import { listTeamMembersWithUsers, addTeamMember, updateTeamMemberRole, removeTeamMember, searchUsers } from "@/services/teamService";
 
 // チームメンバー管理の状態とロジックを集約
-export function useTeamMembersManagement(projectId?: number) {
+// 注意: 現在のスキーマでは task_members テーブルを使用するため、taskId が必要です
+export function useTeamMembersManagement(taskId?: number) {
   const members = ref<TeamMemberWithUser[]>([]);
   const isLoading = ref(false);
   const errorMessage = ref("");
@@ -15,7 +16,7 @@ export function useTeamMembersManagement(projectId?: number) {
     try {
       isLoading.value = true;
       errorMessage.value = "";
-      const res = await listTeamMembersWithUsers(projectId);
+      const res = await listTeamMembersWithUsers(taskId);
       if (res.success && res.data) {
         members.value = res.data as TeamMemberWithUser[];
       } else {
@@ -32,32 +33,56 @@ export function useTeamMembersManagement(projectId?: number) {
   };
 
   const addMember = async (userId: number, role: TeamRole) => {
+    if (!taskId) {
+      throw new Error("タスクIDが指定されていません");
+    }
     try {
-      const res = await addTeamMember({ projectId, userId, role });
-      if (res.success) await loadMembers();
-      else throw new Error(res.error || "メンバー追加に失敗しました");
+      const payload: TeamMemberInsert = {
+        user_id: userId,
+        task_id: taskId,
+        role: role
+      };
+      const res = await addTeamMember(payload);
+      if (res) {
+        await loadMembers();
+      } else {
+        throw new Error("メンバー追加に失敗しました");
+      }
     } catch (e) {
       console.error(e);
       throw e;
     }
   };
 
-  const changeRole = async (memberId: string, role: TeamRole) => {
+  const changeRole = async (userId: number, role: TeamRole) => {
+    if (!taskId) {
+      throw new Error("タスクIDが指定されていません");
+    }
     try {
-      const res = await updateTeamMemberRole(memberId, role);
-      if (res.success) await loadMembers();
-      else throw new Error(res.error || "役割変更に失敗しました");
+      const payload: TeamMemberUpdate = { role: role };
+      const res = await updateTeamMemberRole(userId, taskId, payload);
+      if (res) {
+        await loadMembers();
+      } else {
+        throw new Error("役割変更に失敗しました");
+      }
     } catch (e) {
       console.error(e);
       throw e;
     }
   };
 
-  const removeMember = async (memberId: string) => {
+  const removeMember = async (userId: number) => {
+    if (!taskId) {
+      throw new Error("タスクIDが指定されていません");
+    }
     try {
-      const res = await removeTeamMember(memberId);
-      if (res.success) await loadMembers();
-      else throw new Error(res.error || "メンバー削除に失敗しました");
+      const success = await removeTeamMember(userId, taskId);
+      if (success) {
+        await loadMembers();
+      } else {
+        throw new Error("メンバー削除に失敗しました");
+      }
     } catch (e) {
       console.error(e);
       throw e;
@@ -67,8 +92,11 @@ export function useTeamMembersManagement(projectId?: number) {
   const searchCandidateUsers = async (query: string) => {
     try {
       isSearching.value = true;
-      const res = await searchUsers(query);
-      candidateUsers.value = res.success && res.data ? res.data : [];
+      const users = await searchUsers(query);
+      candidateUsers.value = users.map(user => ({
+        id: user.id,
+        display_name: user.display_name || user.email || ""
+      }));
     } catch (e) {
       console.error("ユーザー検索に失敗:", e);
       candidateUsers.value = [];

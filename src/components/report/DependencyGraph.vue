@@ -29,7 +29,12 @@ const selectedNode = ref<any>(null);
 const networkOptions: Options = {
   nodes: {
     shape: "box",
-    margin: 10,
+    margin: {
+      top: 10,
+      right: 10,
+      bottom: 10,
+      left: 10
+    },
     widthConstraint: {
       maximum: 200
     },
@@ -48,6 +53,7 @@ const networkOptions: Options = {
       }
     },
     smooth: {
+      enabled: true,
       type: "cubicBezier",
       forceDirection: "horizontal",
       roundness: 0.4
@@ -109,7 +115,7 @@ const initializeGraph = () => {
         shape: node.nodeType === "project" ? "ellipse" : "box",
         size: node.nodeType === "project" ? 30 : undefined,
         font: node.nodeType === "project" 
-          ? { size: 16, bold: true }
+          ? { size: 16, bold: "bold" as const }
           : { size: 14 }
       })),
       edges: props.graphData.edges.map((edge) => ({
@@ -161,36 +167,44 @@ const initializeGraph = () => {
 const highlightCriticalPath = (criticalPath: string[]) => {
   if (!network.value) return;
 
-  criticalPath.forEach((nodeId) => {
-    network.value?.body.data.nodes.update({
-      id: nodeId,
-      borderWidth: 4,
-      borderWidthSelected: 4,
-      color: {
-        border: "#dc3545", // 赤枠
-        highlight: {
-          border: "#dc3545"
+  // vis-networkの内部APIを使用するため、型アサーションが必要
+  const networkInstance = network.value as any;
+  if (networkInstance.body?.data?.nodes?.update) {
+    criticalPath.forEach((nodeId) => {
+      networkInstance.body.data.nodes.update({
+        id: nodeId,
+        borderWidth: 4,
+        borderWidthSelected: 4,
+        color: {
+          border: "#dc3545", // 赤枠
+          highlight: {
+            border: "#dc3545"
+          }
         }
-      }
+      });
     });
-  });
+  }
 };
 
 // 循環依存強調
 const highlightCircularDependencies = (cycles: string[][]) => {
   if (!network.value) return;
 
-  cycles.forEach((cycle) => {
-    cycle.forEach((nodeId) => {
-      network.value?.body.data.nodes.update({
-        id: nodeId,
-        color: {
-          background: "#fff3cd", // 黄色背景
-          border: "#ffc107"
-        }
+  // vis-networkの内部APIを使用するため、型アサーションが必要
+  const networkInstance = network.value as any;
+  if (networkInstance.body?.data?.nodes?.update) {
+    cycles.forEach((cycle) => {
+      cycle.forEach((nodeId) => {
+        networkInstance.body.data.nodes.update({
+          id: nodeId,
+          color: {
+            background: "#fff3cd", // 黄色背景
+            border: "#ffc107"
+          }
+        });
       });
     });
-  });
+  }
 };
 
 // レイアウト変更
@@ -219,7 +233,7 @@ const changeLayout = (layoutType: "hierarchical" | "force") => {
         shape: node.nodeType === "project" ? "ellipse" : "box",
         size: node.nodeType === "project" ? 30 : undefined,
         font: node.nodeType === "project" 
-          ? { size: 16, bold: true }
+          ? { size: 16, bold: "bold" as const }
           : { size: 14 }
       })),
       edges: props.graphData.edges.map((edge) => ({

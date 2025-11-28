@@ -82,7 +82,7 @@ const createChart = async () => {
   chartInstance.value = new ChartJS(ctx, {
     type: props.type,
     data: props.data,
-    options: getChartOptions()
+    options: getChartOptions() as any // Chart.jsの複雑な型システムを回避するためanyを使用
   });
 };
 

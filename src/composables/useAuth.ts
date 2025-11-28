@@ -2,7 +2,7 @@
 // 目的: アプリケーション全体で認証状態を共有・管理
 
 import { ref, computed } from "vue";
-import { useRouter } from "vue-router";
+import router from "@/router";
 import * as authService from "@/services/authService";
 import type {
   LoginCredentials,
@@ -31,8 +31,6 @@ let authInitializationPromise: Promise<void> | null = null;
  * アプリケーション全体で認証状態を共有
  */
 export function useAuth() {
-  const router = useRouter();
-
   // 計算プロパティ
   const user = computed(() => globalAuthState.value.user);
   const isAuthenticated = computed(() => globalAuthState.value.isAuthenticated);

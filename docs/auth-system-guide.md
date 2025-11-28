@@ -2,7 +2,25 @@
 
 ## 📋 概要
 
-Zenkoh Project Scheduler に Supabase Auth を活用した本格的な認証システムを統合しました。ログイン、会員登録、セッション管理、ルーターガードまで完全実装しています。
+Zenkoh Project Scheduler に Supabase Auth を活用した本格的な認証システムを統合しました。ログイン、会員登録、セッション管理、ルーターガード、users テーブルとの完全統合まで実装済みです。
+
+## ✅ 実装完了内容
+
+### 1. データベーススキーマ
+- ✅ `auth_id` カラム: UUID型、UNIQUE制約付き（Supabase Auth と users テーブルを紐付け）
+- ✅ `role` カラム: ユーザー権限管理（admin, manager, member, viewer）
+
+### 2. コード実装
+- ✅ `mapSupabaseUserToAuthUser`: users テーブルの `avatar_url` と `role` を使用
+- ✅ `updateUserProfile`: users テーブル更新機能実装
+- ✅ `signUp`: 会員登録時に users テーブルにレコード作成（`auth_id` で紐付け）
+- ✅ `login`: ログイン時に users テーブルからプロフィール取得
+- ✅ `getCurrentSession`: セッション取得時にプロフィール取得
+- ✅ `getCurrentUser`: ユーザー情報取得時にプロフィール取得
+
+### 3. 型定義
+- ✅ `Users` インターフェースに `role` フィールド追加
+- ✅ `auth_id` フィールドで Supabase Auth UUID と連携
 
 ## 🎯 実装内容
 
@@ -11,19 +29,19 @@ Zenkoh Project Scheduler に Supabase Auth を活用した本格的な認証シ�
 ```
 src/
 ├── types/
-│   └── auth.ts                    # 認証型定義（新規作成）
+│   └── auth.ts                    # 認証型定義
 ├── services/
-│   └── authService.ts             # Supabase Auth サービス（新規作成）
+│   └── authService.ts             # Supabase Auth サービス
 ├── composables/
-│   └── useAuth.ts                 # 認証状態管理 Composable（新規作成）
+│   └── useAuth.ts                 # 認証状態管理 Composable
 ├── pages/
-│   ├── LoginPage.vue              # ログインページ（新規作成）
-│   └── SignUpPage.vue             # 会員登録ページ（新規作成）
+│   ├── LoginPage.vue              # ログインページ
+│   └── SignUpPage.vue             # 会員登録ページ
 ├── components/common/
-│   └── NavigationBar.vue          # ユーザーメニュー追加（更新）
+│   └── NavigationBar.vue          # ユーザーメニュー
 ├── router/
-│   └── index.ts                   # 認証ガード追加（更新）
-└── main.js                        # 認証システム初期化（更新）
+│   └── index.ts                   # 認証ガード
+└── main.js                        # 認証システム初期化
 ```
 
 ### 2. 主要機能
@@ -161,6 +179,52 @@ export interface SignUpCredentials {
 }
 ```
 
+## 📋 マイグレーション実行手順
+
+### Step 1: データベースマイグレーション実行
+
+Supabase ダッシュボードの SQL Editor で以下を実行:
+
+```sql
+-- 1. auth_id カラムの確認（既に存在する場合はスキップ）
+ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_id UUID UNIQUE;
+CREATE INDEX IF NOT EXISTS idx_users_auth_id ON users(auth_id);
+
+-- 2. role カラムの追加
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'member' CHECK (role IN ('admin', 'manager', 'member', 'viewer'));
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+
+-- 3. 既存ユーザーにデフォルト権限を設定
+UPDATE users SET role = 'member' WHERE role IS NULL;
+```
+
+または、マイグレーションスクリプトを実行:
+
+```bash
+# Supabase CLI を使用する場合
+supabase db push
+
+# または、SQL Editor で直接実行
+# scripts/migrations/2025-01-XX_add_auth_id_to_users.sql
+# scripts/migrations/2025-01-XX_add_role_to_users.sql
+```
+
+### Step 2: 型定義の再生成（オプション）
+
+データベーススキーマ変更後、型定義を再生成:
+
+```bash
+npm run types:gen
+```
+
+**注意**: `src/types/db/users.ts` は既に `role` フィールドを手動で追加済みです。再生成すると上書きされる可能性があるため、必要に応じて手動で調整してください。
+
+### Step 3: スキーマ確認
+
+```bash
+npm run check:schema
+```
+
 ## 🚀 使用方法
 
 ### ログイン処理
@@ -256,6 +320,43 @@ const { hasRole } = useAuth();
 </script>
 ```
 
+### ユーザープロフィール更新
+
+```typescript
+import { updateUserProfile } from "@/services/authService";
+import { useAuth } from "@/composables/useAuth";
+
+const { user } = useAuth();
+
+// プロフィール更新
+await updateUserProfile(user.value!.id, {
+  display_name: "新しい表示名",
+  first_name: "太郎",
+  last_name: "山田",
+  department: "開発部",
+  position: "エンジニア",
+  role: "manager", // 権限変更
+  avatar_url: "https://example.com/avatar.jpg",
+});
+```
+
+## 📊 データフロー
+
+### 会員登録フロー
+1. Supabase Auth で会員登録 → UUID 生成
+2. `users` テーブルにレコード作成（`auth_id` = UUID）
+3. プロフィール情報を返す
+
+### ログインフロー
+1. Supabase Auth でログイン → UUID 取得
+2. `users` テーブルから `auth_id` で検索
+3. プロフィール情報を取得して返す
+
+### プロフィール更新フロー
+1. `auth_id` で `users` テーブルのレコードを検索
+2. 指定されたフィールドを更新
+3. 更新後のレコードを返す
+
 ## 🔐 セキュリティ機能
 
 ### 1. パスワード検証
@@ -302,28 +403,6 @@ const { hasRole } = useAuth();
 - ログアウトボタン
 - プロフィール・設定へのリンク（準備中）
 
-## 🔄 データフロー
-
-```
-1. ユーザーがログインフォームに入力
-   ↓
-2. LoginPage → useAuth.login()
-   ↓
-3. authService.login() → Supabase Auth
-   ↓
-4. Supabase Auth が認証
-   ↓
-5. セッション情報 + ユーザー情報を取得
-   ↓
-6. usersテーブルからプロフィール取得
-   ↓
-7. グローバル認証状態を更新
-   ↓
-8. ルーターガードが認証状態を確認
-   ↓
-9. ダッシュボードページへリダイレクト
-```
-
 ## 🛠️ Supabase 設定
 
 ### 認証プロバイダー
@@ -350,20 +429,105 @@ Supabase ダッシュボードで以下を設定:
 ```sql
 CREATE TABLE users (
   id BIGINT PRIMARY KEY,
+  auth_id UUID UNIQUE,              -- Supabase Auth UUID（認証統合用）
   email TEXT NOT NULL UNIQUE,
   display_name TEXT NOT NULL,
   password_hash TEXT NOT NULL,
+  role TEXT DEFAULT 'member' CHECK (role IN ('admin', 'manager', 'member', 'viewer')),
+  avatar_url TEXT,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL
 );
 ```
 
-**TODO**: 将来追加するフィールド
-- `avatar_url TEXT` - プロフィール画像URL
-- `role TEXT` - ユーザー権限（admin/manager/member/viewer）
-- `last_login_at TIMESTAMPTZ` - 最終ログイン日時
-- `email_verified_at TIMESTAMPTZ` - メール確認日時
+## 🔍 確認事項
+
+### 動作確認チェックリスト
+
+- [ ] マイグレーション実行済み
+- [ ] 会員登録時に users テーブルにレコードが作成される
+- [ ] ログイン時に users テーブルからプロフィールが取得される
+- [ ] `avatar_url` が正しく表示される
+- [ ] `role` が正しく取得される
+- [ ] `updateUserProfile` でプロフィール更新ができる
+- [ ] 権限チェック（`hasRole`）が正しく動作する
+
+## 📝 テスト手順
+
+1. **会員登録テスト**
+```bash
+# ブラウザで /signup にアクセス
+# メール・パスワード・表示名を入力
+# → ダッシュボードへ自動ログイン
+```
+
+2. **ログインテスト**
+```bash
+# ログアウト後、/login にアクセス
+# 登録したメール・パスワードを入力
+# → ダッシュボードへリダイレクト
+```
+
+3. **認証ガードテスト**
+```bash
+# ログアウト状態で / にアクセス
+# → /login?redirect=/ へリダイレクト
+# ログイン後、元のページ（/）へ戻る
+```
+
+4. **セッション永続化テスト**
+```bash
+# ログイン後、ページリフレッシュ
+# → ログイン状態が維持される
+```
+
+5. **ログアウトテスト**
+```bash
+# ナビゲーションバーのユーザーメニューからログアウト
+# → ログインページへリダイレクト
+```
+
+## ⚠️ 注意事項
+
+### 1. 環境変数
+
+`.env.local` に Supabase 認証設定が必要:
+
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### 2. users テーブルとの同期
+
+- Supabase Auth のユーザーID（UUID）と users テーブルの `auth_id` で紐付け
+- 会員登録時に users テーブルへレコード自動作成
+- `password_hash` は空文字（Supabase Auth で管理）
+
+### 3. セッション有効期限
+
+- デフォルト: 1時間
+- リフレッシュトークンで自動更新
+- 長期間ログイン維持は「Remember Me」機能で対応
+
+### 4. エラーハンドリング
+
+- すべての認証操作は `AuthResult<T>` 型で統一
+- エラーメッセージは日本語化
+- ユーザーフレンドリーなエラー表示
+
+### 5. 既存ユーザー
+
+既存の users テーブルレコードには `auth_id` が NULL の可能性があります。必要に応じて手動で紐付けを行ってください。
+
+### 6. 型定義の再生成
+
+`npm run types:gen` を実行すると、手動で追加した `role` フィールドが上書きされる可能性があります。再生成後は必要に応じて手動で調整してください。
+
+### 7. 権限管理
+
+`role` フィールドは `admin`, `manager`, `member`, `viewer` のみ許可されています。データベース制約でチェックされています。
 
 ## 🔮 将来の拡張
 
@@ -422,69 +586,14 @@ export async function searchUsers(query: string): Promise<AuthResult<AuthUser[]>
 }
 ```
 
-## ⚠️ 注意事項
+## 📚 関連ファイル
 
-### 1. 環境変数
-
-`.env.local` に Supabase 認証設定が必要:
-
-```env
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-### 2. users テーブルとの同期
-
-- Supabase Auth のユーザーIDと users テーブルの id は同期
-- 会員登録時に users テーブルへレコード作成
-- password_hash は空文字（Supabase Auth で管理）
-
-### 3. セッション有効期限
-
-- デフォルト: 1時間
-- リフレッシュトークンで自動更新
-- 長期間ログイン維持は「Remember Me」機能で対応
-
-### 4. エラーハンドリング
-
-- すべての認証操作は `AuthResult<T>` 型で統一
-- エラーメッセージは日本語化
-- ユーザーフレンドリーなエラー表示
-
-## 📝 テスト手順
-
-1. **会員登録テスト**
-```bash
-# ブラウザで /signup にアクセス
-# メール・パスワード・表示名を入力
-# → ダッシュボードへ自動ログイン
-```
-
-2. **ログインテスト**
-```bash
-# ログアウト後、/login にアクセス
-# 登録したメール・パスワードを入力
-# → ダッシュボードへリダイレクト
-```
-
-3. **認証ガードテスト**
-```bash
-# ログアウト状態で / にアクセス
-# → /login?redirect=/ へリダイレクト
-# ログイン後、元のページ（/）へ戻る
-```
-
-4. **セッション永続化テスト**
-```bash
-# ログイン後、ページリフレッシュ
-# → ログイン状態が維持される
-```
-
-5. **ログアウトテスト**
-```bash
-# ナビゲーションバーのユーザーメニューからログアウト
-# → ログインページへリダイレクト
-```
+- `src/services/authService.ts` - 認証サービス実装
+- `src/types/db/users.ts` - users テーブル型定義
+- `src/types/auth.ts` - 認証関連型定義
+- `src/composables/useAuth.ts` - 認証 Composable
+- `scripts/migrations/2025-01-XX_add_auth_id_to_users.sql` - auth_id カラム追加
+- `scripts/migrations/2025-01-XX_add_role_to_users.sql` - role カラム追加
 
 ## 🎉 まとめ
 
@@ -494,7 +603,14 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 2. **ユーザー管理**: 会員登録、ログイン、プロフィール管理
 3. **セッション管理**: 安全で永続的なセッション
 4. **ルーターガード**: 未認証アクセスの自動ブロック
-5. **将来の拡張性**: ソーシャルログイン、2FA等への対応準備
+5. **users テーブル統合**: Supabase Auth と完全連携
+6. **権限管理**: ロールベースのアクセス制御
+7. **将来の拡張性**: ソーシャルログイン、2FA等への対応準備
 
 これにより、エンタープライズ級のアプリケーションとしての基盤がさらに強化されました。
+
+---
+
+**最終更新**: 2025-01-XX  
+**ステータス**: ✅ 実装完了・統合完了
 

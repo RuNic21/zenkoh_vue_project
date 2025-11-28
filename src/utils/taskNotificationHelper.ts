@@ -76,8 +76,8 @@ export async function updateTaskWithNotification(
     
     // 割り当て先が変更された場合は通知を送信
     if (
-      payload.assignee_user_id !== undefined && 
-      payload.assignee_user_id !== previousAssignee &&
+      payload.primary_assignee_id !== undefined && 
+      payload.primary_assignee_id !== previousAssignee &&
       newAssigneeName && 
       newAssigneeEmail && 
       task.project_id

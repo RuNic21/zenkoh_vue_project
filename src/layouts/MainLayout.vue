@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // メインレイアウトコンポーネント: プロジェクト管理スケジューラーの基本レイアウト
-import { ref } from "vue";
-import { useRoute } from "vue-router";
+import { ref, computed } from "vue";
+import router from "@/router";
 
 // ルート情報を取得
-const route = useRoute();
+const route = computed(() => router.currentRoute.value);
 
 // NavigationItem インターフェース定義
 interface NavigationItem {
@@ -58,7 +58,7 @@ const toggleSidebar = () => {
 
 // アクティブかどうかを判定
 const isActive = (routeName: string): boolean => {
-  return route.name === routeName;
+  return route.value.name === routeName;
 };
 </script>
 

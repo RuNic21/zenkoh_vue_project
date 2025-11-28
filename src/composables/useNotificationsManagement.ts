@@ -7,8 +7,14 @@ import {
   updateAlertRule,
   deleteAlertRule,
 } from "@/services/notificationService";
-import type { NotificationInsert, NotificationUpdate, Notifications } from "@/types/db/notifications";
-import type { AlertRuleInsert, AlertRuleUpdate, AlertRules } from "@/types/db/alert_rules";
+import type { 
+  Notification, 
+  NotificationInsert, 
+  NotificationUpdate,
+  AlertRule,
+  AlertRuleInsert,
+  AlertRuleUpdate
+} from "@/types/notification";
 import { ERROR_MESSAGES } from "@/constants/messages";
 
 // 通知/アラートルールの編集操作のみを提供する軽量 composable
@@ -19,12 +25,12 @@ export function useNotificationsManagement() {
    * @returns 作成された通知データ
    * @throws エラーが発生した場合
    */
-  const createNotificationAction = async (payload: NotificationInsert): Promise<Notifications> => {
+  const createNotificationAction = async (payload: NotificationInsert): Promise<Notification> => {
     const res = await createNotification(payload);
-    if (!res) {
-      throw new Error(ERROR_MESSAGES.NOTIFICATION_CREATE_FAILED);
+    if (!res.success || !res.data) {
+      throw new Error(res.error || ERROR_MESSAGES.NOTIFICATION_CREATE_FAILED);
     }
-    return res;
+    return res.data;
   };
 
   /**
@@ -34,7 +40,7 @@ export function useNotificationsManagement() {
    * @returns 更新された通知データ
    * @throws エラーが発生した場合
    */
-  const updateNotificationAction = async (id: number, payload: NotificationUpdate): Promise<Notifications> => {
+  const updateNotificationAction = async (id: number, payload: NotificationUpdate): Promise<Notification> => {
     const res = await updateNotification(id, payload);
     if (!res) {
       throw new Error(ERROR_MESSAGES.NOTIFICATION_UPDATE_FAILED);
@@ -72,7 +78,7 @@ export function useNotificationsManagement() {
    * @returns 作成されたアラートルールデータ
    * @throws エラーが発生した場合
    */
-  const createAlertRuleAction = async (payload: AlertRuleInsert): Promise<AlertRules> => {
+  const createAlertRuleAction = async (payload: AlertRuleInsert): Promise<AlertRule> => {
     const res = await createAlertRule(payload);
     if (!res) {
       throw new Error(ERROR_MESSAGES.ALERT_RULE_CREATE_FAILED);
@@ -87,7 +93,7 @@ export function useNotificationsManagement() {
    * @returns 更新されたアラートルールデータ
    * @throws エラーが発生した場合
    */
-  const updateAlertRuleAction = async (id: number, payload: AlertRuleUpdate): Promise<AlertRules> => {
+  const updateAlertRuleAction = async (id: number, payload: AlertRuleUpdate): Promise<AlertRule> => {
     const res = await updateAlertRule(id, payload);
     if (!res) {
       throw new Error(ERROR_MESSAGES.ALERT_RULE_UPDATE_FAILED);

@@ -7,7 +7,8 @@ defineOptions({
   name: 'TeamManagement'
 });
 
-import { ref, computed, onMounted, onActivated, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { usePageActivation } from "@/composables/usePageActivation";
 // TODO: プロジェクトメンバー管理機能が実装されたら有効化
 // import { useTeamMembersManagement } from "@/composables/useTeamMembersManagement";
 // TODO: プロジェクト別チーム情報機能（project_members テーブル作成後に有効化）
@@ -652,13 +653,6 @@ const handleEditUser = (user?: User) => {
 //       closeMemberModal();
 //       alert("チームメンバーが正常に追加されました");
 //     } else {
-//       alert("チームメンバーの追加に失敗しました");
-//     }
-//   } catch (error) {
-//     console.error("チームメンバー追加エラー:", error);
-//     alert("チームメンバー追加中にエラーが発生しました");
-//   }
-// };
 
 // プロジェクトメンバー追加
 const handleAddProjectMember = async () => {
@@ -688,11 +682,6 @@ const handleAddProjectMember = async () => {
 //     } else {
 //       alert("チームメンバーの役割更新に失敗しました");
 //     }
-//   } catch (error) {
-//     console.error("チームメンバー役割更新エラー:", error);
-//     alert("チームメンバー役割更新中にエラーが発生しました");
-//   }
-// };
 
 // プロジェクトメンバー役割更新
 const handleUpdateProjectMemberRole = async (projectId: number, userId: number, newRole: TeamRole) => {
@@ -719,14 +708,6 @@ const handleUpdateProjectMemberRole = async (projectId: number, userId: number, 
 //       await loadMembers();
 //       await tmLoadProjectTeams();
 //       alert("チームメンバーが正常に削除されました");
-//     } else {
-//       alert("チームメンバーの削除に失敗しました");
-//     }
-//   } catch (error) {
-//     console.error("チームメンバー削除エラー:", error);
-//     alert("チームメンバー削除中にエラーが発生しました");
-//   }
-// };
 
 // プロジェクトメンバー削除
 const handleRemoveProjectMember = async (projectId: number, userId: number) => {
@@ -1614,7 +1595,6 @@ const handleOpenProfileEvent = async (event: CustomEvent<{ authId: string }>) =>
 
 // 初期化
 onMounted(async () => {
-  console.log("チーム管理ページが初期化されました");
   await Promise.all([
     loadUsers(),
     // プロジェクトチーム情報
@@ -1631,8 +1611,7 @@ onMounted(async () => {
 });
 
 // Keep-Alive: ページが再度アクティブになったときにデータを更新
-onActivated(async () => {
-  console.log("TeamManagement ページが再アクティブ化されました");
+usePageActivation(async () => {
   // 詳細ページから戻ってきたときに最新のデータを表示
   await Promise.all([
     loadUsers(),

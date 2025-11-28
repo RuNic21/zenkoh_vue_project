@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // プロジェクト管理スケジューラー: メインアプリケーションコンポーネント
-import { onMounted, computed } from "vue";
-import { useRoute } from "vue-router";
+import { onMounted, computed, ref } from "vue";
+import router from "./router";
 import { useScheduleStore } from "./store/schedule";
 import MainLayout from "./layouts/MainLayout.vue";
 // 共通コンポーネント
@@ -9,11 +9,18 @@ import NavigationBar from "./components/common/NavigationBar.vue";
 import ToastMessage from "./components/common/ToastMessage.vue";
 import ConfirmDialog from "./components/common/ConfirmDialog.vue";
 
-const route = useRoute();
 const store = useScheduleStore();
 
+// 現在のルート情報を追跡（router-view の slot から取得）
+const currentRoute = ref(router.currentRoute.value);
+
+// ルート変更を監視
+router.afterEach((to) => {
+  currentRoute.value = to;
+});
+
 // 認証が必要なページかどうかを判定
-const requiresAuth = computed(() => route.meta.requiresAuth !== false);
+const requiresAuth = computed(() => currentRoute.value.meta.requiresAuth !== false);
 
 // アプリケーション初期化
 onMounted(async () => {
@@ -34,7 +41,7 @@ onMounted(async () => {
         <div class="main-content position-relative max-height-vh-100 h-100 border-radius-lg">
           
           <!-- ナビゲーションバー -->
-          <NavigationBar :current-page="route.name?.toString() || 'dashboard'" />
+          <NavigationBar :current-page="currentRoute.name?.toString() || 'dashboard'" />
 
           <!-- メインコンテンツエリア -->
           <div class="container-fluid py-4">

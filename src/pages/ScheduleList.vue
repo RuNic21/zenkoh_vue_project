@@ -4,8 +4,9 @@ defineOptions({
   name: 'ScheduleList'
 });
 
-import { ref, computed, onActivated } from "vue";
+import { ref, computed } from "vue";
 import { useScheduleList } from "@/composables/useScheduleList";
+import { usePageActivation } from "@/composables/usePageActivation";
 import { getProgressBarClass } from "../utils/uiHelpers";
 import type { ScheduleItem } from "../types/schedule";
 import type { Project } from "../types/project";
@@ -67,8 +68,7 @@ const handleEmptyStateReset = () => {
 
 // Keep-Alive: ページが再度アクティブになったときにデータを更新
 // 詳細ページから戻ってきたときに最新のデータを表示するため
-onActivated(() => {
-  console.log("ScheduleList ページが再アクティブ化されました");
+usePageActivation(() => {
   // DBから最新のデータを再読み込み
   loadSchedulesFromDb();
 });

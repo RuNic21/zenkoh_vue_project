@@ -7,8 +7,8 @@ defineOptions({
 });
 
 // using useProjectManagement composable; no local refs required
-import { onActivated } from "vue";
 import { useProjectManagement } from "@/composables/useProjectManagement";
+import { usePageActivation } from "@/composables/usePageActivation";
 import router from "@/router";
 import OptimizedDataTable from "../components/table/OptimizedDataTable.vue";
 import ProjectFilterPanel from "../components/project/ProjectFilterPanel.vue";
@@ -74,8 +74,7 @@ const handleProjectRowClick = (row: any) => {
 };
 
 // Keep-Alive: ページが再度アクティブになったときにデータを更新
-onActivated(() => {
-  console.log("ProjectManagement ページが再アクティブ化されました");
+usePageActivation(() => {
   // 詳細ページから戻ってきたときに最新のデータを表示
   loadProjects();
 });
@@ -193,14 +192,14 @@ onActivated(() => {
                       <div 
                         class="progress-bar" 
                         :class="{
-                          'bg-success': value >= 75,
-                          'bg-info': value >= 50 && value < 75,
-                          'bg-warning': value >= 25 && value < 50,
-                          'bg-danger': value < 25
+                          'bg-success': (value as number) >= 75,
+                          'bg-info': (value as number) >= 50 && (value as number) < 75,
+                          'bg-warning': (value as number) >= 25 && (value as number) < 50,
+                          'bg-danger': (value as number) < 25
                         }"
-                        :style="{ width: value + '%' }"
+                        :style="{ width: (value as number) + '%' }"
                         role="progressbar"
-                        :aria-valuenow="value"
+                        :aria-valuenow="value as number"
                         aria-valuemin="0"
                         aria-valuemax="100"
                       ></div>
@@ -213,9 +212,9 @@ onActivated(() => {
                 <template #cell-taskSummary="{ value, item }">
                   <div class="d-flex align-items-center gap-1">
                     <span class="badge badge-sm" :class="{
-                      'bg-gradient-success': item.completedTasks === item.totalTasks && item.totalTasks > 0,
-                      'bg-gradient-info': item.completedTasks < item.totalTasks && item.totalTasks > 0,
-                      'bg-gradient-secondary': item.totalTasks === 0
+                      'bg-gradient-success': (item as any).completedTasks === (item as any).totalTasks && (item as any).totalTasks > 0,
+                      'bg-gradient-info': (item as any).completedTasks < (item as any).totalTasks && (item as any).totalTasks > 0,
+                      'bg-gradient-secondary': (item as any).totalTasks === 0
                     }">
                       {{ value }}
                     </span>
@@ -225,13 +224,13 @@ onActivated(() => {
                 <!-- 残り日数セル: 緊急度に応じた色分け -->
                 <template #cell-daysRemaining="{ value, item }">
                   <span class="badge badge-sm" :class="{
-                    'bg-gradient-danger': item.daysRemainingStatus === 'overdue',
-                    'bg-gradient-warning': item.daysRemainingStatus === 'warning',
-                    'bg-gradient-success': item.daysRemainingStatus === 'normal',
-                    'bg-gradient-secondary': item.daysRemainingStatus === 'none'
+                    'bg-gradient-danger': (item as any).daysRemainingStatus === 'overdue',
+                    'bg-gradient-warning': (item as any).daysRemainingStatus === 'warning',
+                    'bg-gradient-success': (item as any).daysRemainingStatus === 'normal',
+                    'bg-gradient-secondary': (item as any).daysRemainingStatus === 'none'
                   }">
                     <i class="material-symbols-rounded text-xs me-1" style="font-size: 14px;">
-                      {{ item.daysRemainingStatus === 'overdue' ? 'warning' : 'schedule' }}
+                      {{ (item as any).daysRemainingStatus === 'overdue' ? 'warning' : 'schedule' }}
                     </i>
                     {{ value }}
                   </span>
@@ -239,7 +238,7 @@ onActivated(() => {
 
                 <!-- 状態セル -->
                 <template #cell-status="{ value }">
-                  <StatusBadge :status="value" />
+                  <StatusBadge :status="value as string" />
                 </template>
               </OptimizedDataTable>
 

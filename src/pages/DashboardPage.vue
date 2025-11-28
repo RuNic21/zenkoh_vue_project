@@ -16,6 +16,7 @@ import RecentNotifications from "@/components/dashboard/RecentNotifications.vue"
 import ProjectTasksModal from "@/components/dashboard/ProjectTasksModal.vue";
 import { useDashboard } from "@/composables/useDashboard";
 import { useMessage } from "@/composables/useMessage";
+import { usePageActivation } from "@/composables/usePageActivation";
 import type { ProjectProgressRow, TaskProgressRow } from "@/services/dashboardService";
 import type { ScheduleItem, ScheduleStatus, SchedulePriority } from "@/types/schedule";
 import type { Task } from "@/types/task";
@@ -246,67 +247,36 @@ const loadActivityFeed = async () => {
 
 // アプリケーション初期化
 onMounted(async () => {
-  console.log("ダッシュボードページが起動しました");
   await loadDashboardFromDb();
   await loadRecentTasks();
   await loadActivityFeed();
 });
 
 // Keep-Alive: ページが再度アクティブになったときにデータを更新
-// ただし、タブの visibilitychange イベントと重複しないように、少し遅延させる
-let activationTimeout: number | null = null;
-onActivated(async () => {
-  console.log("Dashboard ページが再アクティブ化されました");
-  
-  // 既存のタイムアウトをクリア
-  if (activationTimeout !== null) {
-    clearTimeout(activationTimeout);
-    activationTimeout = null;
+usePageActivation(async () => {
+  // 詳細ページから戻ってきたときに最新のデータを表示
+  // 各データ読み込みを順次実行（エラーが発生しても続行）
+  // ネットワーク接続が不安定な場合を考慮
+  try {
+    await loadDashboardFromDb();
+  } catch (error) {
+    console.error("ダッシュボードデータの読み込みエラー:", error);
   }
   
-  // タブが表示されている場合のみデータを更新
-  if (document.hidden) {
-    console.log("タブが非表示のため、データの読み込みをスキップします");
-    return;
+  try {
+    await loadRecentTasks();
+  } catch (error) {
+    console.error("タスクデータの読み込みエラー:", error);
   }
   
-  // タブの visibilitychange イベントとの重複を避けるため、少し遅延
-  // ブラウザのネットワーク接続が安定するまで待機
-  activationTimeout = window.setTimeout(async () => {
-    try {
-      // 詳細ページから戻ってきたときに最新のデータを表示
-      // ただし、タブが表示されている場合のみ
-      if (!document.hidden) {
-        console.log("Dashboard データを再読み込みします...");
-        
-        // 各データ読み込みを順次実行（エラーが発生しても続行）
-        // ネットワーク接続が不安定な場合を考慮
-        try {
-          await loadDashboardFromDb();
-        } catch (error) {
-          console.error("ダッシュボードデータの読み込みエラー:", error);
-        }
-        
-        try {
-          await loadRecentTasks();
-        } catch (error) {
-          console.error("タスクデータの読み込みエラー:", error);
-        }
-        
-        try {
-          await loadActivityFeed();
-        } catch (error) {
-          console.error("活動フィードの読み込みエラー:", error);
-        }
-        
-        console.log("Dashboard データの再読み込みが完了しました");
-      }
-    } catch (error) {
-      console.error("Dashboard データの再読み込み中にエラーが発生:", error);
-    } finally {
-      activationTimeout = null;
-    }
-  }, 800); // 800ms待機してネットワーク接続の安定化を待つ
+  try {
+    await loadActivityFeed();
+  } catch (error) {
+    console.error("活動フィードの読み込みエラー:", error);
+  }
+}, {
+  checkVisibility: true,
+  delay: 800
 });
 </script>
 

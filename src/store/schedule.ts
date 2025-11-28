@@ -2,37 +2,6 @@
 // 目的: 一覧/詳細/ダッシュボード間で同一データを共有し、一貫した状態を保つ
 // 新規: Task ベースの DB 連携に変更
 
-// TODO: DB連携されていない機能のストア実装が必要
-// 1. コメント管理ストア
-//    - コメント追加/削除/編集アクション実装が必要
-//    - コメントデータリアルタイム同期実装が必要
-//    - コメント権限管理ロジック実装が必要
-//
-// 2. 添付ファイル管理ストア
-//    - ファイルアップロード/ダウンロード/削除アクション実装が必要
-//    - ファイルメタデータ管理ロジック実装が必要
-//    - ファイルサイズおよびタイプ検証ロジック実装が必要
-//
-// 3. タグ管理ストア
-//    - タグ追加/削除アクション実装が必要
-//    - タグ自動補完データ管理実装が必要
-//    - タグ別フィルタリング状態管理実装が必要
-//
-// 4. メモ/ノート管理ストア
-//    - メモ保存/ロードアクション実装が必要
-//    - メモ履歴管理ロジック実装が必要
-//    - メモバージョン管理システム実装が必要
-//
-// 5. ユーザー認証ストア
-//    - 現在のユーザー情報管理実装が必要
-//    - ユーザー権限チェックロジック実装が必要
-//    - ログイン/ログアウト状態管理実装が必要
-//
-// 6. リアルタイム同期ストア
-//    - WebSocket接続管理実装が必要
-//    - データ変更通知システム実装が必要
-//    - 競合解決ロジック実装が必要
-
 import { ref, computed } from "vue";
 import type { ScheduleItem } from "../types/schedule";
 import { listTasksWithProject, createTask, updateTask, deleteTask, getTaskById, listTasks } from "../services/taskService";
@@ -129,7 +98,6 @@ export const useScheduleStore = () => ({
       const scheduleItems = tasksToScheduleItems(tasksResult.data, users, tasksResult.data);
       
       schedules.value = scheduleItems;
-      console.log("スケジュールデータを DB から読み込みました:", scheduleItems.length, "件");
     } catch (error) {
       console.error("スケジュールデータの読み込みに失敗:", error);
       schedules.value = [];
@@ -195,11 +163,10 @@ export const useScheduleStore = () => ({
                 assigneeInfo.email,
                 projectName
               );
-              console.log("✅ タスク再割り当て通知を送信しました");
             }
           } catch (notificationError) {
             // 通知送信失敗してもタスク更新は成功として扱う
-            console.warn("⚠️ タスク再割り当て通知の送信に失敗:", notificationError);
+            console.warn("タスク再割り当て通知の送信に失敗:", notificationError);
           }
         }
         
@@ -222,7 +189,6 @@ export const useScheduleStore = () => ({
           // ユーザー取得に失敗した場合は、入力値で更新（限定的）
           updateSchedule(item);
         }
-        console.log("スケジュールを保存しました:", item.id);
       } else {
         throw new Error(result.error || "タスクの更新に失敗しました");
       }
@@ -255,8 +221,6 @@ export const useScheduleStore = () => ({
       const activeProjects = projects.filter(p => !p.is_archived);
       const defaultProject = activeProjects.length > 0 ? activeProjects[0] : projects[0];
       
-      console.log("デフォルトプロジェクトを選択:", defaultProject.name, "(ID:", defaultProject.id, ")");
-      
       // ScheduleItem を TaskInsert に変換
       const taskInsert = scheduleItemToTaskInsert(item, defaultProject.id);
       
@@ -277,7 +241,6 @@ export const useScheduleStore = () => ({
         if (scheduleItems.length > 0) {
           const scheduleItem = scheduleItems[0];
           schedules.value.push(scheduleItem);
-          console.log("新しいスケジュールを作成しました:", scheduleItem.id);
           return scheduleItem;
         } else {
           throw new Error("スケジュールアイテムの変換に失敗しました");

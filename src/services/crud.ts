@@ -67,14 +67,26 @@ export function createCrudRepo<T, TInsert, TUpdate>(table: string): CrudRepo<T, 
     async remove(match: Partial<T>) {
       return handleServiceCall(
         async () => {
-          let q = supabase.from(table).delete();
+          // 削除前に一致する行数を取得
+          let countQuery = supabase.from(table).select("*", { count: "exact", head: true });
           for (const [k, v] of Object.entries(match)) {
-            q = q.eq(k, v as never);
+            countQuery = countQuery.eq(k, v as never);
           }
-          const { count, error } = await q.select("id", { count: "exact", head: true });
-          if (error) {
-            throw new Error(translateSupabaseError(error));
+          const { count, error: countError } = await countQuery;
+          if (countError) {
+            throw new Error(translateSupabaseError(countError));
           }
+          
+          // 削除を実行
+          let deleteQuery = supabase.from(table).delete();
+          for (const [k, v] of Object.entries(match)) {
+            deleteQuery = deleteQuery.eq(k, v as never);
+          }
+          const { error: deleteError } = await deleteQuery;
+          if (deleteError) {
+            throw new Error(translateSupabaseError(deleteError));
+          }
+          
           return count ?? 0;
         },
         `[${table}] delete 失敗`

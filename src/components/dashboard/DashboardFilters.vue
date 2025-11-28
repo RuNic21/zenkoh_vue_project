@@ -17,15 +17,15 @@ const props = defineProps<{
   availableTags: string[];  // 利用可能なタグ一覧
 }>();
 
-// Emits定義
+// Emits定義（オブジェクト形式を使用して型エラーを回避）
 const emit = defineEmits<{
-  (e: "update:searchQuery", v: string): void;
-  (e: "update:priorityFilter", v: string): void;
-  (e: "update:deadlineFilter", v: string): void;
-  (e: "update:projectFilter", v: string): void;
-  (e: "update:tagFilter", v: string[]): void;
-  (e: "clear"): void;
-  (e: "refresh"): void;
+  "update:searchQuery": [value: string];
+  "update:priorityFilter": [value: string];
+  "update:deadlineFilter": [value: string];
+  "update:projectFilter": [value: string];
+  "update:tagFilter": [value: string[]];
+  "clear": [];
+  "refresh": [];
 }>();
 
 // アクティブなフィルタ数を計算
@@ -38,6 +38,31 @@ const activeFiltersCount = computed(() => {
   if (props.tagFilter.length > 0) count++;
   return count;
 });
+
+// イベントハンドラー関数（型安全性を確保するため）
+const handleSearchQueryUpdate = (value: string | number | null | "") => {
+  emit("update:searchQuery", String(value ?? ""));
+};
+
+const handlePriorityFilterUpdate = (value: string | number | null | "") => {
+  emit("update:priorityFilter", String(value ?? ""));
+};
+
+const handleDeadlineFilterUpdate = (value: string | number | null | "") => {
+  emit("update:deadlineFilter", String(value ?? ""));
+};
+
+const handleProjectFilterUpdate = (value: string | number | null | "") => {
+  emit("update:projectFilter", String(value ?? ""));
+};
+
+const handleClear = () => {
+  emit("clear");
+};
+
+const handleRefresh = () => {
+  emit("refresh");
+};
 
 // タグの選択/解除を処理
 const toggleTag = (tag: string) => {
@@ -53,6 +78,10 @@ const toggleTag = (tag: string) => {
   }
   
   emit("update:tagFilter", currentTags);
+};
+
+const handleClearTags = () => {
+  emit("update:tagFilter", []);
 };
 
 // 優先度オプション
@@ -86,8 +115,8 @@ const projectOptions = computed(() => {
     :active-filters-count="activeFiltersCount"
     :show-refresh-button="true"
     :show-reset-button="true"
-    @reset="emit('clear')"
-    @refresh="emit('refresh')"
+    @reset="handleClear"
+    @refresh="handleRefresh"
   >
     <!-- 検索フィルター -->
     <FilterField
@@ -95,7 +124,7 @@ const projectOptions = computed(() => {
       icon="fas fa-search"
       type="text"
       :model-value="searchQuery"
-      @update:model-value="emit('update:searchQuery', $event)"
+      @update:model-value="handleSearchQueryUpdate"
       placeholder="タスク名・プロジェクト名・担当者"
       col-class="col-lg-4 col-md-6"
     />
@@ -106,7 +135,7 @@ const projectOptions = computed(() => {
       icon="fas fa-exclamation-circle"
       type="select"
       :model-value="priorityFilter"
-      @update:model-value="emit('update:priorityFilter', $event)"
+      @update:model-value="handlePriorityFilterUpdate"
       :options="priorityOptions"
       col-class="col-lg-2 col-md-6"
     />
@@ -117,7 +146,7 @@ const projectOptions = computed(() => {
       icon="fas fa-calendar"
       type="select"
       :model-value="deadlineFilter"
-      @update:model-value="emit('update:deadlineFilter', $event)"
+      @update:model-value="handleDeadlineFilterUpdate"
       :options="deadlineOptions"
       col-class="col-lg-2 col-md-6"
     />
@@ -128,7 +157,7 @@ const projectOptions = computed(() => {
       icon="fas fa-project-diagram"
       type="select"
       :model-value="projectFilter"
-      @update:model-value="emit('update:projectFilter', $event)"
+      @update:model-value="handleProjectFilterUpdate"
       :options="projectOptions"
       col-class="col-lg-3 col-md-6"
     />
@@ -179,7 +208,7 @@ const projectOptions = computed(() => {
         <button
           type="button"
           class="btn btn-sm btn-outline-secondary"
-          @click="emit('update:tagFilter', [])"
+          @click="handleClearTags"
         >
           <i class="material-symbols-rounded me-1" style="font-size: 0.875rem;">close</i>
           タグフィルタをクリア

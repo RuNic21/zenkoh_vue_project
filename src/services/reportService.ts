@@ -20,21 +20,35 @@ import type { Task } from "../types/task";
 import { handleServiceCall, createSuccessResult, createErrorResult, translateSupabaseError, type ServiceResult } from "../utils/errorHandler";
 
 // Project with User 型（JOIN時）
-interface ProjectWithUser extends Omit<Project, "users"> {
-  users?: { display_name: string };
+// Supabase クエリ結果はすべてのプロジェクト属性を含まない可能性があるため、Partial を使用
+interface ProjectWithUser extends Partial<Omit<Project, "users">> {
+  id: number;
+  name: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  owner_user_id?: number | null;
+  users?: { display_name: string } | { display_name: string }[];
 }
 
 // Task with relations 型（JOIN時）
-interface TaskWithRelations extends Omit<Task, "projects" | "users"> {
-  projects?: { name: string };
-  users?: { display_name: string };
-  description?: string | null;
-  wbs_code?: string | null;
+// Supabase クエリ結果はすべてのタスク属性を含まない可能性があるため、必要な属性のみ定義
+interface TaskWithRelations {
+  id: number;
+  task_name: string;
+  status?: string;
+  priority?: string;
+  progress_percent?: number | null;
   planned_start?: string | null;
   planned_end?: string | null;
+  parent_task_id?: number | null;
+  project_id?: number | null;
+  primary_assignee_id?: number | null;
+  description?: string | null;
+  wbs_code?: string | null;
   actual_start?: string | null;
   actual_end?: string | null;
-  primary_assignee_id?: number | null;
+  projects?: { name: string } | { name: string }[];
+  users?: { display_name: string } | { display_name: string }[];
 }
 
 // プロジェクト進捗レポート生成
@@ -121,11 +135,16 @@ export async function generateProjectProgressReport(
         status = "未開始";
       }
 
-      const projectWithUser = project as ProjectWithUser;
+      // users が配列または単一オブジェクトの可能性があるため、安全に取得
+      const projectWithUser = project as any;
+      const ownerName = Array.isArray(projectWithUser.users)
+        ? projectWithUser.users[0]?.display_name
+        : projectWithUser.users?.display_name;
+      
       projectReports.push({
         projectId: project.id,
         projectName: project.name,
-        ownerName: projectWithUser.users?.display_name || "-",
+        ownerName: ownerName || "-",
         startDate: project.start_date,
         endDate: project.end_date,
         totalTasks,
@@ -506,8 +525,6 @@ export async function generateTagReport(
 // 統合レポート生成
 export async function generateReport(options: ReportOptions = {}): Promise<ReportGenerationResult> {
   try {
-    console.log("レポート生成を開始します...", options);
-
     const [
       projectProgressResult,
       taskStatisticsResult,
@@ -552,8 +569,6 @@ export async function generateReport(options: ReportOptions = {}): Promise<Repor
       generatedAt: new Date(),
       options
     };
-
-    console.log("レポート生成が完了しました");
 
     return {
       success: true,
@@ -721,19 +736,30 @@ export async function generateGanttData(
       }
 
       // 間トチャートデータに変換
-      const ganttData: import("../types/report").GanttTaskData[] = tasks.map(task => ({
-        id: String(task.id),
-        name: task.task_name || "無題のタスク",
-        start: task.planned_start || "",
-        end: task.planned_end || "",
-        progress: task.progress_percent || 0,
-        dependencies: task.parent_task_id ? String(task.parent_task_id) : undefined,
-        projectId: task.project_id,
-        projectName: (task as TaskWithRelations).projects?.name || "プロジェクト未割当",
-        assigneeName: (task as TaskWithRelations).users?.display_name || "担当者未割当",
-        status: task.status || "NOT_STARTED",
-        priority: task.priority || "MEDIUM"
-      }));
+      const ganttData: import("../types/report").GanttTaskData[] = tasks.map(task => {
+        // projects と users が配列または単一オブジェクトの可能性があるため、安全に取得
+        const taskWithRelations = task as any;
+        const projectName = Array.isArray(taskWithRelations.projects)
+          ? taskWithRelations.projects[0]?.name
+          : taskWithRelations.projects?.name;
+        const assigneeName = Array.isArray(taskWithRelations.users)
+          ? taskWithRelations.users[0]?.display_name
+          : taskWithRelations.users?.display_name;
+        
+        return {
+          id: String(task.id),
+          name: task.task_name || "無題のタスク",
+          start: task.planned_start || "",
+          end: task.planned_end || "",
+          progress: task.progress_percent || 0,
+          dependencies: task.parent_task_id ? String(task.parent_task_id) : undefined,
+          projectId: task.project_id,
+          projectName: projectName || "プロジェクト未割当",
+          assigneeName: assigneeName || "担当者未割当",
+          status: task.status || "NOT_STARTED",
+          priority: task.priority || "MEDIUM"
+        };
+      });
 
       return ganttData;
     },
@@ -857,20 +883,28 @@ export async function generateDependencyGraphData(
         };
 
         tasks.forEach(task => {
-          const taskWithRelations = task as TaskWithRelations;
+          // projects と users が配列または単一オブジェクトの可能性があるため、安全に取得
+          const taskWithRelations = task as any;
+          const projectName = Array.isArray(taskWithRelations.projects)
+            ? taskWithRelations.projects[0]?.name
+            : taskWithRelations.projects?.name;
+          const assigneeName = Array.isArray(taskWithRelations.users)
+            ? taskWithRelations.users[0]?.display_name
+            : taskWithRelations.users?.display_name;
+          
           nodes.push({
             id: `task_${task.id}`,
             label: task.task_name || "無題のタスク",
-            title: `プロジェクト: ${taskWithRelations.projects?.name || "未割当"}\nステータス: ${task.status}\n進捗: ${task.progress_percent}%`,
-            group: taskWithRelations.projects?.name || "未割当",
+            title: `プロジェクト: ${projectName || "未割当"}\nステータス: ${task.status}\n進捗: ${task.progress_percent}%`,
+            group: projectName || "未割当",
             color: getStatusColor(task.status),
             nodeType: "task",
             status: task.status || "NOT_STARTED",
             priority: task.priority || "MEDIUM",
             progress: task.progress_percent || 0,
-            projectName: taskWithRelations.projects?.name || undefined,
+            projectName: projectName || undefined,
             description: taskWithRelations.description || undefined,
-            assigneeName: taskWithRelations.users?.display_name || undefined,
+            assigneeName: assigneeName || undefined,
             plannedStart: formatDate(taskWithRelations.planned_start),
             plannedEnd: formatDate(taskWithRelations.planned_end),
             actualStart: formatDate(taskWithRelations.actual_start),

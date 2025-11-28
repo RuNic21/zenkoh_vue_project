@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useRoute } from "vue-router";
 import router from "@/router";
 import { useScheduleDetail } from "@/composables/useScheduleDetail";
 import { getCurrentUserInfo } from "@/utils/userHelper";
@@ -11,8 +10,11 @@ import { listUsers } from "../services/dbServices";
 import type { Users } from "../types/db/users";
 import type { TaskStatusHistory } from "../types/taskStatusHistory";
 
-// Router
-const route = useRoute();
+// Router props (router/index.tsでprops: trueが設定されているため)
+interface Props {
+  id: string;
+}
+const props = defineProps<Props>();
 
 // 共通コンポーネントのインポート
 import PageHeader from "../components/common/PageHeader.vue";
@@ -56,7 +58,7 @@ const {
   loadUsers,          // ユーザー読み込み関数
   loadTaskById,       // タスク読み込み関数
   loadParentTasks,    // 親タスク候補読み込み関数
-} = useScheduleDetail(route.params.id as string);
+} = useScheduleDetail(props.id);
 
 // メッセージシステム
 const { showSuccess, showError } = useMessage();
@@ -90,7 +92,6 @@ const saveChanges = async () => {
   try {
     await store.save({ ...editForm.value });
     isEditMode.value = false;
-    console.log("スケジュールが保存されました");
   } catch (e) {
     console.error("保存に失敗", e);
     const message = e instanceof Error ? e.message : "保存に失敗しました";
@@ -120,7 +121,6 @@ const deleteSchedule = async () => {
   
   try {
     await store.delete(scheduleDetail.value.id);
-    console.log("スケジュールが削除されました");
     // 削除後は一覧画面に戻る（Appコンポーネントの currentPage を変更）
     // または emit でページ変更をリクエスト
     showSuccess("スケジュールを削除しました");
@@ -171,7 +171,6 @@ const handleRemoveTag = async (tag: string) => {
     // 編集モードの場合、削除後すぐに保存
     if (isEditMode.value) {
       await saveChanges();
-      console.log(`タグ「${tag}」を削除しました`);
     }
   } catch (error) {
     console.error("タグの削除に失敗:", error);
@@ -225,8 +224,6 @@ const executeQuickAction = async (action: any) => {
       timestamp: new Date().toLocaleString('ja-JP'),
       reason: `${action.label}アクション実行`
     });
-    
-    console.log(`${action.label}アクションを実行しました`);
   } catch (error) {
     console.error("クイックアクションの実行に失敗:", error);
   }

@@ -2,11 +2,9 @@
 // 最近の通知ウィジェット
 // 目的: ダッシュボードに最近の通知を表示
 
-import { useRouter } from "vue-router";
+import router from "@/router";
 import { useNotifications } from "@/composables/useNotifications";
 import { NOTIFICATION_STATUS_LABELS, NOTIFICATION_STATUS_COLORS } from "@/types/notification";
-
-const router = useRouter();
 
 // 通知データを取得
 const {

@@ -47,11 +47,11 @@ src/
 │   ├── task/               # タスク用
 │   ├── team/               # チーム用
 │   └── user/               # ユーザー用
-├── composables/            # Composition API 関数
-├── services/               # データベース・API サービス（12個の専門サービス）
+├── composables/            # Composition API 関数（14個）
+├── services/               # データベース・API サービス（14個の専門サービス）
 ├── store/                  # 状態管理
 ├── types/                  # TypeScript 型定義
-├── utils/                  # ユーティリティ関数
+├── utils/                  # ユーティリティ関数（16個）
 └── assets/                 # 静的リソース
 ```
 
@@ -88,7 +88,7 @@ import { ref } from "vue";
 - [src/main.js](mdc:src/main.js): Vue アプリ初期化、Material Dashboard CSS 読み込み
 - [src/App.vue](mdc:src/App.vue): ルートコンポーネント、ページルーティング、ダッシュボード
 
-### サービス層（12個の専門サービス）
+### サービス層（14個の専門サービス）
 - [src/services/supabaseClient.ts](mdc:src/services/supabaseClient.ts): Supabase 接続クライアント
 - [src/services/authService.ts](mdc:src/services/authService.ts): 認証サービス（Supabase Auth）
 - [src/services/crud.ts](mdc:src/services/crud.ts): 汎用 CRUD ファクトリ
@@ -101,6 +101,8 @@ import { ref } from "vue";
 - [src/services/reportService.ts](mdc:src/services/reportService.ts): レポート生成・エクスポート
 - [src/services/teamService.ts](mdc:src/services/teamService.ts): チーム管理
 - [src/services/notificationService.ts](mdc:src/services/notificationService.ts): 通知システム
+- [src/services/commentService.ts](mdc:src/services/commentService.ts): コメント管理サービス
+- [src/services/taskStatusHistoryService.ts](mdc:src/services/taskStatusHistoryService.ts): タスクステータス履歴サービス
 
 ### 状態管理
 - [src/store/schedule.ts](mdc:src/store/schedule.ts): スケジュール状態管理、DB 連携
@@ -109,6 +111,7 @@ import { ref } from "vue";
 - [src/types/db/](mdc:src/types/db/): Supabase スキーマ自動生成型（編集禁止）
   - projects.ts, tasks.ts, users.ts, boards.ts, board_columns.ts
   - task_members.ts, notifications.ts, alert_rules.ts
+  - project_members.ts, information_schema_columns.ts
 - [src/types/auth.ts](mdc:src/types/auth.ts): 認証関連型
 - [src/types/schedule.ts](mdc:src/types/schedule.ts): UI 表示用型
 - [src/types/task.ts](mdc:src/types/task.ts): ビジネスロジック用型
@@ -116,13 +119,26 @@ import { ref } from "vue";
 - [src/types/team.ts](mdc:src/types/team.ts): チーム管理用型
 - [src/types/report.ts](mdc:src/types/report.ts): レポート・分析用型
 - [src/types/notification.ts](mdc:src/types/notification.ts): 通知システム用型
+- [src/types/comment.ts](mdc:src/types/comment.ts): コメント用型
+- [src/types/taskStatusHistory.ts](mdc:src/types/taskStatusHistory.ts): タスクステータス履歴用型
 
-### ユーティリティ
+### ユーティリティ（16個）
 - [src/utils/taskAdapter.ts](mdc:src/utils/taskAdapter.ts): DB ↔ UI 型変換
 - [src/utils/uiHelpers.ts](mdc:src/utils/uiHelpers.ts): UI ヘルパー関数
 - [src/utils/dateUtils.ts](mdc:src/utils/dateUtils.ts): 日付処理
 - [src/utils/errorHandler.ts](mdc:src/utils/errorHandler.ts): 統一エラー処理
 - [src/utils/performanceUtils.ts](mdc:src/utils/performanceUtils.ts): パフォーマンス最適化
+- [src/utils/chartColors.ts](mdc:src/utils/chartColors.ts): チャート色定義
+- [src/utils/chartOptions.ts](mdc:src/utils/chartOptions.ts): チャートオプション設定
+- [src/utils/exportUtils.ts](mdc:src/utils/exportUtils.ts): エクスポート機能（CSV/PDF/Excel）
+- [src/utils/formatters.ts](mdc:src/utils/formatters.ts): データフォーマット関数
+- [src/utils/notificationDebugger.ts](mdc:src/utils/notificationDebugger.ts): 通知デバッグツール
+- [src/utils/notificationTrigger.ts](mdc:src/utils/notificationTrigger.ts): 通知トリガー処理
+- [src/utils/tableUtils.ts](mdc:src/utils/tableUtils.ts): テーブルユーティリティ
+- [src/utils/taskNotificationHelper.ts](mdc:src/utils/taskNotificationHelper.ts): タスク通知ヘルパー
+- [src/utils/timeoutUtils.ts](mdc:src/utils/timeoutUtils.ts): タイムアウト処理
+- [src/utils/typeGuards.ts](mdc:src/utils/typeGuards.ts): 型ガード関数
+- [src/utils/userHelper.ts](mdc:src/utils/userHelper.ts): ユーザーヘルパー関数
 
 ## 🔧 開発スクリプト
 
@@ -184,5 +200,8 @@ npm run types:fromcsv         # CSVから型生成
 ## 📚 関連ドキュメント
 
 - [データベーススキーマ](../docs/database-schema.md)
-- [データベース統合ガイド](../docs/database-integration-guide.md)
+- [データベース統合ガイド](../docs/database-guide.md)
+- [認証システム統合ガイド](../docs/auth-system-guide.md)
+- [マイグレーションガイド](../docs/migration-guide.md)
+- [タグ機能ガイド](../docs/tag-feature-guide.md)
 - [README](../README.md)

@@ -34,6 +34,9 @@ export interface NotificationUpdate {
   status?: NotificationStatus;
   sent_at?: string;
   last_error?: string;
+  to_email?: string;
+  subject?: string;
+  body_text?: string;
 }
 
 // 通知状態

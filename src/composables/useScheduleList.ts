@@ -1,5 +1,5 @@
 import { ref, computed, onMounted, watch } from "vue";
-import { useRouter } from "vue-router";
+import router from "@/router";
 import { useScheduleStore } from "@/store/schedule";
 import { listProjects } from "@/services/projectService";
 import { createTask as createTaskService } from "@/services/taskService";
@@ -11,7 +11,6 @@ import type { TaskInsert } from "@/types/task";
 
 // スケジュール一覧ページの状態とロジックを集約する composable
 export function useScheduleList() {
-  const router = useRouter();
   const store = useScheduleStore();
   const schedules = store.schedules;
   const isLoading = store.isLoading;
@@ -198,24 +197,16 @@ export function useScheduleList() {
       }
       
       // 作成成功後、タスク割り当て通知を送信
-      console.log("📧 通知送信プロセス開始");
-      console.log("   - taskData:", taskData);
-      console.log("   - primary_assignee_id:", taskData.primary_assignee_id);
-      
       if (taskData.primary_assignee_id) {
         try {
-          console.log("👤 割り当て先ユーザー情報を取得中...");
           // 割り当て先ユーザー情報を取得
           const assigneeInfo = await getUserInfo(taskData.primary_assignee_id);
-          console.log("   - ユーザー情報:", assigneeInfo);
           
           // プロジェクト名を取得
           const project = projects.value.find(p => p.id === taskData.project_id);
           const projectName = project?.name || "不明なプロジェクト";
-          console.log("   - プロジェクト名:", projectName);
           
           if (assigneeInfo && assigneeInfo.email) {
-            console.log("📨 通知を作成中...");
             // タスク割り当て通知を送信
             await triggerTaskAssignedNotification(
               result.data,
@@ -223,30 +214,16 @@ export function useScheduleList() {
               assigneeInfo.email,
               projectName
             );
-            console.log("✅ タスク割り当て通知を送信しました");
-            
-            // デバッグ: データベースの通知を確認
-            const { checkNotificationsInDatabase } = await import("@/utils/notificationDebugger");
-            await checkNotificationsInDatabase();
-          } else {
-            console.warn("⚠️ 通知送信条件が満たされていません");
-            console.log("   - assigneeInfo:", assigneeInfo);
-            console.log("   - email:", assigneeInfo?.email);
           }
         } catch (notificationError) {
           // 通知送信失敗してもタスク作成は成功として扱う
-          console.error("❌ タスク割り当て通知の送信に失敗:", notificationError);
+          console.error("タスク割り当て通知の送信に失敗:", notificationError);
         }
-      } else {
-        console.warn("⚠️ primary_assignee_id が設定されていません。通知は送信されません。");
       }
       
       // 作成成功後、スケジュールを再読み込み
       await loadSchedulesFromDb();
       closeCreateModal();
-      
-      // 成功メッセージ（オプション）
-      console.log("タスクが正常に作成されました:", result.data);
     } catch (e) {
       console.error("タスクの作成に失敗", e);
       const message = e instanceof Error ? e.message : "タスクの作成に失敗しました";

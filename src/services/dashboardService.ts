@@ -1,32 +1,7 @@
 // ダッシュボード用サービス（プロジェクト分析・統計情報）
 // 目的: プロジェクトの統計情報、タスク分析、進捗率計算を提供
-//
-// TODO: 今後の機能拡張予定
-// 1. チャートデータ生成関数
-//    - getProjectProgressChartData(): プロジェクト進行率チャート用データ
-//    - getTaskStatusChartData(): タスク状態分布パイチャート用データ
-//    - getMonthlyProjectTrendData(): 月別プロジェクト推移データ
-//    - getAssigneeWorkloadData(): 担当者別作業量データ
-//
-// 2. タイムラインデータ生成関数
-//    - getProjectTimelineData(): ガントチャート用タイムラインデータ
-//    - getMilestoneData(): マイルストーンデータ
-//    - getProjectDependencyData(): プロジェクト依存関係データ
-//
-// 3. カンバンボードデータ生成関数
-//    - getKanbanBoardData(): カンバンボード用データ
-//    - getColumnStatistics(): カラム別統計情報
-//    - getWIPLimits(): WIP制限情報
-//
-// 4. 高度な分析関数
-//    - getProjectHealthScore(): プロジェクト健全性スコア
-//    - getRiskAnalysis(): リスク分析データ
-//    - getPerformanceMetrics(): パフォーマンス指標
-//
-// 5. エクスポート用データ生成
-//    - getExportData(): CSV/PDFエクスポート用データ
-//    - getReportData(): レポート生成用データ
 
+import { withTimeout, createTimeoutPromise } from "@/utils/timeoutUtils";
 import { supabase } from "./supabaseClient";
 import type { Project } from "../types/project";
 import type { Task } from "../types/task";
@@ -326,11 +301,9 @@ export interface ProjectProgressRow {
 export async function fetchProjectProgress(limit?: number): Promise<ServiceResult<ProjectProgressRow[]>> {
   return handleServiceCall(
     async () => {
-      console.log("[fetchProjectProgress] プロジェクト進捗情報の取得を開始...");
       const startTime = Date.now();
 
       // プロジェクト一覧を取得（ユーザー情報も含む）
-      console.log("[fetchProjectProgress] プロジェクト一覧を取得中...");
       const projectsQuery = supabase
         .from("projects")
         .select(`
@@ -345,17 +318,13 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
       }
 
       if (!projects || projects.length === 0) {
-        console.log("[fetchProjectProgress] プロジェクトが0件のため、空配列を返します");
         return [];
       }
-
-      console.log(`[fetchProjectProgress] プロジェクト取得成功: ${projects.length}件`);
 
       // プロジェクトIDのリストを作成
       const projectIds = projects.map(p => p.id);
       
       // すべてのタスクを一括取得（N+1 クエリ問題を解決）
-      console.log("[fetchProjectProgress] すべてのタスクを一括取得中...");
       const tasksQuery = supabase
         .from("tasks")
         .select("project_id, status, progress_percent, planned_end, is_archived, updated_at")
@@ -381,8 +350,6 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
           tasksByProjectId.get(projectId)!.push(task);
         }
       }
-
-      console.log(`[fetchProjectProgress] タスク取得成功: ${allTasks?.length || 0}件（${tasksByProjectId.size}プロジェクトに分散）`);
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -428,8 +395,14 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
 
         // プロジェクトとユーザー情報を持つ型定義
         interface ProjectWithUser extends Project {
-          users?: { display_name: string };
+          users?: { display_name: string } | { display_name: string }[];
         }
+        
+        // users が配列または単一オブジェクトの可能性があるため、安全に取得
+        const projectWithUser = project as any;
+        const ownerName = Array.isArray(projectWithUser.users)
+          ? projectWithUser.users[0]?.display_name
+          : projectWithUser.users?.display_name;
         
         const row: ProjectProgressRow & { _latestUpdateTime: number } = {
           id: project.id,
@@ -448,7 +421,7 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
           average_progress: averageProgress,
           overdue_tasks: overdueTasks,
           // App.vueで使用する追加プロパティ
-          owner: (project as ProjectWithUser).users?.display_name || "-",
+          owner: ownerName || "-",
           status: status,
           progress: averageProgress,
           dueDate: project.end_date,
@@ -473,9 +446,6 @@ export async function fetchProjectProgress(limit?: number): Promise<ServiceResul
 
       // limit が指定されている場合は先頭N件のみ返す
       const result = limit ? finalRows.slice(0, limit) : finalRows;
-      
-      const duration = Date.now() - startTime;
-      console.log(`[fetchProjectProgress] 処理完了: ${result.length}件（${duration}ms）`);
       
       return result;
     },
@@ -511,30 +481,15 @@ export interface TaskProgressRow {
 export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResult<TaskProgressRow[]>> {
   return handleServiceCall(
     async () => {
-      console.log(`[fetchRecentTasks] タスク取得を開始（limit: ${limit}）...`);
-      
       // タブが非表示から表示に戻った場合、少し待機してからクエリを実行
       // (ブラウザがネットワーク接続を再確立する時間を確保)
       if (typeof document !== 'undefined' && !document.hidden) {
-        console.log("[fetchRecentTasks] タブが表示されています。ネットワーク接続を確認中...");
         // 短い待機時間を追加（ブラウザのネットワーク接続が安定するまで）
         await new Promise(resolve => setTimeout(resolve, 200));
       }
       
-      // タイムアウトを設定（30秒に延長 - ネットワークが不安定な場合を考慮）
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          console.error("[fetchRecentTasks] タイムアウト: 30秒経過しました");
-          reject(new Error("タスク取得がタイムアウトしました（30秒）"));
-        }, 30000);
-      });
-
       // タスク一覧を取得（まずはタスクのみ、後でプロジェクト・ユーザー情報を個別に取得）
-      console.log("[fetchRecentTasks] タスクの基本情報を取得します...");
-      const queryStartTime = Date.now();
-      
       // まずタスクのみを取得（JOINなしで高速化）
-      console.log("[fetchRecentTasks] Supabase クエリを構築します...");
       const tasksQuery = supabase
         .from("tasks")
         .select(`
@@ -546,72 +501,42 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
         .order("updated_at", { ascending: false })
         .limit(limit);
       
-      console.log("[fetchRecentTasks] Supabase クエリを実行します...");
-
-      console.log("[fetchRecentTasks] Promise.race を実行します（タスク基本情報）...");
-      
       // Supabase クエリを実行（タイムアウト付き）
-      let tasksResult: { type: 'success'; result: { data: any; error: any } } | { type: 'timeout' };
-      try {
-        tasksResult = await Promise.race([
-          tasksQuery.then(result => ({ type: 'success' as const, result })),
-          timeoutPromise.then(() => ({ type: 'timeout' as const }))
-        ]) as { type: 'success'; result: { data: any; error: any } } | { type: 'timeout' };
-      } catch (error) {
-        console.error("[fetchRecentTasks] Promise.race でエラーが発生:", error);
-        throw error;
-      }
-      
-      if (tasksResult.type === 'timeout') {
-        console.error("[fetchRecentTasks] タイムアウトが発生しました");
-        throw new Error("タスク取得がタイムアウトしました（30秒）");
-      }
+      const tasksResult = await withTimeout(
+        Promise.resolve(tasksQuery.then(result => ({ type: 'success' as const, result }))),
+        30000,
+        "タスク取得がタイムアウトしました（30秒）"
+      ) as { type: 'success'; result: { data: any; error: any } };
       
       const { data: tasks, error: tasksError } = tasksResult.result;
-      
-      const queryEndTime = Date.now();
-      const queryDuration = queryEndTime - queryStartTime;
-      console.log(`[fetchRecentTasks] クエリ完了（${queryDuration}ms）`);
 
       if (tasksError) {
         console.error("[fetchRecentTasks] エラーが発生:", tasksError);
         throw new Error(translateSupabaseError(tasksError));
       }
 
-      console.log(`[fetchRecentTasks] タスク取得成功: ${tasks?.length || 0}件`);
-
       if (!tasks || tasks.length === 0) {
-        console.log("[fetchRecentTasks] タスクが0件のため、空配列を返します");
         return [];
       }
-
-      console.log(`[fetchRecentTasks] タスク基本情報取得成功: ${tasks.length}件`);
       
       // プロジェクトIDとユーザーIDを収集
       const projectIds = [...new Set(tasks.map((t: any) => t.project_id).filter(Boolean))];
       const userIds = [...new Set(tasks.map((t: any) => t.primary_assignee_id).filter(Boolean))];
       
-      console.log(`[fetchRecentTasks] プロジェクト情報を取得します（${projectIds.length}件）...`);
-      console.log(`[fetchRecentTasks] ユーザー情報を取得します（${userIds.length}件）...`);
-      
       // プロジェクト情報を一括取得（タイムアウト付き）
       const projectsMap = new Map<number, { id: number; name: string }>();
       if (projectIds.length > 0) {
         try {
-          console.log(`[fetchRecentTasks] プロジェクト情報を取得中（ID: ${projectIds.join(', ')}）...`);
-          const projectTimeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("プロジェクト情報取得がタイムアウトしました（15秒）")), 15000);
-          });
-          
           const projectQuery = supabase
             .from("projects")
             .select("id, name")
             .in("id", projectIds);
           
-          const projectResult = await Promise.race([
-            projectQuery.then(result => ({ type: 'success' as const, result })),
-            projectTimeoutPromise.then(() => ({ type: 'timeout' as const }))
-          ]).catch(() => ({ type: 'timeout' as const }));
+          const projectResult = await withTimeout(
+            Promise.resolve(projectQuery.then(result => ({ type: 'success' as const, result }))),
+            15000,
+            "プロジェクト情報取得がタイムアウトしました（15秒）"
+          ).catch(() => ({ type: 'timeout' as const })) as { type: 'success'; result: { data: any; error: any } } | { type: 'timeout' };
           
           if (projectResult.type === 'success') {
             const { data: projects, error: projectsError } = projectResult.result;
@@ -619,7 +544,6 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
               projects.forEach((p: any) => {
                 projectsMap.set(p.id, { id: p.id, name: p.name });
               });
-              console.log(`[fetchRecentTasks] プロジェクト情報取得成功: ${projects.length}件`);
             } else {
               console.warn("[fetchRecentTasks] プロジェクト情報の取得に失敗:", projectsError);
             }
@@ -636,20 +560,16 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
       const usersMap = new Map<number, { display_name: string }>();
       if (userIds.length > 0) {
         try {
-          console.log(`[fetchRecentTasks] ユーザー情報を取得中（ID: ${userIds.join(', ')}）...`);
-          const userTimeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("ユーザー情報取得がタイムアウトしました（15秒）")), 15000);
-          });
-          
           const userQuery = supabase
             .from("users")
             .select("id, display_name")
             .in("id", userIds);
           
-          const userResult = await Promise.race([
-            userQuery.then(result => ({ type: 'success' as const, result })),
-            userTimeoutPromise.then(() => ({ type: 'timeout' as const }))
-          ]).catch(() => ({ type: 'timeout' as const }));
+          const userResult = await withTimeout(
+            Promise.resolve(userQuery.then(result => ({ type: 'success' as const, result }))),
+            15000,
+            "ユーザー情報取得がタイムアウトしました（15秒）"
+          ).catch(() => ({ type: 'timeout' as const })) as { type: 'success'; result: { data: any; error: any } } | { type: 'timeout' };
           
           if (userResult.type === 'success') {
             const { data: users, error: usersError } = userResult.result;
@@ -657,7 +577,6 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
               users.forEach((u: any) => {
                 usersMap.set(u.id, { display_name: u.display_name });
               });
-              console.log(`[fetchRecentTasks] ユーザー情報取得成功: ${users.length}件`);
             } else {
               console.warn("[fetchRecentTasks] ユーザー情報の取得に失敗:", usersError);
             }
@@ -669,8 +588,6 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
           console.warn("[fetchRecentTasks] ユーザー情報の取得中にエラー:", e);
         }
       }
-
-      console.log("[fetchRecentTasks] タスクデータをマッピング中...");
 
       const today = new Date();
       today.setHours(0, 0, 0, 0); // 時間をリセットして日付のみで比較
@@ -714,7 +631,6 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
         };
       });
 
-      console.log(`[fetchRecentTasks] マッピング完了: ${taskProgressRows.length}件`);
       return taskProgressRows;
     },
     "最近のタスク取得に失敗しました"

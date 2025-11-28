@@ -2,8 +2,9 @@
 // レポートページコンポーネント
 // 目的: プロジェクト・タスク・ユーザーの統計レポートを表示・生成
 
-import { ref, computed, onActivated } from "vue";
+import { ref, computed } from "vue";
 import { useReportPage } from "@/composables/useReportPage";
+import { usePageActivation } from "@/composables/usePageActivation";
 import { useMessage } from "@/composables/useMessage";
 import type { 
   ReportData, 
@@ -90,8 +91,7 @@ const resetFilters = () => {
 };
 
 // Keep-Alive: ページが再度アクティブになったときにデータを更新
-onActivated(async () => {
-  console.log("ReportPage ページが再アクティブ化されました");
+usePageActivation(async () => {
   // 詳細ページから戻ってきたときに最新のデータで再生成
   await generateReportData();
 });

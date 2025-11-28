@@ -140,7 +140,6 @@ export function useReportPage() {
           id: user.id,
           display_name: user.display_name
         }));
-        console.log("ユーザー一覧取得完了:", availableUsers.value.length, "件");
       } else {
         console.error("ユーザー一覧取得に失敗:", usersRes.error);
       }

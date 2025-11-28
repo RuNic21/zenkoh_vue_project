@@ -89,7 +89,7 @@ const projectOptions = computed(() => {
 });
 
 // ヘルパー関数: フィールド更新
-const updateField = (field: keyof FilterValues, value: string | number | null) => {
+const updateField = (field: keyof FilterValues, value: string | number | null | string[]) => {
   emit("update:modelValue", { ...props.modelValue, [field]: value });
 };
 </script>

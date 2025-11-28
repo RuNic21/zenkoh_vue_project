@@ -5,6 +5,7 @@ import {
   type ProjectProgressRow,
   type TaskProgressRow 
 } from "@/services/dashboardService";
+import { withTimeout } from "@/utils/timeoutUtils";
 
 // ダッシュボード機能の状態とロジックを集約する composable
 export function useDashboard() {
@@ -189,7 +190,6 @@ export function useDashboard() {
   const loadDashboardFromDb = async (): Promise<void> => {
     // 既に読み込み中の場合は重複実行を防ぐ
     if (isDashboardLoadingInProgress) {
-      console.log("ダッシュボードデータは既に読み込み中です");
       return;
     }
 
@@ -198,26 +198,15 @@ export function useDashboard() {
       isDashboardLoading.value = true;
       dashboardErrorMessage.value = "";
       
-      console.log("ダッシュボードデータの読み込みを開始...");
-      
-      // タイムアウトを設定（30秒に延長 - 最適化されたクエリでもネットワークが不安定な場合を考慮）
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          console.error("ダッシュボードデータの読み込みがタイムアウトしました（30秒）");
-          reject(new Error("タイムアウト: データの読み込みに時間がかかりすぎています（30秒）"));
-        }, 30000);
-      });
-      
-      const result = await Promise.race([
+      // タイムアウト付きでダッシュボードデータを取得
+      const result = await withTimeout(
         fetchProjectProgress(10),
-        timeoutPromise
-      ]);
-      
-      console.log("ダッシュボードデータの読み込みが完了:", result.success ? "成功" : "失敗");
+        30000,
+        "タイムアウト: データの読み込みに時間がかかりすぎています（30秒）"
+      );
       
       if (result.success && result.data) {
         projectProgressList.value = result.data;
-        console.log(`プロジェクト数: ${result.data.length}`);
         dashboardErrorMessage.value = ""; // 成功時はエラーメッセージをクリア
       } else {
         // 部分的な失敗でも、既存のデータがあれば保持（空配列で上書きしない）
@@ -233,7 +222,6 @@ export function useDashboard() {
       const errorMessage = e instanceof Error ? e.message : "ダッシュボードの読み込みに失敗しました。しばらくしてから再試行してください。";
       dashboardErrorMessage.value = errorMessage;
     } finally {
-      console.log("ダッシュボードデータの読み込み処理を終了");
       isDashboardLoading.value = false;
       isDashboardLoadingInProgress = false;
     }
@@ -243,7 +231,6 @@ export function useDashboard() {
   const loadRecentTasks = async (): Promise<void> => {
     // 既に読み込み中の場合は重複実行を防ぐ
     if (isTaskLoadingInProgress) {
-      console.log("タスクデータは既に読み込み中です");
       return;
     }
 
@@ -252,38 +239,15 @@ export function useDashboard() {
       isTaskLoading.value = true;
       taskErrorMessage.value = "";
       
-      console.log("タスクデータの読み込みを開始...");
-      console.log("fetchRecentTasks API を呼び出します...");
-      
-      // タイムアウトを設定（30秒に延長 - ネットワークが不安定な場合を考慮）
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          console.error("タスクデータの読み込みがタイムアウトしました（30秒）");
-          reject(new Error("タイムアウト: データの読み込みに時間がかかりすぎています（30秒）"));
-        }, 30000);
-      });
-      
-      // API呼び出し前にタイムスタンプを記録
-      const startTime = Date.now();
-      console.log(`API呼び出し開始時刻: ${new Date(startTime).toISOString()}`);
-      
-      const fetchPromise = fetchRecentTasks(10);
-      console.log("fetchRecentTasks Promise を作成しました");
-      
-      const result = await Promise.race([
-        fetchPromise,
-        timeoutPromise
-      ]);
-      
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-      console.log(`API呼び出し完了時刻: ${new Date(endTime).toISOString()}`);
-      console.log(`API呼び出し所要時間: ${duration}ms`);
-      console.log("タスクデータの読み込みが完了:", result.success ? "成功" : "失敗");
+      // タイムアウト付きでタスクデータを取得
+      const result = await withTimeout(
+        fetchRecentTasks(10),
+        30000,
+        "タイムアウト: データの読み込みに時間がかかりすぎています（30秒）"
+      );
       
       if (result.success && result.data) {
         taskProgressList.value = result.data;
-        console.log(`タスク数: ${result.data.length}`);
         taskErrorMessage.value = ""; // 成功時はエラーメッセージをクリア
       } else {
         // 部分的な失敗でも、既存のデータがあれば保持（空配列で上書きしない）
@@ -295,12 +259,10 @@ export function useDashboard() {
       }
     } catch (e) {
       console.error("タスクの読み込み中にエラーが発生:", e);
-      console.error("エラーの詳細:", e instanceof Error ? e.stack : String(e));
       taskProgressList.value = [];
       const errorMessage = e instanceof Error ? e.message : "タスクの読み込みに失敗しました。";
       taskErrorMessage.value = errorMessage;
     } finally {
-      console.log("タスクデータの読み込み処理を終了");
       isTaskLoading.value = false;
       isTaskLoadingInProgress = false;
     }

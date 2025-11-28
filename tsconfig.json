@@ -13,7 +13,7 @@
     "isolatedModules": true,
     "strict": false,
     "forceConsistentCasingInFileNames": true,
-    "types": ["vite/client", "vue-router"],
+    "types": ["vite/client"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
@@ -35,6 +35,7 @@
     "src/components/icons/IconDocumentation.vue",
     "src/components/icons/IconEcosystem.vue",
     "src/components/icons/IconSupport.vue",
-    "src/components/icons/IconTooling.vue"
+    "src/components/icons/IconTooling.vue",
+    "src/pages/NotificationTestPage.vue"
   ]
 }

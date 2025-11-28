@@ -334,14 +334,23 @@ export async function getProjectTeams(): Promise<ServiceResult<ProjectTeam[]>> {
 
       // ProjectMembers with User 型の members をマッピング
       interface ProjectMemberWithUser extends ProjectMembers {
-        user: User;
+        user: User | User[];
       }
-      const memberList: TeamMemberWithUser[] = (members || []).map((m: ProjectMemberWithUser) => ({
-        user_id: m.user_id,
-        task_id: 0, // プロジェクトメンバーには task_id の概念がないため 0 を設定（UIで未使用）
-        role: m.role,
-        user: m.user,
-      }));
+      const memberList: TeamMemberWithUser[] = (members || []).map((m: any) => {
+        // user が配列または単一オブジェクトの可能性があるため、安全に取得
+        const user = Array.isArray(m.user) ? m.user[0] : m.user;
+        // role を型安全にキャスト
+        const role = (m.role === "OWNER" || m.role === "CONTRIBUTOR" || m.role === "REVIEWER") 
+          ? m.role 
+          : "CONTRIBUTOR" as "OWNER" | "CONTRIBUTOR" | "REVIEWER";
+        
+        return {
+          user_id: m.user_id,
+          task_id: 0, // プロジェクトメンバーには task_id の概念がないため 0 を設定（UIで未使用）
+          role: role,
+          user: user,
+        };
+      });
 
       const activeMembers = memberList.filter(m => m.user?.is_active).length;
 
@@ -449,15 +458,19 @@ export async function getUserActivityStats(): Promise<UserActivity[]> {
         continue;
       }
       
-      const tasks = (taskMembers || []).map(tm => tm.task).filter((t): t is Tasks => t !== null && t !== undefined);
+      // task が配列または単一オブジェクトの可能性があるため、安全に取得
+      const tasks = (taskMembers || []).flatMap(tm => {
+        const task = Array.isArray(tm.task) ? tm.task : (tm.task ? [tm.task] : []);
+        return task.filter((t: any) => t !== null && t !== undefined);
+      });
       const totalTasks = tasks.length;
-      const completedTasks = tasks.filter((t: Tasks) => t.status === "DONE").length;
-      const inProgressTasks = tasks.filter((t: Tasks) => t.status === "IN_PROGRESS").length;
+      const completedTasks = tasks.filter((t: any) => t.status === "DONE").length;
+      const inProgressTasks = tasks.filter((t: any) => t.status === "IN_PROGRESS").length;
       const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
       
       // 最後の活動日時を取得
       const lastActivity = tasks.length > 0 
-        ? Math.max(...tasks.map((t: Tasks) => new Date(t.updated_at).getTime()))
+        ? Math.max(...tasks.map((t: any) => new Date(t.updated_at).getTime()))
         : 0;
       
       userActivities.push({
@@ -534,11 +547,15 @@ export async function getUserProfileStats(userId: number): Promise<UserProfileSt
       return null;
     }
     
-    const tasks = (taskMembers || []).map(tm => tm.task).filter((t): t is Tasks => t !== null && t !== undefined);
+    // task が配列または単一オブジェクトの可能性があるため、安全に取得
+    const tasks = (taskMembers || []).flatMap(tm => {
+      const task = Array.isArray(tm.task) ? tm.task : (tm.task ? [tm.task] : []);
+      return task.filter((t: any) => t !== null && t !== undefined);
+    });
     const totalTasks = tasks.length;
-    const completedTasks = tasks.filter((t: Tasks) => t.status === "DONE").length;
-    const inProgressTasks = tasks.filter((t: Tasks) => t.status === "IN_PROGRESS").length;
-    const overdueTasks = tasks.filter((t: Tasks) => {
+    const completedTasks = tasks.filter((t: any) => t.status === "DONE").length;
+    const inProgressTasks = tasks.filter((t: any) => t.status === "IN_PROGRESS").length;
+    const overdueTasks = tasks.filter((t: any) => {
       if (!t.planned_end) return false;
       return new Date(t.planned_end) < new Date() && t.status !== "DONE";
     }).length;
@@ -546,19 +563,19 @@ export async function getUserProfileStats(userId: number): Promise<UserProfileSt
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
     
     // 平均タスク期間を計算
-    const completedTasksWithDuration = tasks.filter((t: Tasks) => 
+    const completedTasksWithDuration = tasks.filter((t: any) => 
       t.status === "DONE" && t.actual_start && t.actual_end
     );
     const averageTaskDuration = completedTasksWithDuration.length > 0 
-      ? completedTasksWithDuration.reduce((sum: number, t: Tasks) => {
-          const duration = new Date(t.actual_end!).getTime() - new Date(t.actual_start!).getTime();
+      ? completedTasksWithDuration.reduce((sum: number, t: any) => {
+          const duration = new Date(t.actual_end).getTime() - new Date(t.actual_start).getTime();
           return sum + duration;
         }, 0) / completedTasksWithDuration.length / (1000 * 60 * 60 * 24) // 日数に変換
       : 0;
     
     // 最後の活動日時
     const lastActivity = tasks.length > 0 
-      ? Math.max(...tasks.map((t: Tasks) => new Date(t.updated_at).getTime()))
+      ? Math.max(...tasks.map((t: any) => new Date(t.updated_at).getTime()))
       : 0;
     
     // 生産性スコア（完了率 + 進捗率 - 遅延率）
@@ -612,7 +629,15 @@ export async function getUserActivityLogs(
       return [];
     }
     
-    const activities: UserActivityLog[] = (tasks || []).map((task: Tasks, index: number) => ({
+    // tasks が配列の配列または単一オブジェクト配列の可能性があるため、安全に処理
+    const taskList = (tasks || []).flatMap((task: any) => {
+      if (Array.isArray(task)) {
+        return task;
+      }
+      return [task];
+    }).filter((t: any) => t !== null && t !== undefined && t.task_name);
+    
+    const activities: UserActivityLog[] = taskList.map((task: any, index: number) => ({
       id: index + 1,
       user_id: userId,
       action: "TASK_UPDATE",
@@ -724,10 +749,21 @@ export async function listProjectMembers(projectId: number): Promise<Array<{ use
       return [];
     }
     // ProjectMembers with User join の結果を適切な型で返す
-    interface ProjectMemberWithUserData extends ProjectMembers {
-      user: User;
+    // クエリ結果には project_id が含まれていない可能性があるため、型を柔軟に定義
+    interface ProjectMemberWithUserData {
+      user_id: number;
+      role: string;
+      joined_at: string;
+      user: User | User[];
+      project_id?: number; // クエリに含まれていない可能性があるため optional
     }
-    return (data || []) as ProjectMemberWithUserData[];
+    return (data || []).map((item: any) => ({
+      user_id: item.user_id,
+      role: item.role,
+      joined_at: item.joined_at,
+      user: Array.isArray(item.user) ? item.user[0] : item.user,
+      project_id: item.project_id
+    })) as Array<{ user_id: number; role: string; joined_at: string; user: User }>;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("プロジェクトメンバー取得でエラー:", msg);

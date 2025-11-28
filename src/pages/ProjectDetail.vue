@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // プロジェクト詳細ページ: 個別プロジェクトの詳細表示・編集機能
 import { ref, computed } from "vue";
-import { useRoute } from "vue-router";
 import router from "@/router";
 import { useScheduleStore } from "../store/schedule";
 import { useProjectDetail } from "@/composables/useProjectDetail";
@@ -27,8 +26,11 @@ import {
 } from "@/services/teamService";
 import type { Task } from "@/types/task";
 
-// Router
-const route = useRoute();
+// Router props (router/index.tsでprops: trueが設定されているため)
+interface Props {
+  id: string;
+}
+const props = defineProps<Props>();
 
 // プロジェクト詳細の状態・ロジックは composable から取得
 // useProjectDetail から状態や操作関数を取得
@@ -56,7 +58,7 @@ const {
   inProgressTasksCount,     // 進行中タスク数
   notStartedTasksCount,     // 未開始タスク数
   loadProjectDetail,        // プロジェクト読み込み関数
-} = useProjectDetail(route.params.id as string);
+} = useProjectDetail(props.id);
 
 // ===== プロジェクトメンバー管理（project_members） =====
 // 目的: プロジェクト詳細ページ内でメンバー一覧・追加・役割変更・削除を提供
@@ -75,7 +77,7 @@ const loadProjectMembers = async () => {
   try {
     isProjectMembersLoading.value = true;
     projectMembersErrorMessage.value = "";
-    const pid = Number(route.params.id);
+    const pid = Number(props.id);
     if (!pid) {
       projectMembers.value = [];
       return;
@@ -99,7 +101,7 @@ const loadProjectMembers = async () => {
 // メンバー追加
 const handleAddProjectMember = async () => {
   try {
-    const pid = Number(route.params.id);
+    const pid = Number(props.id);
     if (!pid || !memberForm.value.user_id) return;
     const ok = await addProjectMember(pid, memberForm.value.user_id, memberForm.value.role);
     if (ok) {
@@ -118,7 +120,7 @@ const handleAddProjectMember = async () => {
 // 役割変更
 const handleUpdateProjectMemberRole = async (userId: number, newRole: "OWNER"|"CONTRIBUTOR"|"REVIEWER") => {
   try {
-    const pid = Number(route.params.id);
+    const pid = Number(props.id);
     if (!pid) return;
     const ok = await updateProjectMemberRole(pid, userId, newRole);
     if (ok) {
@@ -136,7 +138,7 @@ const handleUpdateProjectMemberRole = async (userId: number, newRole: "OWNER"|"C
 // メンバー削除
 const handleRemoveProjectMember = async (userId: number) => {
   try {
-    const pid = Number(route.params.id);
+    const pid = Number(props.id);
     if (!pid) return;
     if (!window.confirm("このメンバーを削除しますか？")) return;
     const ok = await removeProjectMember(pid, userId);
@@ -295,9 +297,7 @@ const getHeaderActions = () => {
   return actions;
 };
 
-// 初期化ログのみ維持
 // 注: loadProjectFromRoute()はcomposable内のonMountedで自動実行されます
-console.log("プロジェクト詳細ページが読み込まれました");
 </script>
 
 <template>

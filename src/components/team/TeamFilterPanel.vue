@@ -15,11 +15,13 @@ interface Props {
 }
 
 // Emits定義
+// FilterFieldコンポーネントは string | number | null | "" をemitするため、それに対応
+type FilterValue = string | number | null | "";
 interface Emits {
-  (e: 'update:searchQuery', value: string): void;
-  (e: 'update:statusFilter', value: string): void;
-  (e: 'update:roleFilter', value: string): void;
-  (e: 'update:globalSearchQuery', value: string): void;
+  (e: 'update:searchQuery', value: FilterValue): void;
+  (e: 'update:statusFilter', value: FilterValue): void;
+  (e: 'update:roleFilter', value: FilterValue): void;
+  (e: 'update:globalSearchQuery', value: FilterValue): void;
   (e: 'clearFilters'): void;
 }
 

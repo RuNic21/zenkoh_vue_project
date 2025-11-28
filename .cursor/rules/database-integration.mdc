@@ -27,9 +27,11 @@ Database Layer (Supabase)
 - **DB型**: `src/types/db/*.ts` (自動生成、編集禁止)
   - projects.ts, tasks.ts, users.ts, boards.ts, board_columns.ts
   - task_members.ts, notifications.ts, alert_rules.ts
+  - project_members.ts, information_schema_columns.ts
 - **ビジネス型**: `src/types/task.ts`, `src/types/project.ts` (手動定義)
 - **UI型**: `src/types/schedule.ts` (画面表示用)
 - **専門型**: `src/types/team.ts`, `src/types/report.ts`, `src/types/notification.ts`
+- **追加型**: `src/types/comment.ts`, `src/types/taskStatusHistory.ts`
 
 ## 🔧 開発ルール
 
@@ -130,6 +132,7 @@ const saveChanges = async () => {
 - **USERS** → **NOTIFICATIONS** (1:N)
 - **ALERT_RULES** → **NOTIFICATIONS** (1:N)
 - **TASKS** → **TASKS** (自己参照: parent_task_id)
+- **PROJECTS** → **PROJECT_MEMBERS** (1:N)
 
 ### 2. 必須フィールドルール
 ```typescript
@@ -253,6 +256,14 @@ const report = await generateReport(options);
 // 通知管理
 import { listNotifications } from "@/services/notificationService";
 const notifications = await listNotifications();
+
+// コメント管理
+import { listComments, createComment } from "@/services/commentService";
+const comments = await listComments(taskId);
+
+// タスクステータス履歴
+import { getTaskStatusHistory } from "@/services/taskStatusHistoryService";
+const history = await getTaskStatusHistory(taskId);
 ```
 
 ### 3. 新しいアダプター関数作成
@@ -313,5 +324,8 @@ export const useScheduleStore = () => ({
 ## 📚 関連ドキュメント
 
 - [データベーススキーマドキュメント](../docs/database-schema.md)
-- [フロントエンドアーキテクチャ](./frontend-architecture.mdc)
+- [データベース統合ガイド](../docs/database-guide.md)
+- [認証システム統合ガイド](../docs/auth-system-guide.md)
+- [マイグレーションガイド](../docs/migration-guide.md)
+- [タグ機能ガイド](../docs/tag-feature-guide.md)
 - [コーディングスタイルガイド](./coding-style.mdc)

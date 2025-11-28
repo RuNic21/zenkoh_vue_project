@@ -10,7 +10,7 @@ alwaysApply: false
 **すべてのリクエストで自動的に参照される基本ルール**
 
 - **coding-style.mdc** — 日本語コメント方針、UI テキスト日本語、セミコロン/ダブルクォート、既存インデント遵守、新機能開発ガイドライン
-- **project-structure.mdc** — プロジェクト構造・ディレクトリ配置・ファイル命名規則・主要ファイル役割（12個の専門サービス、9つのページ対応、Vue Router・認証システム統合）
+- **project-structure.mdc** — プロジェクト構造・ディレクトリ配置・ファイル命名規則・主要ファイル役割（14個の専門サービス、9つのページ対応、Vue Router・認証システム統合）
 
 ## 🎯 ファイルタイプ別適用ルール（globs指定）
 **特定のファイルタイプで自動的に参照されるルール**
@@ -23,7 +23,7 @@ alwaysApply: false
 ## 📚 選択的参照ルール（description指定）
 **ユーザーが明示的に参照する必要がある専門ルール**
 
-- **database-integration.mdc** — データベース統合ルール・Supabase連携・型変換・エラー処理・開発ツール（12個の専門サービス・認証システム対応）
+- **database-integration.mdc** — データベース統合ルール・Supabase連携・型変換・エラー処理・開発ツール（14個の専門サービス・認証システム対応）
 - **development-workflow.mdc** — 開発ワークフロー・デバッグ手順・トラブルシューティング・デプロイ準備（Vue Router・認証システム・新機能ページ開発プロセス対応）
 - **auto-documentation-sync.mdc** — 自動文書同期ルール・コード変更時の文書/ルール自動更新マッピング・変更タイプ別更新対象・検証プロセス
 
@@ -33,14 +33,33 @@ alwaysApply: false
 - 型/ヘルパーは重複定義せず既存へ集約
 - コード変更時は関連文書・ルールの更新を自動チェック
 
+## 📚 関連ドキュメント（docs/）
+
+プロジェクトの詳細ドキュメントは `docs/` フォルダにあります:
+
+- **auth-system-guide.md** — 認証システム統合ガイド（ログイン・会員登録・セッション管理・users テーブル統合）
+- **migration-guide.md** — マイグレーションガイド（スキーマ変更・実行手順・検証方法）
+- **tag-feature-guide.md** — タグ機能ガイド（使用方法・テスト手順・拡張機能実装）
+- **database-guide.md** — データベース統合ガイド（アクセスルール・型変換・エラー処理・開発ツール）
+- **database-schema.md** — データベーススキーマ全体（テーブル定義・リレーション図）
+
 ## 変更履歴（要約）
-- 2025-10: **最新更新** - auto-documentation-sync.mdc 追加（コード変更時の自動文書同期ルール）
-- 2025-01: Vue Router 4 統合・Supabase Auth 認証システム統合完了（12個の専門サービス、9つのページ対応）
-- 2025-01: material-dashboard-ui-styles.mdc 追加（Material Dashboard 3 完全UI/UXガイド - 色彩/タイポグラフィ/レイアウト/コンポーネント/レスポンシブデザイン原則）
+- 2025-01: **最新更新** - ルールファイル最新化完了
+  - project-structure.mdc: サービス14個、composables 14個、utils 16個に更新
+  - database-integration.mdc: 新規サービス（commentService, taskStatusHistoryService）追加
+  - 型定義（comment.ts, taskStatusHistory.ts）追加を反映
+  - テーブル関係（project_members）追加を反映
+- 2025-01: **最新更新** - ドキュメント整理・統合完了
+  - 認証関連ドキュメント3件を `auth-system-guide.md` に統合
+  - マイグレーション関連ドキュメント3件を `migration-guide.md` に統合
+  - タグ機能関連ドキュメント2件を `tag-feature-guide.md` に統合
+  - データベース関連ドキュメント2件を `database-guide.md` に統合
+  - 不要ファイル削除（database-tables.txt, check-users-schema.mjs, test-crud.mjs）
+- 2025-10: auto-documentation-sync.mdc 追加（コード変更時の自動文書同期ルール）
+- 2025-01: Vue Router 4 統合・Supabase Auth 認証システム統合完了（14個の専門サービス、9つのページ対応）
+- 2025-01: material-dashboard-ui-styles.mdc 追加（Material Dashboard 3 完全UI/UXガイド）
 - 2025-01: ルール統合・最適化（typescript-patterns, material-dashboard-integration を vue-patterns に統合）
 - 2025-01: ルール整理・重複削除（vue-components, project-guidelines-ja, project-data-architecture を削除）
 - 2025-01: database-integration.mdc 追加（DB統合完了・実際連携ルール）
-- 2025-01: 不要ファイル削除（scheduleService.ts, supabaseClient.js）
-- 2025-01: サービス層整理完了（12個の専門サービスに拡張）
-- 2025-01: プロジェクト拡張対応（新機能開発ガイドライン追加）
+- 2025-01: サービス層整理完了（14個の専門サービスに拡張）
 - 2025-01: 全ルールファイル更新（現在のプロジェクト状態に完全対応）

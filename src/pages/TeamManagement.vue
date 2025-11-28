@@ -172,7 +172,10 @@ const alertRulesErrorMessage = ref("");
 // 通知統計情報
 const isNotificationStatsLoading = ref(false);
 
-// フィルタリング・検索（セクション別に分離）
+// フィルタリング・検索（全セクション共通検索 + セクション別フィルター）
+// 全カード・セクションに適用される共通検索フィルター
+const globalSearchQuery = ref("");
+
 // ユーザー管理用フィルター
 const userSearchQuery = ref("");
 const userStatusFilter = ref("all"); // 'all' | 'active' | 'inactive'
@@ -287,11 +290,24 @@ const alertRuleForm = ref<{
 
 // ===== 計算プロパティ =====
 
-// フィルタリングされたユーザー一覧（ユーザー管理専用フィルター）
+// フィルタリングされたユーザー一覧（共通検索 + ユーザー管理専用フィルター）
 const filteredUsers = computed(() => {
   let filtered = users.value;
 
-  // ユーザー検索クエリでフィルタリング
+  // 共通検索クエリでフィルタリング（全カードに適用）
+  if (globalSearchQuery.value.trim()) {
+    const query = globalSearchQuery.value.toLowerCase();
+    filtered = filtered.filter(user => 
+      user.display_name.toLowerCase().includes(query) ||
+      user.email.toLowerCase().includes(query) ||
+      (user.first_name && user.first_name.toLowerCase().includes(query)) ||
+      (user.last_name && user.last_name.toLowerCase().includes(query)) ||
+      (user.department && user.department.toLowerCase().includes(query)) ||
+      (user.position && user.position.toLowerCase().includes(query))
+    );
+  }
+
+  // ユーザー専用検索クエリでフィルタリング（後方互換性）
   if (userSearchQuery.value.trim()) {
     const query = userSearchQuery.value.toLowerCase();
     filtered = filtered.filter(user => 
@@ -339,11 +355,21 @@ const filteredUsers = computed(() => {
 //   return filtered;
 // });
 
-// フィルタリングされた通知一覧（通知管理専用フィルター）
+// フィルタリングされた通知一覧（共通検索 + 通知管理専用フィルター）
 const filteredNotifications = computed(() => {
   let filtered = notifications.value;
 
-  // 通知検索クエリでフィルタリング
+  // 共通検索クエリでフィルタリング（全カードに適用）
+  if (globalSearchQuery.value.trim()) {
+    const query = globalSearchQuery.value.toLowerCase();
+    filtered = filtered.filter(notification => 
+      notification.subject.toLowerCase().includes(query) ||
+      notification.to_email.toLowerCase().includes(query) ||
+      notification.body_text.toLowerCase().includes(query)
+    );
+  }
+
+  // 通知専用検索クエリでフィルタリング（後方互換性）
   if (notificationSearchQuery.value.trim()) {
     const query = notificationSearchQuery.value.toLowerCase();
     filtered = filtered.filter(notification => 
@@ -402,11 +428,21 @@ const notificationColumns = computed(() => [
   }
 ]);
 
-// フィルタリングされたアラートルール一覧（アラートルール専用フィルター）
+// フィルタリングされたアラートルール一覧（共通検索 + アラートルール専用フィルター）
 const filteredAlertRules = computed(() => {
   let filtered = alertRules.value;
 
-  // アラートルール検索クエリでフィルタリング
+  // 共通検索クエリでフィルタリング（全カードに適用）
+  if (globalSearchQuery.value.trim()) {
+    const query = globalSearchQuery.value.toLowerCase();
+    filtered = filtered.filter(rule => 
+      rule.name.toLowerCase().includes(query) ||
+      rule.rule_type.toLowerCase().includes(query) ||
+      (rule.notify_email && rule.notify_email.toLowerCase().includes(query))
+    );
+  }
+
+  // アラートルール専用検索クエリでフィルタリング（後方互換性）
   if (alertRuleSearchQuery.value.trim()) {
     const query = alertRuleSearchQuery.value.toLowerCase();
     filtered = filtered.filter(rule => 
@@ -419,11 +455,19 @@ const filteredAlertRules = computed(() => {
   return filtered;
 });
 
-// フィルタリングされたユーザー活動統計（活動統計専用フィルター）
+// フィルタリングされたユーザー活動統計（共通検索 + 活動統計専用フィルター）
 const filteredUserActivities = computed(() => {
   let filtered = userActivities.value;
 
-  // 活動統計検索クエリでフィルタリング（ユーザー名で検索）
+  // 共通検索クエリでフィルタリング（全カードに適用）
+  if (globalSearchQuery.value.trim()) {
+    const query = globalSearchQuery.value.toLowerCase();
+    filtered = filtered.filter(activity => 
+      activity.display_name.toLowerCase().includes(query)
+    );
+  }
+
+  // 活動統計専用検索クエリでフィルタリング（後方互換性）
   if (activitySearchQuery.value.trim()) {
     const query = activitySearchQuery.value.toLowerCase();
     filtered = filtered.filter(activity => 
@@ -1424,7 +1468,22 @@ const onSaveAlertRule = async (f: {
 };
 
 
-// フィルタリセット（セクション別）
+// フィルタリセット（共通検索 + セクション別）
+// 全フィルターをリセット
+const clearAllFilters = () => {
+  globalSearchQuery.value = "";
+  userSearchQuery.value = "";
+  userStatusFilter.value = "all";
+  notificationSearchQuery.value = "";
+  notificationStatusFilter.value = "all";
+  alertRuleSearchQuery.value = "";
+  activitySearchQuery.value = "";
+  searchQuery.value = "";
+  statusFilter.value = "all";
+  roleFilter.value = "all";
+};
+
+// セクション別フィルターリセット
 const clearUserFilters = () => {
   userSearchQuery.value = "";
   userStatusFilter.value = "all";
@@ -1445,6 +1504,7 @@ const clearActivityFilters = () => {
 
 // TeamFilterPanel用（後方互換性）
 const clearFilters = () => {
+  globalSearchQuery.value = "";
   searchQuery.value = "";
   statusFilter.value = "all";
   roleFilter.value = "all";
@@ -1620,14 +1680,15 @@ const {
       />
     </div>
 
-    <!-- フィルタリング・アクションパネル（ユーザー管理専用） -->
+    <!-- フィルタリング・アクションパネル（全カード共通フィルター） -->
     <div class="row mb-4">
       <div class="col-12">
         <TeamFilterPanel
+          v-model:global-search-query="globalSearchQuery"
           v-model:search-query="userSearchQuery"
           v-model:status-filter="userStatusFilter"
           v-model:role-filter="roleFilter"
-          @clear-filters="clearUserFilters"
+          @clear-filters="clearFilters"
         />
       </div>
     </div>
@@ -1703,17 +1764,24 @@ const {
                 </p>
               </div>
             </div>
-            <!-- 検索バー（活動統計専用） -->
+            <!-- 検索バー（共通検索が適用中） -->
             <div class="row">
               <div class="col-md-6 mb-2">
                 <div class="input-group input-group-outline">
                   <input 
                     type="text" 
                     class="form-control" 
-                    placeholder="ユーザー名で検索..."
+                    :placeholder="globalSearchQuery ? '共通検索が適用中...' : 'ユーザー名で検索（個別）...'"
                     v-model="activitySearchQuery"
+                    :disabled="!!globalSearchQuery"
                   >
+                  <span v-if="globalSearchQuery" class="input-group-text text-info">
+                    <i class="fa fa-globe"></i>
+                  </span>
                 </div>
+                <small v-if="globalSearchQuery" class="text-info">
+                  <i class="fa fa-info-circle"></i> 共通検索フィルターが適用されています
+                </small>
               </div>
               <div class="col-md-3 mb-2">
                 <button 
@@ -1721,7 +1789,7 @@ const {
                   @click="clearActivityFilters"
                 >
                   <i class="fa fa-times me-1"></i>
-                  フィルタクリア
+                  個別フィルタクリア
                 </button>
               </div>
             </div>
@@ -1817,17 +1885,24 @@ const {
                 </p>
               </div>
             </div>
-            <!-- 検索・フィルターバー（通知専用） -->
+            <!-- 検索・フィルターバー（共通検索が適用中） -->
             <div class="row">
               <div class="col-md-6 mb-2">
                 <div class="input-group input-group-outline">
                   <input 
                     type="text" 
                     class="form-control" 
-                    placeholder="通知を検索（件名、送信先、本文）..."
+                    :placeholder="globalSearchQuery ? '共通検索が適用中...' : '通知を検索（件名、送信先、本文）...'"
                     v-model="notificationSearchQuery"
+                    :disabled="!!globalSearchQuery"
                   >
+                  <span v-if="globalSearchQuery" class="input-group-text text-info">
+                    <i class="fa fa-globe"></i>
+                  </span>
                 </div>
+                <small v-if="globalSearchQuery" class="text-info">
+                  <i class="fa fa-info-circle"></i> 共通検索フィルターが適用されています
+                </small>
               </div>
               <div class="col-md-3 mb-2">
                 <select 
@@ -1847,7 +1922,7 @@ const {
                   @click="clearNotificationFilters"
                 >
                   <i class="fa fa-times me-1"></i>
-                  フィルタクリア
+                  個別フィルタクリア
                 </button>
               </div>
             </div>
@@ -1926,7 +2001,8 @@ const {
       </div>
     </div>
 
-    <!-- アラートルール一覧 -->
+    <!-- 今後使うかもしれないので残す
+    アラートルール一覧
     <div class="row mb-4">
       <div class="col-12">
         <div class="card">
@@ -1950,17 +2026,24 @@ const {
                 </button>
               </div>
             </div>
-            <!-- 検索バー（アラートルール専用） -->
+            検索バー（共通検索が適用中）
             <div class="row">
               <div class="col-md-6 mb-2">
                 <div class="input-group input-group-outline">
                   <input 
                     type="text" 
                     class="form-control" 
-                    placeholder="ルール名、タイプ、メールアドレスで検索..."
+                    :placeholder="globalSearchQuery ? '共通検索が適用中...' : 'ルール名、タイプ、メールアドレスで検索（個別）...'"
                     v-model="alertRuleSearchQuery"
+                    :disabled="!!globalSearchQuery"
                   >
+                  <span v-if="globalSearchQuery" class="input-group-text text-info">
+                    <i class="fa fa-globe"></i>
+                  </span>
                 </div>
+                <small v-if="globalSearchQuery" class="text-info">
+                  <i class="fa fa-info-circle"></i> 共通検索フィルターが適用されています
+                </small>
               </div>
               <div class="col-md-3 mb-2">
                 <button 
@@ -1968,13 +2051,13 @@ const {
                   @click="clearAlertRuleFilters"
                 >
                   <i class="fa fa-times me-1"></i>
-                  フィルタクリア
+                  個別フィルタクリア
                 </button>
               </div>
             </div>
           </div>
           <div class="card-body px-0 pt-0 pb-2">
-            <!-- ローディング状態 -->
+            ローディング状態
             <div v-if="isAlertRulesLoading" class="text-center py-4">
               <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">読み込み中...</span>
@@ -1982,12 +2065,12 @@ const {
               <p class="text-sm text-secondary mt-2">アラートルールデータを読み込み中...</p>
             </div>
             
-            <!-- エラー表示 -->
+            エラー表示
             <div v-else-if="alertRulesErrorMessage" class="alert alert-danger mx-3" role="alert">
               {{ alertRulesErrorMessage }}
             </div>
             
-            <!-- アラートルール一覧テーブル（コンポーネント） -->
+            アラートルール一覧テーブル（コンポーネント）
             <AlertRuleTable 
               v-else
               :rows="filteredAlertRules" 
@@ -2002,6 +2085,7 @@ const {
         </div>
       </div>
     </div>
+    -->
 
 
     <!-- プロジェクトメンバー追加モーダル -->

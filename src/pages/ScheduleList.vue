@@ -38,6 +38,8 @@ const {
   searchQuery,          // 検索クエリ（名称など）
   selectedProjectId,    // 選択中のプロジェクトID
   assigneeQuery,        // 担当者名の検索クエリ
+  tagFilter,            // タグフィルター
+  availableTags,        // 利用可能なタグ一覧
   handleFilterUpdate,   // フィルタ変更ハンドラ
   groupedSchedules,     // プロジェクト別のスケジュールグループ
   projectStats,         // プロジェクト別の統計情報
@@ -77,7 +79,8 @@ const filterValues = computed({
     searchQuery: searchQuery.value,
     filterStatus: filterStatus.value,
     selectedProjectId: selectedProjectId.value,
-    assigneeQuery: assigneeQuery.value
+    assigneeQuery: assigneeQuery.value,
+    tagFilter: tagFilter.value
   }),
   set: (newValues) => {
     // 部分更新にも対応: 定義されたキーのみ更新し、他は維持
@@ -92,6 +95,9 @@ const filterValues = computed({
     }
     if (Object.prototype.hasOwnProperty.call(newValues, "assigneeQuery") && newValues.assigneeQuery !== undefined) {
       assigneeQuery.value = newValues.assigneeQuery;
+    }
+    if (Object.prototype.hasOwnProperty.call(newValues, "tagFilter") && newValues.tagFilter !== undefined) {
+      tagFilter.value = newValues.tagFilter;
     }
   }
 });
@@ -129,6 +135,7 @@ const filterValues = computed({
         <SearchFilterBar
           v-model="filterValues"
           :projects="projects"
+          :available-tags="availableTags"
           @reset="resetFilters()"
         />
       </div>

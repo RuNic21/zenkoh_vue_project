@@ -13,12 +13,14 @@ interface FilterValues {
   filterStatus: string;             // ステータス
   selectedProjectId: number | null; // プロジェクト選択
   assigneeQuery: string;            // 担当者名での検索
+  tagFilter?: string[];             // 選択されたタグの配列（オプション）
 }
 
 // Propsの型定義
 interface Props {
   modelValue: FilterValues;
   projects: Project[];
+  availableTags?: string[];         // 利用可能なタグ一覧（オプション）
   searchPlaceholder?: string;
   showProjectFilter?: boolean;
   showStatusFilter?: boolean;
@@ -27,6 +29,7 @@ interface Props {
 
 // Propsの受け取り（デフォルト値含む）
 const props = withDefaults(defineProps<Props>(), {
+  availableTags: () => [],
   searchPlaceholder: "キーワードで検索（部分一致、複数単語OK）",
   showProjectFilter: true,
   showStatusFilter: true,
@@ -46,8 +49,26 @@ const activeFiltersCount = computed(() => {
   if (props.modelValue.filterStatus !== "all") count++;
   if (props.modelValue.selectedProjectId !== null) count++;
   if (props.modelValue.assigneeQuery) count++;
+  if (props.modelValue.tagFilter && props.modelValue.tagFilter.length > 0) count++;
   return count;
 });
+
+// タグの選択/解除を処理
+const toggleTag = (tag: string) => {
+  const currentTags = props.modelValue.tagFilter || [];
+  const newTags = [...currentTags];
+  const index = newTags.indexOf(tag);
+  
+  if (index >= 0) {
+    // 既に選択されている場合は解除
+    newTags.splice(index, 1);
+  } else {
+    // 選択されていない場合は追加
+    newTags.push(tag);
+  }
+  
+  updateField('tagFilter', newTags);
+};
 
 // ステータスオプション
 const statusOptions = [
@@ -139,6 +160,50 @@ const updateField = (field: keyof FilterValues, value: string | number | null) =
         </div>
       </div>
     </div>
+    
+    <!-- タグフィルター -->
+    <div v-if="availableTags && availableTags.length > 0" class="col-12 mt-3">
+      <label class="form-label text-sm text-dark fw-bold ms-1 mb-2">
+        <i class="fas fa-tags text-sm me-1"></i>
+        タグでフィルタ
+        <span v-if="modelValue.tagFilter && modelValue.tagFilter.length > 0" class="badge bg-gradient-primary ms-2">
+          {{ modelValue.tagFilter.length }}個選択中
+        </span>
+      </label>
+      <div class="d-flex flex-wrap gap-2">
+        <button
+          v-for="tag in availableTags"
+          :key="tag"
+          type="button"
+          :class="[
+            'btn btn-sm',
+            modelValue.tagFilter && modelValue.tagFilter.includes(tag)
+              ? 'bg-gradient-primary text-white' 
+              : 'btn-outline-primary'
+          ]"
+          @click="toggleTag(tag)"
+        >
+          <i 
+            v-if="modelValue.tagFilter && modelValue.tagFilter.includes(tag)" 
+            class="material-symbols-rounded me-1"
+            style="font-size: 0.875rem;"
+          >
+            check_circle
+          </i>
+          {{ tag }}
+        </button>
+      </div>
+      <div v-if="modelValue.tagFilter && modelValue.tagFilter.length > 0" class="mt-2">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          @click="updateField('tagFilter', [])"
+        >
+          <i class="material-symbols-rounded me-1" style="font-size: 0.875rem;">close</i>
+          タグフィルタをクリア
+        </button>
+      </div>
+    </div>
   </FilterPanel>
 </template>
 
@@ -162,6 +227,34 @@ const updateField = (field: keyof FilterValues, value: string | number | null) =
   line-height: 1;
 }
 
+/* タグフィルターボタンのスタイル */
+.btn-sm {
+  font-size: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.btn-sm:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-sm.bg-gradient-primary {
+  border: none;
+}
+
+.btn-outline-primary {
+  border-color: #5e72e4;
+  color: #5e72e4;
+}
+
+.btn-outline-primary:hover {
+  background-color: #5e72e4;
+  border-color: #5e72e4;
+  color: white;
+}
+
 /* レスポンシブ調整 */
 @media (max-width: 991px) {
   .filter-stats-compact {
@@ -170,6 +263,10 @@ const updateField = (field: keyof FilterValues, value: string | number | null) =
   
   .col-lg-1.col-md-12 {
     margin-top: 0.5rem;
+  }
+  
+  .d-flex.flex-wrap.gap-2 {
+    gap: 0.5rem !important;
   }
 }
 </style>

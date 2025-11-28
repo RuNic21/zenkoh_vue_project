@@ -134,6 +134,97 @@ const DEMO_USERS = [
     bio: "関係者調整と議事録整備を支援するPMOです。",
     skills: ["PMO", "議事録", "調整力"],
     tags: ["PMO", "ドキュメント"]
+  },
+  {
+    email: "takeshi.watanabe@zenkoh.com",
+    displayName: "渡辺 健",
+    firstName: "健",
+    lastName: "渡辺",
+    department: "セキュリティ室",
+    position: "セキュリティエンジニア",
+    phone: "080-2233-4455",
+    role: "member",
+    bio: "クラウドセキュリティとコンプライアンス対応を担当。",
+    skills: ["セキュリティ", "AWS", "コンプライアンス"],
+    tags: ["セキュリティ", "コンプライアンス"]
+  },
+  {
+    email: "yuki.morita@zenkoh.com",
+    displayName: "森田 由紀",
+    firstName: "由紀",
+    lastName: "森田",
+    department: "プロダクト推進部",
+    position: "フロントエンドエンジニア",
+    phone: "090-1122-3344",
+    role: "member",
+    bio: "Vue.js と React を使ったフロントエンド開発を担当。",
+    skills: ["Vue.js", "React", "TypeScript"],
+    tags: ["フロントエンド", "リモート可"]
+  },
+  {
+    email: "hiroshi.yamada@zenkoh.com",
+    displayName: "山田 博",
+    firstName: "博",
+    lastName: "山田",
+    department: "バックエンド開発部",
+    position: "バックエンドエンジニア",
+    phone: "080-3344-5566",
+    role: "member",
+    bio: "Node.js と PostgreSQL を使ったバックエンド開発を担当。",
+    skills: ["Node.js", "PostgreSQL", "REST API"],
+    tags: ["バックエンド", "API設計"]
+  },
+  {
+    email: "akiko.suzuki@zenkoh.com",
+    displayName: "鈴木 明子",
+    firstName: "明子",
+    lastName: "鈴木",
+    department: "データ分析室",
+    position: "データアナリスト",
+    phone: "070-4455-6677",
+    role: "member",
+    bio: "ビジネスデータの分析とレポート作成を担当。",
+    skills: ["SQL", "Tableau", "統計分析"],
+    tags: ["データ分析", "レポート"]
+  },
+  {
+    email: "kenji.fujita@zenkoh.com",
+    displayName: "藤田 健二",
+    firstName: "健二",
+    lastName: "藤田",
+    department: "インフラ運用室",
+    position: "インフラエンジニア",
+    phone: "080-5566-7788",
+    role: "member",
+    bio: "オンプレミスとクラウドのインフラ運用を担当。",
+    skills: ["Linux", "Docker", "Kubernetes"],
+    tags: ["インフラ", "運用"]
+  },
+  {
+    email: "miho.okada@zenkoh.com",
+    displayName: "岡田 美穂",
+    firstName: "美穂",
+    lastName: "岡田",
+    department: "プロジェクト管理室",
+    position: "プロジェクトマネージャー",
+    phone: "090-6677-8899",
+    role: "manager",
+    bio: "複数プロジェクトの進捗管理とリソース調整を担当。",
+    skills: ["プロジェクト管理", "リソース管理", "進捗管理"],
+    tags: ["PM", "マルチプロジェクト"]
+  },
+  {
+    email: "sho.tanaka@zenkoh.com",
+    displayName: "田中 翔",
+    firstName: "翔",
+    lastName: "田中",
+    department: "モバイル開発部",
+    position: "モバイルエンジニア",
+    phone: "080-7788-9900",
+    role: "member",
+    bio: "iOS と Android アプリの開発を担当。",
+    skills: ["Swift", "Kotlin", "React Native"],
+    tags: ["モバイル", "アプリ開発"]
   }
 ];
 
@@ -198,7 +289,7 @@ const PROJECT_BLUEPRINTS = [
       {
         name: "主要3拠点でのパイロット検証",
         description: "足立・江東・板橋拠点での実地検証とフィードバック収集を行う。",
-        status: "HOLD",
+        status: "BLOCKED",
         priority: "HIGH",
         plannedStart: "2025-02-17",
         plannedEnd: "2025-03-21",
@@ -224,6 +315,98 @@ const PROJECT_BLUEPRINTS = [
           { email: "risa.ando@zenkoh.com", role: "COORDINATOR" },
           { email: "k.yamamoto@zenkoh.com", role: "OWNER" }
         ]
+      },
+      {
+        name: "配送ルート最適化アルゴリズム実装",
+        description: "リアルタイム交通情報を考慮した配送ルート最適化エンジンを開発する。",
+        status: "IN_PROGRESS",
+        priority: "HIGH",
+        plannedStart: "2025-02-10",
+        plannedEnd: "2025-03-15",
+        progress: 40,
+        columnName: "進行中",
+        assigneeEmail: "y.sato@zenkoh.com",
+        memberRoles: [
+          { email: "y.sato@zenkoh.com", role: "LEAD" },
+          { email: "hiroshi.yamada@zenkoh.com", role: "CONTRIBUTOR" },
+          { email: "m.kobayashi@zenkoh.com", role: "REVIEWER" }
+        ]
+      },
+      {
+        name: "倉庫作業員向けモバイルアプリ開発",
+        description: "在庫確認とピッキング指示を表示するモバイルアプリを開発する。",
+        status: "NOT_STARTED",
+        priority: "MEDIUM",
+        plannedStart: "2025-03-01",
+        plannedEnd: "2025-04-30",
+        progress: 0,
+        columnName: "未着手",
+        assigneeEmail: "sho.tanaka@zenkoh.com",
+        memberRoles: [
+          { email: "sho.tanaka@zenkoh.com", role: "CONTRIBUTOR" },
+          { email: "s.nakamura@zenkoh.com", role: "UX" },
+          { email: "ayumi.tanaka@zenkoh.com", role: "QA" }
+        ]
+      },
+      {
+        name: "配送ドライバー向けナビゲーション統合",
+        description: "既存ナビアプリと連携し、配送先情報を自動入力する機能を実装する。",
+        status: "NOT_STARTED",
+        priority: "MEDIUM",
+        plannedStart: "2025-03-20",
+        plannedEnd: "2025-05-10",
+        progress: 5,
+        columnName: "未着手",
+        assigneeEmail: "yuki.morita@zenkoh.com",
+        memberRoles: [
+          { email: "yuki.morita@zenkoh.com", role: "CONTRIBUTOR" },
+          { email: "y.sato@zenkoh.com", role: "TECH_LEAD" }
+        ]
+      },
+      {
+        name: "データ品質監視ダッシュボード",
+        description: "データ連携の品質を監視し、異常を検知するダッシュボードを構築する。",
+        status: "IN_PROGRESS",
+        priority: "MEDIUM",
+        plannedStart: "2025-01-15",
+        plannedEnd: "2025-02-28",
+        progress: 65,
+        columnName: "進行中",
+        assigneeEmail: "haruki.ishikawa@zenkoh.com",
+        memberRoles: [
+          { email: "haruki.ishikawa@zenkoh.com", role: "DATA_ENGINEER" },
+          { email: "akiko.suzuki@zenkoh.com", role: "REVIEWER" }
+        ]
+      },
+      {
+        name: "顧客向け配送状況通知システム",
+        description: "顧客に配送状況をリアルタイムで通知するメール/SMSシステムを構築する。",
+        status: "NOT_STARTED",
+        priority: "LOW",
+        plannedStart: "2025-04-01",
+        plannedEnd: "2025-05-20",
+        progress: 0,
+        columnName: "未着手",
+        assigneeEmail: "hiroshi.yamada@zenkoh.com",
+        memberRoles: [
+          { email: "hiroshi.yamada@zenkoh.com", role: "CONTRIBUTOR" },
+          { email: "risa.ando@zenkoh.com", role: "COORDINATOR" }
+        ]
+      },
+      {
+        name: "パフォーマンステスト実施",
+        description: "システム全体の負荷テストとパフォーマンス最適化を実施する。",
+        status: "NOT_STARTED",
+        priority: "HIGH",
+        plannedStart: "2025-05-15",
+        plannedEnd: "2025-06-15",
+        progress: 0,
+        columnName: "未着手",
+        assigneeEmail: "ayumi.tanaka@zenkoh.com",
+        memberRoles: [
+          { email: "ayumi.tanaka@zenkoh.com", role: "QA" },
+          { email: "naoki.kudo@zenkoh.com", role: "SRE" }
+        ]
       }
     ],
     alertRules: [
@@ -247,7 +430,7 @@ const PROJECT_BLUEPRINTS = [
         subject: "【物流DX】在庫データ連携の仕様確認が必要です",
         body: "倉庫チームとの最終レビュー前にフィールド定義を確定してください。",
         toEmail: "m.kobayashi@zenkoh.com",
-        status: "pending",
+        status: "QUEUED",
         relatedTask: "倉庫在庫データ連携仕様の確定",
         relatedRule: "期限超過アラート（物流DX）",
         sendAfter: "2025-02-03T09:00:00+09:00"
@@ -256,7 +439,7 @@ const PROJECT_BLUEPRINTS = [
         subject: "【物流DX】ダッシュボードUIレビュー依頼",
         body: "初期モックを共有しました。1/27 までにフィードバックをお願いします。",
         toEmail: "s.nakamura@zenkoh.com",
-        status: "pending",
+        status: "QUEUED",
         relatedTask: "配送リードタイム可視化ダッシュボード",
         relatedRule: "進捗停滞アラート（物流DX）",
         sendAfter: "2025-01-24T10:00:00+09:00"
@@ -322,7 +505,7 @@ const PROJECT_BLUEPRINTS = [
       {
         name: "釧路工場でのテストデプロイ",
         description: "Gateway Edge を設置し、実データでボトルネック計測を行う。",
-        status: "DELAYED",
+        status: "BLOCKED",
         priority: "HIGH",
         plannedStart: "2025-02-10",
         plannedEnd: "2025-03-07",
@@ -348,6 +531,81 @@ const PROJECT_BLUEPRINTS = [
           { email: "ayumi.tanaka@zenkoh.com", role: "QA" },
           { email: "torikoshi2260@gmail.com", role: "SPONSOR" }
         ]
+      },
+      {
+        name: "IoTゲートウェイ機器選定と調達",
+        description: "4社の工場環境に適合するIoTゲートウェイ機器を選定し、調達手続きを進める。",
+        status: "DONE",
+        priority: "HIGH",
+        plannedStart: "2024-11-18",
+        plannedEnd: "2024-12-10",
+        progress: 100,
+        columnName: "リリース準備",
+        assigneeEmail: "ehddnr0501@gmail.com",
+        memberRoles: [
+          { email: "ehddnr0501@gmail.com", role: "OWNER" },
+          { email: "risa.ando@zenkoh.com", role: "COORDINATOR" }
+        ]
+      },
+      {
+        name: "データストリーミングパイプライン構築",
+        description: "Kafka と Flink を使ったリアルタイムデータストリーミングパイプラインを構築する。",
+        status: "IN_PROGRESS",
+        priority: "HIGH",
+        plannedStart: "2024-12-15",
+        plannedEnd: "2025-01-31",
+        progress: 70,
+        columnName: "開発中",
+        assigneeEmail: "haruki.ishikawa@zenkoh.com",
+        memberRoles: [
+          { email: "haruki.ishikawa@zenkoh.com", role: "DATA_ENGINEER" },
+          { email: "naoki.kudo@zenkoh.com", role: "SRE" }
+        ]
+      },
+      {
+        name: "歩留まり予測モデル開発",
+        description: "機械学習を使った歩留まり予測モデルを開発し、精度検証を行う。",
+        status: "IN_PROGRESS",
+        priority: "MEDIUM",
+        plannedStart: "2025-01-10",
+        plannedEnd: "2025-02-28",
+        progress: 50,
+        columnName: "開発中",
+        assigneeEmail: "akiko.suzuki@zenkoh.com",
+        memberRoles: [
+          { email: "akiko.suzuki@zenkoh.com", role: "CONTRIBUTOR" },
+          { email: "haruki.ishikawa@zenkoh.com", role: "DATA_ENGINEER" }
+        ]
+      },
+      {
+        name: "工場責任者向けトレーニング資料作成",
+        description: "ダッシュボードの使い方とアラート対応手順をまとめたトレーニング資料を作成する。",
+        status: "NOT_STARTED",
+        priority: "LOW",
+        plannedStart: "2025-03-10",
+        plannedEnd: "2025-03-31",
+        progress: 0,
+        columnName: "要件整理",
+        assigneeEmail: "risa.ando@zenkoh.com",
+        memberRoles: [
+          { email: "risa.ando@zenkoh.com", role: "COORDINATOR" },
+          { email: "s.nakamura@zenkoh.com", role: "UX" }
+        ]
+      },
+      {
+        name: "セキュリティ監査対応",
+        description: "外部セキュリティ監査に対応し、脆弱性診断と修正を実施する。",
+        status: "NOT_STARTED",
+        priority: "HIGH",
+        plannedStart: "2025-03-15",
+        plannedEnd: "2025-04-10",
+        progress: 0,
+        columnName: "要件整理",
+        assigneeEmail: "takeshi.watanabe@zenkoh.com",
+        memberRoles: [
+          { email: "takeshi.watanabe@zenkoh.com", role: "CONTRIBUTOR" },
+          { email: "ehddnr0501@gmail.com", role: "OWNER" }
+        ]
       }
     ],
     alertRules: [
@@ -371,7 +629,7 @@ const PROJECT_BLUEPRINTS = [
         subject: "【北海道】テストデプロイ準備状況共有",
         body: "釧路工場でのネットワーク調整が必要です。現地チームと日程を再調整してください。",
         toEmail: "ehddnr0501@gmail.com",
-        status: "pending",
+        status: "QUEUED",
         relatedTask: "釧路工場でのテストデプロイ",
         relatedRule: "検証期限アラート（北海道）",
         sendAfter: "2025-02-18T09:00:00+09:00"
@@ -380,7 +638,7 @@ const PROJECT_BLUEPRINTS = [
         subject: "【北海道】QA観点ヒアリングのお願い",
         body: "通知テンプレートの想定シナリオを QA で整理する必要があります。",
         toEmail: "ayumi.tanaka@zenkoh.com",
-        status: "pending",
+        status: "QUEUED",
         relatedTask: "稼働率アラート通知ルール設計",
         relatedRule: "品質逸脱アラート（北海道）",
         sendAfter: "2025-03-05T14:00:00+09:00"
@@ -471,6 +729,81 @@ const PROJECT_BLUEPRINTS = [
           { email: "r.shibata@zenkoh.com", role: "OWNER" },
           { email: "risa.ando@zenkoh.com", role: "COORDINATOR" }
         ]
+      },
+      {
+        name: "スマートメーター連携API開発",
+        description: "電力会社のスマートメーターAPIと連携し、リアルタイム電力データを取得する。",
+        status: "IN_PROGRESS",
+        priority: "HIGH",
+        plannedStart: "2025-02-20",
+        plannedEnd: "2025-04-10",
+        progress: 30,
+        columnName: "着手中",
+        assigneeEmail: "hiroshi.yamada@zenkoh.com",
+        memberRoles: [
+          { email: "hiroshi.yamada@zenkoh.com", role: "CONTRIBUTOR" },
+          { email: "naoki.kudo@zenkoh.com", role: "SRE" }
+        ]
+      },
+      {
+        name: "異常検知アルゴリズム実装",
+        description: "電力使用パターンの異常を検知する機械学習モデルを実装する。",
+        status: "NOT_STARTED",
+        priority: "MEDIUM",
+        plannedStart: "2025-04-15",
+        plannedEnd: "2025-06-15",
+        progress: 0,
+        columnName: "計画中",
+        assigneeEmail: "akiko.suzuki@zenkoh.com",
+        memberRoles: [
+          { email: "akiko.suzuki@zenkoh.com", role: "CONTRIBUTOR" },
+          { email: "haruki.ishikawa@zenkoh.com", role: "DATA_ENGINEER" }
+        ]
+      },
+      {
+        name: "データ保持ポリシーとアーカイブ設計",
+        description: "長期データ保持とアーカイブ戦略を設計し、コスト最適化を図る。",
+        status: "NOT_STARTED",
+        priority: "LOW",
+        plannedStart: "2025-05-01",
+        plannedEnd: "2025-06-30",
+        progress: 0,
+        columnName: "計画中",
+        assigneeEmail: "haruki.ishikawa@zenkoh.com",
+        memberRoles: [
+          { email: "haruki.ishikawa@zenkoh.com", role: "DATA_ENGINEER" },
+          { email: "r.shibata@zenkoh.com", role: "OWNER" }
+        ]
+      },
+      {
+        name: "ユーザー認証と権限管理実装",
+        description: "製造ラインごとのアクセス制御とロールベース権限管理を実装する。",
+        status: "IN_PROGRESS",
+        priority: "HIGH",
+        plannedStart: "2025-02-10",
+        plannedEnd: "2025-03-20",
+        progress: 55,
+        columnName: "着手中",
+        assigneeEmail: "takeshi.watanabe@zenkoh.com",
+        memberRoles: [
+          { email: "takeshi.watanabe@zenkoh.com", role: "CONTRIBUTOR" },
+          { email: "y.sato@zenkoh.com", role: "TECH_LEAD" }
+        ]
+      },
+      {
+        name: "モバイルアプリ開発（工場責任者向け）",
+        description: "工場責任者が外出先からも電力使用状況を確認できるモバイルアプリを開発する。",
+        status: "NOT_STARTED",
+        priority: "MEDIUM",
+        plannedStart: "2025-04-01",
+        plannedEnd: "2025-06-30",
+        progress: 0,
+        columnName: "計画中",
+        assigneeEmail: "sho.tanaka@zenkoh.com",
+        memberRoles: [
+          { email: "sho.tanaka@zenkoh.com", role: "CONTRIBUTOR" },
+          { email: "s.nakamura@zenkoh.com", role: "UX" }
+        ]
       }
     ],
     alertRules: [
@@ -487,7 +820,7 @@ const PROJECT_BLUEPRINTS = [
         subject: "【関西POC】データ受信遅延の検知",
         body: "30分以上データが流れていません。現地設備のログ確認をお願いします。",
         toEmail: "naoki.kudo@zenkoh.com",
-        status: "pending",
+        status: "QUEUED",
         relatedTask: "エネルギーデータ受信基盤のIaC整備",
         relatedRule: "電力データ未受信アラート（関西）",
         sendAfter: "2025-02-20T08:30:00+09:00"
@@ -496,10 +829,323 @@ const PROJECT_BLUEPRINTS = [
         subject: "【関西POC】経営層レビュー準備タスク",
         body: "レポートモック案のレビュー会を 3/21 に設定しました。",
         toEmail: "s.nakamura@zenkoh.com",
-        status: "pending",
+        status: "QUEUED",
         relatedTask: "経営層向けレポートモック作成",
         relatedRule: "電力データ未受信アラート（関西）",
         sendAfter: "2025-03-18T11:00:00+09:00"
+      }
+    ]
+  },
+  {
+    code: "mobile-app-redesign",
+    name: "モバイルアプリリニューアルプロジェクト",
+    description: "既存モバイルアプリのUI/UXを刷新し、パフォーマンスとユーザビリティを向上させる。",
+    startDate: "2025-01-15",
+    endDate: "2025-05-31",
+    ownerEmail: "miho.okada@zenkoh.com",
+    board: {
+      name: "モバイルアプリ開発ボード",
+      columns: [
+        { name: "バックログ", wipLimit: null },
+        { name: "設計中", wipLimit: 3 },
+        { name: "開発中", wipLimit: 5 },
+        { name: "テスト中", wipLimit: 3 },
+        { name: "リリース準備", wipLimit: 2 }
+      ]
+    },
+    members: [
+      { email: "miho.okada@zenkoh.com", role: "OWNER" },
+      { email: "sho.tanaka@zenkoh.com", role: "TECH_LEAD" },
+      { email: "yuki.morita@zenkoh.com", role: "CONTRIBUTOR" },
+      { email: "s.nakamura@zenkoh.com", role: "UX" },
+      { email: "ayumi.tanaka@zenkoh.com", role: "QA" },
+      { email: "hiroshi.yamada@zenkoh.com", role: "BACKEND" }
+    ],
+    tasks: [
+      {
+        name: "UI/UXデザインシステム構築",
+        description: "新しいデザインシステムを構築し、コンポーネントライブラリを作成する。",
+        status: "DONE",
+        priority: "HIGH",
+        plannedStart: "2025-01-15",
+        plannedEnd: "2025-02-10",
+        progress: 100,
+        columnName: "リリース準備",
+        assigneeEmail: "s.nakamura@zenkoh.com",
+        memberRoles: [
+          { email: "s.nakamura@zenkoh.com", role: "UX" },
+          { email: "yuki.morita@zenkoh.com", role: "REVIEWER" }
+        ]
+      },
+      {
+        name: "iOSアプリリニューアル開発",
+        description: "SwiftUIを使った新しいiOSアプリを開発する。",
+        status: "IN_PROGRESS",
+        priority: "HIGH",
+        plannedStart: "2025-02-15",
+        plannedEnd: "2025-04-30",
+        progress: 45,
+        columnName: "開発中",
+        assigneeEmail: "sho.tanaka@zenkoh.com",
+        memberRoles: [
+          { email: "sho.tanaka@zenkoh.com", role: "CONTRIBUTOR" },
+          { email: "yuki.morita@zenkoh.com", role: "REVIEWER" }
+        ]
+      },
+      {
+        name: "Androidアプリリニューアル開発",
+        description: "Jetpack Composeを使った新しいAndroidアプリを開発する。",
+        status: "IN_PROGRESS",
+        priority: "HIGH",
+        plannedStart: "2025-02-15",
+        plannedEnd: "2025-04-30",
+        progress: 40,
+        columnName: "開発中",
+        assigneeEmail: "sho.tanaka@zenkoh.com",
+        memberRoles: [
+          { email: "sho.tanaka@zenkoh.com", role: "CONTRIBUTOR" },
+          { email: "ayumi.tanaka@zenkoh.com", role: "QA" }
+        ]
+      },
+      {
+        name: "バックエンドAPI改修",
+        description: "モバイルアプリ向けの新しいREST APIを設計・実装する。",
+        status: "IN_PROGRESS",
+        priority: "HIGH",
+        plannedStart: "2025-02-01",
+        plannedEnd: "2025-03-31",
+        progress: 60,
+        columnName: "開発中",
+        assigneeEmail: "hiroshi.yamada@zenkoh.com",
+        memberRoles: [
+          { email: "hiroshi.yamada@zenkoh.com", role: "BACKEND" },
+          { email: "sho.tanaka@zenkoh.com", role: "TECH_LEAD" }
+        ]
+      },
+      {
+        name: "パフォーマンステスト実施",
+        description: "アプリの起動時間、メモリ使用量、バッテリー消費を測定・最適化する。",
+        status: "NOT_STARTED",
+        priority: "MEDIUM",
+        plannedStart: "2025-04-15",
+        plannedEnd: "2025-05-15",
+        progress: 0,
+        columnName: "テスト中",
+        assigneeEmail: "ayumi.tanaka@zenkoh.com",
+        memberRoles: [
+          { email: "ayumi.tanaka@zenkoh.com", role: "QA" },
+          { email: "sho.tanaka@zenkoh.com", role: "TECH_LEAD" }
+        ]
+      },
+      {
+        name: "ユーザー受け入れテスト（UAT）",
+        description: "ベータテスターを募集し、フィードバックを収集する。",
+        status: "NOT_STARTED",
+        priority: "MEDIUM",
+        plannedStart: "2025-05-01",
+        plannedEnd: "2025-05-20",
+        progress: 0,
+        columnName: "テスト中",
+        assigneeEmail: "s.nakamura@zenkoh.com",
+        memberRoles: [
+          { email: "s.nakamura@zenkoh.com", role: "UX" },
+          { email: "miho.okada@zenkoh.com", role: "OWNER" }
+        ]
+      },
+      {
+        name: "App Store/Google Play申請準備",
+        description: "ストア申請に必要な資料を準備し、審査申請を行う。",
+        status: "NOT_STARTED",
+        priority: "HIGH",
+        plannedStart: "2025-05-20",
+        plannedEnd: "2025-05-31",
+        progress: 0,
+        columnName: "リリース準備",
+        assigneeEmail: "miho.okada@zenkoh.com",
+        memberRoles: [
+          { email: "miho.okada@zenkoh.com", role: "OWNER" },
+          { email: "risa.ando@zenkoh.com", role: "COORDINATOR" }
+        ]
+      }
+    ],
+    alertRules: [
+      {
+        name: "開発遅延アラート（モバイル）",
+        ruleType: "task_overdue",
+        notifyEmail: "miho.okada@zenkoh.com",
+        createdByEmail: "miho.okada@zenkoh.com",
+        params: { graceHours: 48, targetColumn: "開発中" }
+      },
+      {
+        name: "テスト失敗アラート（モバイル）",
+        ruleType: "qa_blocker",
+        notifyEmail: "ayumi.tanaka@zenkoh.com",
+        createdByEmail: "ayumi.tanaka@zenkoh.com",
+        params: { allowedBugs: 3 }
+      }
+    ],
+    notifications: [
+      {
+        subject: "【モバイルアプリ】iOS開発進捗確認",
+        body: "iOSアプリの開発進捗を確認してください。来週のマイルストーンに向けて調整が必要です。",
+        toEmail: "miho.okada@zenkoh.com",
+        status: "QUEUED",
+        relatedTask: "iOSアプリリニューアル開発",
+        relatedRule: "開発遅延アラート（モバイル）",
+        sendAfter: "2025-03-10T10:00:00+09:00"
+      }
+    ]
+  },
+  {
+    code: "security-audit-2025",
+    name: "セキュリティ監査2025",
+    description: "全システムのセキュリティ監査を実施し、脆弱性を特定・修正する。",
+    startDate: "2025-02-01",
+    endDate: "2025-06-30",
+    ownerEmail: "takeshi.watanabe@zenkoh.com",
+    board: {
+      name: "セキュリティ監査ボード",
+      columns: [
+        { name: "監査対象", wipLimit: null },
+        { name: "監査中", wipLimit: 5 },
+        { name: "修正中", wipLimit: 8 },
+        { name: "検証中", wipLimit: 3 },
+        { name: "完了", wipLimit: null }
+      ]
+    },
+    members: [
+      { email: "takeshi.watanabe@zenkoh.com", role: "OWNER" },
+      { email: "naoki.kudo@zenkoh.com", role: "SRE" },
+      { email: "y.sato@zenkoh.com", role: "TECH_LEAD" },
+      { email: "hiroshi.yamada@zenkoh.com", role: "BACKEND" },
+      { email: "ayumi.tanaka@zenkoh.com", role: "QA" },
+      { email: "k.yamamoto@zenkoh.com", role: "SPONSOR" }
+    ],
+    tasks: [
+      {
+        name: "外部セキュリティ監査会社選定",
+        description: "セキュリティ監査を実施する外部会社を選定し、契約を締結する。",
+        status: "DONE",
+        priority: "HIGH",
+        plannedStart: "2025-02-01",
+        plannedEnd: "2025-02-15",
+        progress: 100,
+        columnName: "完了",
+        assigneeEmail: "takeshi.watanabe@zenkoh.com",
+        memberRoles: [
+          { email: "takeshi.watanabe@zenkoh.com", role: "OWNER" },
+          { email: "k.yamamoto@zenkoh.com", role: "SPONSOR" }
+        ]
+      },
+      {
+        name: "脆弱性スキャン実施",
+        description: "全システムに対して自動脆弱性スキャンを実施し、結果を分析する。",
+        status: "IN_PROGRESS",
+        priority: "HIGH",
+        plannedStart: "2025-02-20",
+        plannedEnd: "2025-03-31",
+        progress: 55,
+        columnName: "監査中",
+        assigneeEmail: "takeshi.watanabe@zenkoh.com",
+        memberRoles: [
+          { email: "takeshi.watanabe@zenkoh.com", role: "OWNER" },
+          { email: "naoki.kudo@zenkoh.com", role: "SRE" }
+        ]
+      },
+      {
+        name: "ペネトレーションテスト実施",
+        description: "外部監査会社によるペネトレーションテストを実施する。",
+        status: "IN_PROGRESS",
+        priority: "HIGH",
+        plannedStart: "2025-03-01",
+        plannedEnd: "2025-04-15",
+        progress: 40,
+        columnName: "監査中",
+        assigneeEmail: "takeshi.watanabe@zenkoh.com",
+        memberRoles: [
+          { email: "takeshi.watanabe@zenkoh.com", role: "OWNER" },
+          { email: "y.sato@zenkoh.com", role: "TECH_LEAD" }
+        ]
+      },
+      {
+        name: "認証・認可システム見直し",
+        description: "認証・認可システムの脆弱性を修正し、多要素認証を強化する。",
+        status: "NOT_STARTED",
+        priority: "HIGH",
+        plannedStart: "2025-04-01",
+        plannedEnd: "2025-05-15",
+        progress: 0,
+        columnName: "修正中",
+        assigneeEmail: "takeshi.watanabe@zenkoh.com",
+        memberRoles: [
+          { email: "takeshi.watanabe@zenkoh.com", role: "OWNER" },
+          { email: "hiroshi.yamada@zenkoh.com", role: "BACKEND" }
+        ]
+      },
+      {
+        name: "データ暗号化強化",
+        description: "保存データと通信データの暗号化を強化し、鍵管理を改善する。",
+        status: "NOT_STARTED",
+        priority: "HIGH",
+        plannedStart: "2025-04-10",
+        plannedEnd: "2025-05-31",
+        progress: 0,
+        columnName: "修正中",
+        assigneeEmail: "naoki.kudo@zenkoh.com",
+        memberRoles: [
+          { email: "naoki.kudo@zenkoh.com", role: "SRE" },
+          { email: "takeshi.watanabe@zenkoh.com", role: "OWNER" }
+        ]
+      },
+      {
+        name: "セキュリティポリシー文書化",
+        description: "セキュリティポリシーと手順を文書化し、全社員に周知する。",
+        status: "NOT_STARTED",
+        priority: "MEDIUM",
+        plannedStart: "2025-05-15",
+        plannedEnd: "2025-06-15",
+        progress: 0,
+        columnName: "監査対象",
+        assigneeEmail: "risa.ando@zenkoh.com",
+        memberRoles: [
+          { email: "risa.ando@zenkoh.com", role: "COORDINATOR" },
+          { email: "takeshi.watanabe@zenkoh.com", role: "OWNER" }
+        ]
+      },
+      {
+        name: "監査結果レポート作成",
+        description: "監査結果をまとめたレポートを作成し、経営層に報告する。",
+        status: "NOT_STARTED",
+        priority: "MEDIUM",
+        plannedStart: "2025-06-01",
+        plannedEnd: "2025-06-30",
+        progress: 0,
+        columnName: "監査対象",
+        assigneeEmail: "takeshi.watanabe@zenkoh.com",
+        memberRoles: [
+          { email: "takeshi.watanabe@zenkoh.com", role: "OWNER" },
+          { email: "k.yamamoto@zenkoh.com", role: "SPONSOR" }
+        ]
+      }
+    ],
+    alertRules: [
+      {
+        name: "重大脆弱性検知アラート",
+        ruleType: "security_critical",
+        notifyEmail: "takeshi.watanabe@zenkoh.com",
+        createdByEmail: "takeshi.watanabe@zenkoh.com",
+        params: { severity: "critical" }
+      }
+    ],
+    notifications: [
+      {
+        subject: "【セキュリティ監査】重大脆弱性の検知",
+        body: "監査中に重大な脆弱性が検知されました。緊急対応が必要です。",
+        toEmail: "takeshi.watanabe@zenkoh.com",
+        status: "QUEUED",
+        relatedTask: "脆弱性スキャン実施",
+        relatedRule: "重大脆弱性検知アラート",
+        sendAfter: "2025-03-15T09:00:00+09:00"
       }
     ]
   }
@@ -516,6 +1162,46 @@ function uniqByEmail(list) {
     seen.add(item.email);
     return true;
   });
+}
+
+// task_membersのroleをスキーマに準拠した値にマッピング
+// スキーマでは 'OWNER', 'CONTRIBUTOR', 'REVIEWER' のみ許可
+function mapTaskMemberRole(role) {
+  const roleUpper = (role || "").toUpperCase();
+  // 既に有効な値の場合はそのまま返す
+  if (["OWNER", "CONTRIBUTOR", "REVIEWER"].includes(roleUpper)) {
+    return roleUpper;
+  }
+  // リーダー系の役割は OWNER にマッピング
+  if (["TECH_LEAD", "LEAD", "SPONSOR", "COORDINATOR"].includes(roleUpper)) {
+    return "OWNER";
+  }
+  // レビュー系の役割は REVIEWER にマッピング
+  if (["UX", "QA", "REVIEWER"].includes(roleUpper)) {
+    return "REVIEWER";
+  }
+  // その他は CONTRIBUTOR にマッピング
+  return "CONTRIBUTOR";
+}
+
+// alert_rulesのrule_typeをスキーマに準拠した値にマッピング
+// スキーマでは 'DUE_SOON', 'OVERDUE', 'NO_PROGRESS', 'CUSTOM' のみ許可
+function mapAlertRuleType(ruleType) {
+  const typeUpper = (ruleType || "").toUpperCase();
+  // 既に有効な値の場合はそのまま返す
+  if (["DUE_SOON", "OVERDUE", "NO_PROGRESS", "CUSTOM"].includes(typeUpper)) {
+    return typeUpper;
+  }
+  // task_overdue は OVERDUE にマッピング
+  if (typeUpper === "TASK_OVERDUE") {
+    return "OVERDUE";
+  }
+  // progress_milestone, qa_blocker は NO_PROGRESS にマッピング
+  if (["PROGRESS_MILESTONE", "QA_BLOCKER"].includes(typeUpper)) {
+    return "NO_PROGRESS";
+  }
+  // その他は CUSTOM にマッピング
+  return "CUSTOM";
 }
 
 function buildDeleteQuery(table) {
@@ -590,28 +1276,53 @@ async function fetchSafeUsers() {
   return data;
 }
 
+// usersテーブルにroleカラムが存在するか確認
+async function checkRoleColumnExists() {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("role")
+      .limit(1);
+    // エラーが発生した場合、roleカラムが存在しない可能性が高い
+    return !error && data !== null;
+  } catch {
+    return false;
+  }
+}
+
 async function seedDemoUsers() {
   console.log("=== デモユーザーを投入します ===");
   if (DEMO_USERS.length === 0) return [];
-  const payload = DEMO_USERS.map((user) => ({
-    email: user.email,
-    display_name: user.displayName,
-    first_name: user.firstName,
-    last_name: user.lastName,
-    department: user.department,
-    position: user.position,
-    phone: user.phone,
-    password_hash: PASSWORD_PLACEHOLDER,
-    is_active: true,
-    timezone: "Asia/Tokyo",
-    language: "ja",
-    work_hours_start: "09:00",
-    work_hours_end: "18:00",
-    role: user.role,
-    bio: user.bio,
-    skills: buildJsonValue(user.skills),
-    tags: buildJsonValue(user.tags)
-  }));
+  
+  // roleカラムの存在を確認
+  const hasRoleColumn = await checkRoleColumnExists();
+  
+  const payload = DEMO_USERS.map((user) => {
+    const basePayload = {
+      email: user.email,
+      display_name: user.displayName,
+      first_name: user.firstName,
+      last_name: user.lastName,
+      department: user.department,
+      position: user.position,
+      phone: user.phone,
+      password_hash: PASSWORD_PLACEHOLDER,
+      is_active: true,
+      timezone: "Asia/Tokyo",
+      language: "ja",
+      work_hours_start: "09:00",
+      work_hours_end: "18:00",
+      bio: user.bio,
+      skills: buildJsonValue(user.skills),
+      tags: buildJsonValue(user.tags)
+    };
+    // roleカラムが存在する場合のみ追加
+    if (hasRoleColumn) {
+      basePayload.role = user.role;
+    }
+    return basePayload;
+  });
+  
   const { data, error } = await supabase
     .from("users")
     .insert(payload)
@@ -747,7 +1458,7 @@ async function seedProject(projectBlueprint, userMap) {
       taskMemberRows.push({
         task_id: taskRow.id,
         user_id: user.id,
-        role: member.role || "CONTRIBUTOR"
+        role: mapTaskMemberRole(member.role)
       });
     }
   }
@@ -765,7 +1476,7 @@ async function seedProject(projectBlueprint, userMap) {
     return {
       project_id: project.id,
       name: rule.name,
-      rule_type: rule.ruleType,
+      rule_type: mapAlertRuleType(rule.ruleType),
       notify_email: rule.notifyEmail,
       params_json: buildJsonValue(rule.params ?? {}),
       is_enabled: true,
@@ -795,7 +1506,7 @@ async function seedProject(projectBlueprint, userMap) {
       to_email: notice.toEmail,
       subject: notice.subject,
       body_text: notice.body,
-      status: notice.status || "pending",
+      status: notice.status || "QUEUED",
       send_after: notice.sendAfter,
       retry_count: 0
     };

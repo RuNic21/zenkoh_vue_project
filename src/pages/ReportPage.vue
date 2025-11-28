@@ -38,6 +38,7 @@ const {
   projectProgressChartData,
   userWorkloadChartData,
   deadlineChartData,
+  tagChartData,
   generateReportData,
   // Phase 1: 高度な可視化
   ganttData,
@@ -57,6 +58,20 @@ const { showError, showSuccess } = useMessage();
 // プロジェクト詳細モーダル
 const showProjectDetailModal = ref(false);
 const selectedProjectDetail = ref<any>(null);
+
+// 依存関係グラフ用のプロジェクトフィルター
+const selectedProjectForGraph = ref<number | null>(null);
+
+// プロジェクトフィルター変更時の処理
+const onProjectFilterChange = async () => {
+  // フィルターオプションを更新してグラフを再読み込み
+  if (selectedProjectForGraph.value !== null) {
+    filter.projects = [selectedProjectForGraph.value];
+  } else {
+    filter.projects = [];
+  }
+  await loadDependencyGraphData();
+};
 
 
 // チャートデータは composable から取得
@@ -335,9 +350,22 @@ const closeProjectDetailModal = () => {
         </div>
       </div>
 
+      <div class="row mb-4">
+        <div class="col-12">
+          <ReportChartBlock 
+            v-if="tagChartData"
+            title="タグ別タスク分布"
+            :data="tagChartData"
+            type="bar"
+            :height="400"
+          />
+        </div>
+      </div>
+
       <!-- ==================== Phase 1: 高度な可視化 ==================== -->
       
       <!-- ガントチャート -->
+      <!--
       <div class="row mb-4">
         <div class="col-12">
           <div class="card">
@@ -355,17 +383,18 @@ const closeProjectDetailModal = () => {
                 更新
               </button>
             </div>
-            <div class="card-body">
+            <div class="card-body p-3">
               <LoadingSpinner v-if="isLoadingGantt" message="ガントチャートを読み込み中..." />
               <GanttChart
                 v-else
                 :tasks="ganttData"
-                :height="450"
+                :height="280"
               />
             </div>
           </div>
         </div>
       </div>
+      -->
 
       <!-- 依存関係グラフ -->
       <div class="row mb-4">
@@ -376,14 +405,32 @@ const closeProjectDetailModal = () => {
                 <i class="material-symbols-rounded me-2">account_tree</i>
                 タスク依存関係グラフ
               </h6>
-              <button
-                v-if="!isLoadingDependency"
-                class="btn btn-sm btn-outline-primary"
-                @click="loadDependencyGraphData"
-              >
-                <i class="material-symbols-rounded me-1">refresh</i>
-                更新
-              </button>
+              <div class="d-flex align-items-center gap-2">
+                <!-- プロジェクトフィルター -->
+                <select
+                  v-model="selectedProjectForGraph"
+                  class="form-select form-select-sm"
+                  style="width: auto; min-width: 200px;"
+                  @change="onProjectFilterChange"
+                >
+                  <option :value="null">すべてのプロジェクト</option>
+                  <option
+                    v-for="project in availableProjects"
+                    :key="project.id"
+                    :value="project.id"
+                  >
+                    {{ project.name }}
+                  </option>
+                </select>
+                <button
+                  v-if="!isLoadingDependency"
+                  class="btn btn-sm btn-outline-primary"
+                  @click="loadDependencyGraphData"
+                >
+                  <i class="material-symbols-rounded me-1">refresh</i>
+                  更新
+                </button>
+              </div>
             </div>
             <div class="card-body">
               <LoadingSpinner v-if="isLoadingDependency" message="依存関係グラフを読み込み中..." />

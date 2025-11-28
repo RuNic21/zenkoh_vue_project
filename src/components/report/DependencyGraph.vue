@@ -104,7 +104,13 @@ const initializeGraph = () => {
           background: node.color || "#e0e0e0",
           border: node.color || "#999999"
         },
-        group: node.group
+        group: node.group,
+        // プロジェクトノードは大きく、タスクノードは通常サイズ
+        shape: node.nodeType === "project" ? "ellipse" : "box",
+        size: node.nodeType === "project" ? 30 : undefined,
+        font: node.nodeType === "project" 
+          ? { size: 16, bold: true }
+          : { size: 14 }
       })),
       edges: props.graphData.edges.map((edge) => ({
         from: edge.from,
@@ -189,37 +195,125 @@ const highlightCircularDependencies = (cycles: string[][]) => {
 
 // レイアウト変更
 const changeLayout = (layoutType: "hierarchical" | "force") => {
-  if (!network.value) return;
+  if (!network.value || !graphContainer.value || !props.graphData || props.graphData.nodes.length === 0) {
+    return;
+  }
 
-  if (layoutType === "hierarchical") {
-    network.value.setOptions({
-      layout: {
-        hierarchical: {
-          enabled: true,
-          direction: "LR",
-          sortMethod: "directed"
-        }
-      },
-      physics: {
-        enabled: false
+  try {
+    // レイアウト変更のため、既存のネットワークを破棄して再生成
+    // 注意: vis-networkのレイアウト変更はsetOptionsだけでは即座に反映されない場合があるため、
+    // ネットワークを再生成することで確実にレイアウトを適用する
+    
+    // 現在のデータを保持
+    const currentData = {
+      nodes: props.graphData.nodes.map((node) => ({
+        id: node.id,
+        label: node.label,
+        title: node.title,
+        color: {
+          background: node.color || "#e0e0e0",
+          border: node.color || "#999999"
+        },
+        group: node.group,
+        // プロジェクトノードは大きく、タスクノードは通常サイズ
+        shape: node.nodeType === "project" ? "ellipse" : "box",
+        size: node.nodeType === "project" ? 30 : undefined,
+        font: node.nodeType === "project" 
+          ? { size: 16, bold: true }
+          : { size: 14 }
+      })),
+      edges: props.graphData.edges.map((edge) => ({
+        from: edge.from,
+        to: edge.to,
+        label: edge.label,
+        color: edge.color,
+        dashes: edge.dashes || false
+      }))
+    };
+
+    // 新しいオプションを設定
+    const newOptions: Options = {
+      ...networkOptions,
+      layout: layoutType === "hierarchical" 
+        ? {
+            hierarchical: {
+              enabled: true,
+              direction: "LR",
+              sortMethod: "directed",
+              nodeSpacing: 150,
+              levelSeparation: 200,
+              treeSpacing: 200
+            }
+          }
+        : {
+            hierarchical: {
+              enabled: false
+            }
+          },
+      physics: layoutType === "hierarchical"
+        ? {
+            enabled: false
+          }
+        : {
+            enabled: true,
+            barnesHut: {
+              gravitationalConstant: -2000,
+              springLength: 200,
+              springConstant: 0.04
+            }
+          }
+    };
+
+    // 既存ネットワークを破棄
+    if (network.value) {
+      network.value.destroy();
+      network.value = null;
+    }
+
+    // 新しいネットワークを生成
+    network.value = new Network(graphContainer.value, currentData, newOptions);
+
+    // イベントリスナーを再登録
+    network.value.on("click", (params) => {
+      if (params.nodes.length > 0) {
+        const nodeId = params.nodes[0];
+        const node = props.graphData.nodes.find((n) => n.id === nodeId);
+        selectedNode.value = node;
+        console.log("ノードクリック:", node);
+      } else {
+        selectedNode.value = null;
       }
     });
-  } else {
-    network.value.setOptions({
-      layout: {
-        hierarchical: {
-          enabled: false
-        }
-      },
-      physics: {
-        enabled: true,
-        barnesHut: {
-          gravitationalConstant: -2000,
-          springLength: 200,
-          springConstant: 0.04
-        }
+
+    network.value.on("doubleClick", (params) => {
+      if (params.nodes.length > 0) {
+        console.log("ノードダブルクリック:", params.nodes[0]);
       }
     });
+
+    // クリティカルパスと循環依存の強調表示を再適用
+    if (props.analysis) {
+      if (props.analysis.criticalPath.length > 0) {
+        highlightCriticalPath(props.analysis.criticalPath);
+      }
+      if (props.analysis.circularDependencies.length > 0) {
+        highlightCircularDependencies(props.analysis.circularDependencies);
+      }
+    }
+
+    // レイアウト適用後にビューを調整
+    setTimeout(() => {
+      if (network.value) {
+        network.value.fit({
+          animation: {
+            duration: 500,
+            easingFunction: "easeInOutQuad"
+          }
+        });
+      }
+    }, 100);
+  } catch (error) {
+    console.error("レイアウト変更失敗:", error);
   }
 };
 
@@ -337,12 +431,73 @@ defineExpose({
     <div v-if="selectedNode" class="selected-node-info mt-3 p-3 bg-light rounded">
       <h6 class="mb-2">
         <i class="material-symbols-rounded me-1">info</i>
-        選択されたタスク
+        {{ selectedNode.nodeType === "project" ? "選択されたプロジェクト" : "選択されたタスク" }}
       </h6>
       <p class="mb-1"><strong>名前:</strong> {{ selectedNode.label }}</p>
-      <p class="mb-1"><strong>状態:</strong> {{ selectedNode.status }}</p>
-      <p class="mb-1"><strong>優先度:</strong> {{ selectedNode.priority }}</p>
-      <p class="mb-0"><strong>進捗率:</strong> {{ selectedNode.progress }}%</p>
+      <template v-if="selectedNode.nodeType === 'task'">
+        <div class="row">
+          <div class="col-md-6">
+            <p class="mb-1"><strong>プロジェクト:</strong> {{ selectedNode.projectName || "未割当" }}</p>
+            <p class="mb-1"><strong>状態:</strong> 
+              <span class="badge" :class="{
+                'bg-success': selectedNode.status === 'DONE',
+                'bg-primary': selectedNode.status === 'IN_PROGRESS',
+                'bg-warning': selectedNode.status === 'BLOCKED',
+                'bg-danger': selectedNode.status === 'CANCELLED',
+                'bg-secondary': selectedNode.status === 'NOT_STARTED'
+              }">
+                {{ selectedNode.status }}
+              </span>
+            </p>
+            <p class="mb-1"><strong>優先度:</strong> 
+              <span class="badge" :class="{
+                'bg-danger': selectedNode.priority === 'URGENT',
+                'bg-warning': selectedNode.priority === 'HIGH',
+                'bg-info': selectedNode.priority === 'MEDIUM',
+                'bg-secondary': selectedNode.priority === 'LOW'
+              }">
+                {{ selectedNode.priority }}
+              </span>
+            </p>
+            <p class="mb-1"><strong>進捗率:</strong> 
+              <span class="badge bg-primary">{{ selectedNode.progress }}%</span>
+            </p>
+            <p v-if="selectedNode.assigneeName" class="mb-1">
+              <strong>担当者:</strong> {{ selectedNode.assigneeName }}
+            </p>
+            <p v-if="selectedNode.wbsCode" class="mb-1">
+              <strong>WBSコード:</strong> <code>{{ selectedNode.wbsCode }}</code>
+            </p>
+          </div>
+          <div class="col-md-6">
+            <p v-if="selectedNode.description" class="mb-2">
+              <strong>説明:</strong><br>
+              <small class="text-muted">{{ selectedNode.description }}</small>
+            </p>
+            <div v-if="selectedNode.plannedStart || selectedNode.plannedEnd" class="mb-2">
+              <strong>計画期間:</strong><br>
+              <small class="text-muted">
+                <span v-if="selectedNode.plannedStart">{{ selectedNode.plannedStart }}</span>
+                <span v-if="selectedNode.plannedStart && selectedNode.plannedEnd"> ～ </span>
+                <span v-if="selectedNode.plannedEnd">{{ selectedNode.plannedEnd }}</span>
+                <span v-if="!selectedNode.plannedStart && !selectedNode.plannedEnd">未設定</span>
+              </small>
+            </div>
+            <div v-if="selectedNode.actualStart || selectedNode.actualEnd" class="mb-2">
+              <strong>実績期間:</strong><br>
+              <small class="text-muted">
+                <span v-if="selectedNode.actualStart">{{ selectedNode.actualStart }}</span>
+                <span v-if="selectedNode.actualStart && selectedNode.actualEnd"> ～ </span>
+                <span v-if="selectedNode.actualEnd">{{ selectedNode.actualEnd }}</span>
+                <span v-if="!selectedNode.actualStart && !selectedNode.actualEnd">未設定</span>
+              </small>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <p class="mb-0 text-muted">プロジェクトノード</p>
+      </template>
     </div>
 
     <!-- 凡例 -->

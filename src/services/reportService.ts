@@ -10,6 +10,7 @@ import type {
   UserWorkloadReport,
   DeadlineReport,
   PriorityReport,
+  TagReport,
   ReportGenerationResult,
   ChartData,
   ChartDataset
@@ -27,6 +28,13 @@ interface ProjectWithUser extends Omit<Project, "users"> {
 interface TaskWithRelations extends Omit<Task, "projects" | "users"> {
   projects?: { name: string };
   users?: { display_name: string };
+  description?: string | null;
+  wbs_code?: string | null;
+  planned_start?: string | null;
+  planned_end?: string | null;
+  actual_start?: string | null;
+  actual_end?: string | null;
+  primary_assignee_id?: number | null;
 }
 
 // プロジェクト進捗レポート生成
@@ -410,6 +418,91 @@ export async function generatePriorityReport(
   );
 }
 
+// タグ別レポート生成
+export async function generateTagReport(
+  options: ReportOptions = {}
+): Promise<ServiceResult<TagReport[]>> {
+  return handleServiceCall(
+    async () => {
+      // タスク一覧を取得（tagsフィールドを含む）
+      let query = supabase.from("tasks").select("id, status, progress_percent, tags");
+
+      // フィルタリング
+      if (options.projectIds && options.projectIds.length > 0) {
+        query = query.in("project_id", options.projectIds);
+      }
+
+      if (options.userIds && options.userIds.length > 0) {
+        query = query.in("primary_assignee_id", options.userIds);
+      }
+
+      if (!options.includeArchived) {
+        query = query.eq("is_archived", false);
+      }
+
+      const { data: tasks, error } = await query;
+
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
+
+      const taskList = tasks || [];
+      
+      // タグごとのタスクを集計
+      const tagMap = new Map<string, Array<{ id: number; status: string; progress_percent: number }>>();
+
+      // 各タスクのタグを展開して集計
+      taskList.forEach(task => {
+        const tags = task.tags || [];
+        if (Array.isArray(tags) && tags.length > 0) {
+          tags.forEach((tag: string) => {
+            if (!tagMap.has(tag)) {
+              tagMap.set(tag, []);
+            }
+            tagMap.get(tag)!.push({
+              id: task.id,
+              status: task.status,
+              progress_percent: task.progress_percent
+            });
+          });
+        }
+      });
+
+      // タグ別レポートを生成
+      const tagReports: TagReport[] = [];
+
+      tagMap.forEach((tasks, tag) => {
+        const taskCount = tasks.length;
+        const completedCount = tasks.filter(t => t.status === "DONE").length;
+        const inProgressCount = tasks.filter(t => t.status === "IN_PROGRESS").length;
+        const notStartedCount = tasks.filter(t => t.status === "NOT_STARTED").length;
+        const averageProgress = taskCount > 0
+          ? Math.round(tasks.reduce((sum, t) => sum + t.progress_percent, 0) / taskCount)
+          : 0;
+        const completionRate = taskCount > 0
+          ? Math.round((completedCount / taskCount) * 100)
+          : 0;
+
+        tagReports.push({
+          tag,
+          taskCount,
+          completedCount,
+          inProgressCount,
+          notStartedCount,
+          averageProgress,
+          completionRate
+        });
+      });
+
+      // タスク数の多い順にソート
+      tagReports.sort((a, b) => b.taskCount - a.taskCount);
+
+      return tagReports;
+    },
+    "タグ別レポート生成に失敗しました"
+  );
+}
+
 // 統合レポート生成
 export async function generateReport(options: ReportOptions = {}): Promise<ReportGenerationResult> {
   try {
@@ -420,13 +513,15 @@ export async function generateReport(options: ReportOptions = {}): Promise<Repor
       taskStatisticsResult,
       userWorkloadResult,
       deadlineReportResult,
-      priorityReportResult
+      priorityReportResult,
+      tagReportResult
     ] = await Promise.all([
       generateProjectProgressReport(options),
       generateTaskStatisticsReport(options),
       generateUserWorkloadReport(options),
       generateDeadlineReport(options),
-      generatePriorityReport(options)
+      generatePriorityReport(options),
+      generateTagReport(options)
     ]);
 
     // ServiceResultからデータを抽出
@@ -445,6 +540,7 @@ export async function generateReport(options: ReportOptions = {}): Promise<Repor
     const userWorkload = userWorkloadResult.success && userWorkloadResult.data ? userWorkloadResult.data : [];
     const deadlineReport = deadlineReportResult.success && deadlineReportResult.data ? deadlineReportResult.data : [];
     const priorityReport = priorityReportResult.success && priorityReportResult.data ? priorityReportResult.data : [];
+    const tagReport = tagReportResult.success && tagReportResult.data ? tagReportResult.data : [];
 
     const reportData: ReportData = {
       projectProgress,
@@ -452,6 +548,7 @@ export async function generateReport(options: ReportOptions = {}): Promise<Repor
       userWorkload,
       deadlineReport,
       priorityReport,
+      tagReport,
       generatedAt: new Date(),
       options
     };
@@ -523,6 +620,50 @@ export function generatePriorityChartData(priorityReport: PriorityReport[]): Cha
         "#ffc107", 
         "#dc3545"
       ],
+      borderWidth: 1
+    }]
+  };
+}
+
+// タグ別チャートデータ生成
+export function generateTagChartData(tagReport: TagReport[]): ChartData | null {
+  if (!tagReport || tagReport.length === 0) {
+    return null;
+  }
+
+  // タスク数の多い順にソート（上位10件まで表示）
+  const sortedTags = [...tagReport].sort((a, b) => b.taskCount - a.taskCount).slice(0, 10);
+
+  // タグごとに異なる色を生成（動的カラーパレット）
+  const generateColors = (count: number): string[] => {
+    const colors: string[] = [];
+    const baseColors = [
+      "#007bff", "#28a745", "#ffc107", "#dc3545", "#6c757d",
+      "#17a2b8", "#6610f2", "#e83e8c", "#fd7e14", "#20c997"
+    ];
+    
+    for (let i = 0; i < count; i++) {
+      if (i < baseColors.length) {
+        colors.push(baseColors[i]);
+      } else {
+        // 10個以上の場合、色相を回転させて生成
+        const hue = (i * 137.508) % 360; // 黄金角を使用して均等に分布
+        colors.push(`hsl(${hue}, 70%, 50%)`);
+      }
+    }
+    
+    return colors;
+  };
+
+  const colors = generateColors(sortedTags.length);
+
+  return {
+    labels: sortedTags.map(t => t.tag),
+    datasets: [{
+      label: "タスク数",
+      data: sortedTags.map(t => t.taskCount),
+      backgroundColor: colors,
+      borderColor: colors.map(c => c.replace("0.7", "1")),
       borderWidth: 1
     }]
   };
@@ -606,40 +747,67 @@ export async function generateDependencyGraphData(
 ): Promise<ServiceResult<import("../types/report").DependencyGraphData>> {
   return handleServiceCall(
     async () => {
+      // プロジェクト一覧を取得
+      let projectsQuery = supabase
+        .from("projects")
+        .select("id, name, description, is_archived");
+
+      if (options.projectIds && options.projectIds.length > 0) {
+        projectsQuery = projectsQuery.in("id", options.projectIds);
+      }
+
+      if (!options.includeArchived) {
+        projectsQuery = projectsQuery.eq("is_archived", false);
+      }
+
+      const { data: projects, error: projectsError } = await projectsQuery;
+
+      if (projectsError) {
+        throw new Error(translateSupabaseError(projectsError));
+      }
+
       // タスク一覧を取得（親タスク情報を含む）
-      let query = supabase
+      let tasksQuery = supabase
         .from("tasks")
         .select(`
           id,
           task_name,
+          description,
           status,
           priority,
           progress_percent,
           parent_task_id,
           project_id,
-          projects!tasks_project_id_fkey(name)
+          wbs_code,
+          planned_start,
+          planned_end,
+          actual_start,
+          actual_end,
+          primary_assignee_id,
+          projects!tasks_project_id_fkey(name),
+          users!tasks_primary_assignee_id_fkey(display_name)
         `);
 
       // フィルタリング
       if (options.projectIds && options.projectIds.length > 0) {
-        query = query.in("project_id", options.projectIds);
+        tasksQuery = tasksQuery.in("project_id", options.projectIds);
       }
 
       if (options.userIds && options.userIds.length > 0) {
-        query = query.in("primary_assignee_id", options.userIds);
+        tasksQuery = tasksQuery.in("primary_assignee_id", options.userIds);
       }
 
       if (!options.includeArchived) {
-        query = query.eq("is_archived", false);
+        tasksQuery = tasksQuery.eq("is_archived", false);
       }
 
-      const { data: tasks, error } = await query;
+      const { data: tasks, error: tasksError } = await tasksQuery;
 
-      if (error) {
-        throw new Error(translateSupabaseError(error));
+      if (tasksError) {
+        throw new Error(translateSupabaseError(tasksError));
       }
 
-      if (!tasks || tasks.length === 0) {
+      if ((!projects || projects.length === 0) && (!tasks || tasks.length === 0)) {
         return { nodes: [], edges: [] };
       }
 
@@ -654,31 +822,101 @@ export async function generateDependencyGraphData(
         }
       };
 
-      // ノードを生成
-      const nodes: import("../types/report").DependencyNode[] = tasks.map(task => {
-        const taskWithRelations = task as TaskWithRelations;
-        return {
-          id: String(task.id),
-          label: task.task_name || "無題のタスク",
-          title: `プロジェクト: ${taskWithRelations.projects?.name || "未割当"}\nステータス: ${task.status}\n進捗: ${task.progress_percent}%`,
-          group: taskWithRelations.projects?.name || "未割当",
-          color: getStatusColor(task.status),
-          status: task.status || "NOT_STARTED",
-          priority: task.priority || "MEDIUM",
-          progress: task.progress_percent || 0
-        };
-      });
+      const nodes: import("../types/report").DependencyNode[] = [];
 
-      // エッジを生成（親タスクとの依存関係）
-      const edges: import("../types/report").DependencyEdge[] = tasks
-        .filter(task => task.parent_task_id !== null)
-        .map(task => ({
-          from: String(task.parent_task_id),
-          to: String(task.id),
-          arrows: "to" as const,
-          label: "依存",
-          color: "#999999"
-        }));
+      // プロジェクトノードを生成
+      if (projects && projects.length > 0) {
+        projects.forEach(project => {
+          nodes.push({
+            id: `project_${project.id}`,
+            label: project.name || "無題のプロジェクト",
+            title: `プロジェクト: ${project.name}\n説明: ${project.description || "なし"}`,
+            group: "project",
+            color: "#9c27b0", // プロジェクト用の紫色
+            nodeType: "project"
+          });
+        });
+      }
+
+      // タスクノードを生成
+      if (tasks && tasks.length > 0) {
+        // 日付フォーマット用ヘルパー関数
+        const formatDate = (dateStr: string | null | undefined): string | null => {
+          if (!dateStr) return null;
+          try {
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return null;
+            return date.toLocaleDateString("ja-JP", {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit"
+            });
+          } catch {
+            return null;
+          }
+        };
+
+        tasks.forEach(task => {
+          const taskWithRelations = task as TaskWithRelations;
+          nodes.push({
+            id: `task_${task.id}`,
+            label: task.task_name || "無題のタスク",
+            title: `プロジェクト: ${taskWithRelations.projects?.name || "未割当"}\nステータス: ${task.status}\n進捗: ${task.progress_percent}%`,
+            group: taskWithRelations.projects?.name || "未割当",
+            color: getStatusColor(task.status),
+            nodeType: "task",
+            status: task.status || "NOT_STARTED",
+            priority: task.priority || "MEDIUM",
+            progress: task.progress_percent || 0,
+            projectName: taskWithRelations.projects?.name || undefined,
+            description: taskWithRelations.description || undefined,
+            assigneeName: taskWithRelations.users?.display_name || undefined,
+            plannedStart: formatDate(taskWithRelations.planned_start),
+            plannedEnd: formatDate(taskWithRelations.planned_end),
+            actualStart: formatDate(taskWithRelations.actual_start),
+            actualEnd: formatDate(taskWithRelations.actual_end),
+            wbsCode: taskWithRelations.wbs_code || undefined
+          });
+        });
+      }
+
+      const edges: import("../types/report").DependencyEdge[] = [];
+
+      // プロジェクト-タスクエッジを生成
+      if (tasks && tasks.length > 0) {
+        tasks.forEach(task => {
+          if (task.project_id) {
+            edges.push({
+              from: `project_${task.project_id}`,
+              to: `task_${task.id}`,
+              arrows: "to" as const,
+              label: "含む",
+              color: "#9c27b0", // プロジェクト-タスク関係は紫色
+              dashes: true // 点線で表示
+            });
+          }
+        });
+      }
+
+      // タスク間の依存関係エッジを生成
+      // 注意: 親タスクが現在のクエリ結果に含まれている場合のみエッジを生成
+      if (tasks && tasks.length > 0) {
+        const taskIdSet = new Set(tasks.map(t => t.id));
+        tasks
+          .filter(task => {
+            // parent_task_idが存在し、かつ親タスクが現在のクエリ結果に含まれている場合のみ
+            return task.parent_task_id !== null && taskIdSet.has(task.parent_task_id);
+          })
+          .forEach(task => {
+            edges.push({
+              from: `task_${task.parent_task_id}`,
+              to: `task_${task.id}`,
+              arrows: "to" as const,
+              label: "依存",
+              color: "#999999" // タスク間依存関係はグレー
+            });
+          });
+      }
 
       return { nodes, edges };
     },

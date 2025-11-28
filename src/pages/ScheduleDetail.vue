@@ -45,6 +45,8 @@ const {
   showFileModal,      // ファイル添付モーダル表示フラグ
   statusHistory,      // ステータス変更履歴
   availableUsers,     // 選択可能ユーザー一覧
+  availableParentTasks, // 選択可能な親タスク一覧
+  isLoadingParentTasks, // 親タスク読み込み中フラグ
   changeStatus,       // ステータス変更関数
   changePriority,     // 優先度変更関数
   changeProgress,     // 進捗率変更関数
@@ -53,6 +55,7 @@ const {
   addComment,         // コメント追加関数
   loadUsers,          // ユーザー読み込み関数
   loadTaskById,       // タスク読み込み関数
+  loadParentTasks,    // 親タスク候補読み込み関数
 } = useScheduleDetail(route.params.id as string);
 
 // メッセージシステム
@@ -161,7 +164,20 @@ const handleFileUpload = (event: Event) => {
   }
 };
 
-// タグ追加/削除は composable の関数を使用
+// タグ削除処理（削除後、編集モードの場合は自動保存）
+const handleRemoveTag = async (tag: string) => {
+  try {
+    removeTag(tag);
+    // 編集モードの場合、削除後すぐに保存
+    if (isEditMode.value) {
+      await saveChanges();
+      console.log(`タグ「${tag}」を削除しました`);
+    }
+  } catch (error) {
+    console.error("タグの削除に失敗:", error);
+    showError("タグの削除に失敗しました。");
+  }
+};
 
 // タグ自動補完
 const filteredTags = computed(() => {
@@ -176,6 +192,22 @@ const changeAssignee = (userId: number) => {
   const user = availableUsers.value.find(u => u.id === userId);
   if (user) {
     editForm.value.assignee = user.name;
+  }
+};
+
+// 親タスク変更
+const changeParentTask = (taskId: number | null) => {
+  if (taskId === null || taskId === 0) {
+    // 親タスクを解除
+    editForm.value.parentTaskId = null;
+    editForm.value.parentTaskName = undefined;
+  } else {
+    // 親タスクを設定
+    const parentTask = availableParentTasks.value.find(t => t.id === taskId);
+    if (parentTask) {
+      editForm.value.parentTaskId = parentTask.id;
+      editForm.value.parentTaskName = parentTask.task_name;
+    }
   }
 };
 
@@ -557,6 +589,45 @@ const getHeaderActions = () => {
           </div>
         </div>
 
+        <!-- 親タスク -->
+        <div class="card mb-4">
+          <CardHeader title="親タスク" subtitle="このタスクの親タスクを設定できます" />
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label text-sm">親タスク</label>
+              <template v-if="isEditMode">
+                <select
+                  class="form-select form-select-sm"
+                  :value="editForm.parentTaskId || null"
+                  @change="changeParentTask(($event.target as HTMLSelectElement).value ? Number(($event.target as HTMLSelectElement).value) : null)"
+                >
+                  <option :value="null">親タスクなし</option>
+                  <option 
+                    v-for="task in availableParentTasks" 
+                    :key="task.id" 
+                    :value="task.id"
+                  >
+                    {{ task.task_name }}
+                  </option>
+                </select>
+                <div v-if="isLoadingParentTasks" class="text-muted text-xs mt-2">
+                  <i class="material-symbols-rounded" style="font-size: 0.875rem;">sync</i>
+                  親タスク候補を読み込み中...
+                </div>
+              </template>
+              <template v-else>
+                <p v-if="scheduleDetail.parentTaskName" class="form-control-plaintext">
+                  <i class="material-symbols-rounded me-1" style="font-size: 1rem;">account_tree</i>
+                  {{ scheduleDetail.parentTaskName }}
+                </p>
+                <p v-else class="form-control-plaintext text-muted">
+                  親タスクが設定されていません
+                </p>
+              </template>
+            </div>
+          </div>
+        </div>
+
         <!-- タグ -->
         <div class="card mb-4">
           <CardHeader title="タグ" subtitle="タスクに関連するタグを管理できます" />
@@ -573,15 +644,28 @@ const getHeaderActions = () => {
                   v-if="isEditMode"
                   class="btn-close btn-close-white ms-2"
                   style="font-size: 0.6rem;"
-                  @click="removeTag(tag)"
+                  @click="handleRemoveTag(tag)"
                   :title="`${tag}を削除`"
                 ></button>
+              </span>
+              <!-- タグが存在しない場合のメッセージ -->
+              <span v-if="scheduleDetail.tags.length === 0" class="text-muted text-sm">
+                タグが設定されていません
               </span>
             </div>
             
             <!-- タグ管理ボタン -->
-            <div v-if="isEditMode" class="mt-3">
+            <div class="mt-3">
               <button 
+                v-if="!isEditMode"
+                class="btn btn-sm bg-gradient-secondary me-2"
+                @click="toggleEditMode"
+              >
+                <i class="material-symbols-rounded me-1">edit</i>
+                編集してタグを管理
+              </button>
+              <button 
+                v-else
                 class="btn btn-sm bg-gradient-primary"
                 @click="showTagModal = true"
               >

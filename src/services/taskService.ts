@@ -130,6 +130,41 @@ export async function deleteTask(id: number): Promise<ServiceResult<boolean>> {
   );
 }
 
+// 全タスクからユニークなタグ一覧を取得（人気タグ表示用）
+export async function getAllUniqueTags(): Promise<ServiceResult<string[]>> {
+  return handleServiceCall(
+    async () => {
+      // 全タスクのtagsカラムを取得
+      const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .select("tags")
+        .not("tags", "is", null);
+      
+      if (error) {
+        throw new Error(translateSupabaseError(error));
+      }
+      
+      // 全タグをフラット化してユニークなタグ一覧を作成
+      const allTags: string[] = [];
+      if (data) {
+        for (const row of data) {
+          if (Array.isArray(row.tags)) {
+            allTags.push(...row.tags);
+          }
+        }
+      }
+      
+      // 重複を除去してソート
+      const uniqueTags = Array.from(new Set(allTags))
+        .filter(tag => tag && tag.trim().length > 0)
+        .sort();
+      
+      return uniqueTags;
+    },
+    "タグ一覧の取得に失敗しました"
+  );
+}
+
 export type { SelectFilter, WhereCondition };
 
 

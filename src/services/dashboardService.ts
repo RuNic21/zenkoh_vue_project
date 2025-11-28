@@ -497,6 +497,7 @@ export interface TaskProgressRow {
   primary_assignee_id: number | null;
   created_at: string;
   updated_at: string;
+  tags?: string[] | null; // タグ配列
   // App.vueで使用する追加プロパティ
   projectName: string;
   assigneeName: string;
@@ -539,7 +540,7 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
         .select(`
           id, task_name, description, status, priority, progress_percent, 
           planned_start, planned_end, project_id, primary_assignee_id, 
-          created_at, updated_at, is_archived
+          created_at, updated_at, is_archived, tags
         `)
         .eq("is_archived", false)
         .order("updated_at", { ascending: false })
@@ -702,6 +703,7 @@ export async function fetchRecentTasks(limit: number = 10): Promise<ServiceResul
           primary_assignee_id: task.primary_assignee_id,
           created_at: task.created_at,
           updated_at: task.updated_at,
+          tags: (task as any).tags || null, // タグ配列を追加
           // App.vueで使用する追加プロパティ（個別取得したデータから取得）
           projectName: projectsMap.get(task.project_id)?.name || "-",
           assigneeName: usersMap.get(task.primary_assignee_id)?.display_name || "未割当",

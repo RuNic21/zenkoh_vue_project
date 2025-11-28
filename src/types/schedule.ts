@@ -38,6 +38,9 @@ export interface ScheduleItem {
   notes?: string;       // 将来の拡張用
   attachments?: ScheduleAttachment[]; // 将来の拡張用
   comments?: ScheduleComment[];       // 将来の拡張用
+  parentTaskId?: number | null;  // parent_task_id から変換（親タスクID）
+  parentTaskName?: string;      // 親タスク名（表示用）
+  updated_at?: string;  // 更新日時（ISO形式、ソート用）
 }
 
 // 新規作成時のスケジュール項目（ID なし）

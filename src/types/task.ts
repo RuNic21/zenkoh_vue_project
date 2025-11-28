@@ -55,6 +55,9 @@ export interface Task {
   // アーカイブ（必須）
   is_archived: boolean;
 
+  // タグ（任意）
+  tags?: string[] | null;
+
   // 監査情報
   created_by?: number | null;
   updated_by?: number | null;
@@ -81,6 +84,7 @@ export interface TaskInsert {
   current_column_id?: number | null;
   sort_order?: number | null;
   is_archived?: boolean; // 省略時は false
+  tags?: string[] | null;
   created_by?: number | null;
 }
 
@@ -102,6 +106,7 @@ export interface TaskUpdate {
   current_column_id?: number | null;
   sort_order?: number | null;
   is_archived?: boolean;
+  tags?: string[] | null;
   updated_by?: number | null;
 }
 

@@ -69,18 +69,51 @@ const handleAddFromPopular = (tag: string) => {
         </div>
 
         <!-- 人気タグから選ぶ -->
-        <div class="mb-3">
-          <label class="form-label">人気タグ</label>
-          <div class="d-flex flex-wrap gap-1">
+        <div v-if="availableTags.length > 0" class="mb-3">
+          <label class="form-label">
+            <i class="material-symbols-rounded me-1" style="font-size: 1rem;">trending_up</i>
+            人気タグから選択
+            <span class="badge bg-gradient-info ms-2">{{ availableTags.length }}個</span>
+          </label>
+          <div class="d-flex flex-wrap gap-2 mt-2">
             <button
-              v-for="tag in availableTags.slice(0, 8)"
+              v-for="tag in availableTags.slice(0, 12)"
               :key="tag"
-              class="btn btn-sm btn-outline-secondary"
+              :class="[
+                'btn btn-sm',
+                (selectedTags || []).includes(tag)
+                  ? 'bg-gradient-success text-white'
+                  : 'btn-outline-primary'
+              ]"
               @click="handleAddFromPopular(tag)"
               :disabled="(selectedTags || []).includes(tag)"
+              :title="(selectedTags || []).includes(tag) ? '既に追加済み' : 'クリックして追加'"
             >
+              <i 
+                v-if="(selectedTags || []).includes(tag)"
+                class="material-symbols-rounded me-1"
+                style="font-size: 0.875rem;"
+              >
+                check_circle
+              </i>
+              <i 
+                v-else
+                class="material-symbols-rounded me-1"
+                style="font-size: 0.875rem;"
+              >
+                add_circle
+              </i>
               {{ tag }}
             </button>
+          </div>
+          <p v-if="availableTags.length > 12" class="text-sm text-muted mt-2 mb-0">
+            他にも {{ availableTags.length - 12 }} 個のタグがあります
+          </p>
+        </div>
+        <div v-else class="mb-3">
+          <div class="alert alert-info mb-0">
+            <i class="material-symbols-rounded me-2">info</i>
+            まだ人気タグがありません。新しいタグを作成してください。
           </div>
         </div>
       </div>
@@ -94,7 +127,64 @@ const handleAddFromPopular = (tag: string) => {
 
 <style scoped>
 /* モーダル内のボタンと入力の軽微な調整 */
-.btn-outline-secondary { border-radius: 1rem; }
+.btn-sm {
+  font-size: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.btn-sm:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-outline-primary {
+  border-color: #5e72e4;
+  color: #5e72e4;
+}
+
+.btn-outline-primary:hover:not(:disabled) {
+  background-color: #5e72e4;
+  border-color: #5e72e4;
+  color: white;
+}
+
+.btn-sm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.bg-gradient-success {
+  border: none;
+}
+
+/* フォームラベル */
+.form-label {
+  font-weight: 600;
+  color: #344767;
+  display: flex;
+  align-items: center;
+}
+
+.form-label i {
+  opacity: 0.8;
+}
+
+/* アラート */
+.alert-info {
+  background-color: #e7f3ff;
+  border-color: #b3d9ff;
+  color: #004085;
+}
+
+/* レスポンシブ */
+@media (max-width: 576px) {
+  .d-flex.flex-wrap.gap-2 {
+    gap: 0.5rem !important;
+  }
+}
 </style>
 
 

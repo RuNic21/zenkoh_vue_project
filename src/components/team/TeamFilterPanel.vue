@@ -11,6 +11,7 @@ interface Props {
   searchQuery: string;
   statusFilter: string;
   roleFilter: string;
+  globalSearchQuery?: string; // 全カードに適用される共通検索フィルター（オプション）
 }
 
 // Emits定義
@@ -18,6 +19,7 @@ interface Emits {
   (e: 'update:searchQuery', value: string): void;
   (e: 'update:statusFilter', value: string): void;
   (e: 'update:roleFilter', value: string): void;
+  (e: 'update:globalSearchQuery', value: string): void;
   (e: 'clearFilters'): void;
 }
 
@@ -27,6 +29,7 @@ const emit = defineEmits<Emits>();
 // アクティブなフィルタ数を計算
 const activeFiltersCount = computed(() => {
   let count = 0;
+  if (props.globalSearchQuery) count++;
   if (props.searchQuery) count++;
   if (props.statusFilter !== "all") count++;
   if (props.roleFilter !== "all") count++;
@@ -52,14 +55,26 @@ const roleOptions = [
 <template>
   <!-- FilterPanelコンポーネントを活用 -->
   <FilterPanel 
-    title="フィルタリング・検索"
+    title="フィルタリング・検索（全カード適用）"
     :active-filters-count="activeFiltersCount"
     :show-reset-button="true"
     @reset="emit('clearFilters')"
   >
-    <!-- 検索フィルター -->
+    <!-- 共通検索フィルター（全カード・セクションに適用） -->
     <FilterField
-      label="検索"
+      v-if="props.globalSearchQuery !== undefined"
+      label="共通検索（全カード）"
+      icon="fas fa-globe"
+      type="text"
+      :model-value="props.globalSearchQuery"
+      @update:model-value="emit('update:globalSearchQuery', $event)"
+      placeholder="全セクションで検索（ユーザー、通知、ルール、活動...）"
+      col-class="col-12 mb-3"
+    />
+    
+    <!-- ユーザー専用検索フィルター -->
+    <FilterField
+      label="ユーザー検索"
       icon="fas fa-search"
       type="text"
       :model-value="searchQuery"

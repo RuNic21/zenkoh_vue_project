@@ -3,6 +3,7 @@ import {
   generateReport, 
   generateTaskStatusChartData, 
   generatePriorityChartData,
+  generateTagChartData,
   generateGanttData,
   generateDependencyGraphData,
   analyzeDependencies
@@ -114,6 +115,11 @@ export function useReportPage() {
         },
       ],
     };
+  });
+
+  const tagChartData = computed(() => {
+    if (!reportData.value || !reportData.value.tagReport || !Array.isArray(reportData.value.tagReport)) return null;
+    return generateTagChartData(reportData.value.tagReport);
   });
 
   const loadProjectsAndUsers = async () => {
@@ -256,6 +262,7 @@ export function useReportPage() {
     projectProgressChartData,
     userWorkloadChartData,
     deadlineChartData,
+    tagChartData,
     // actions
     loadProjectsAndUsers,
     generateReportData,

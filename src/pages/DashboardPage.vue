@@ -33,10 +33,12 @@ const {
   priorityFilter,
   deadlineFilter,
   projectFilter,
+  tagFilter,
   clearFilters,
   filteredProjects,
   filteredTasks,
   availableProjects,
+  availableTags,
   inProgressCount,
   completedCount,
   completionRate,
@@ -330,14 +332,14 @@ onActivated(async () => {
       </div>
     </div>
 
-    <!-- 統計情報カード -->
+    <!-- 統計情報カード 今後使うかもしれないので残す
     <div class="row mb-4">
       <div class="col-12">
         <StatCards :items="dashboardStats" />
       </div>
-    </div>
+    </div> -->
 
-    <!-- フィルタリングパネル -->
+    <!-- フィルタリングパネル 
     <div class="row mb-4">
       <div class="col-12">
         <DashboardFilters 
@@ -346,15 +348,18 @@ onActivated(async () => {
           :deadline-filter="deadlineFilter"
           :project-filter="projectFilter"
           :available-projects="availableProjects"
+          :tag-filter="tagFilter"
+          :available-tags="availableTags"
           @update:searchQuery="(v:string)=>searchQuery=v"
           @update:priorityFilter="(v:string)=>priorityFilter=v"
           @update:deadlineFilter="(v:string)=>deadlineFilter=v"
           @update:projectFilter="(v:string)=>projectFilter=v"
+          @update:tagFilter="(v:string[])=>tagFilter=v"
           @clear="clearFilters"
           @refresh="handleRefreshDashboard"
         />
       </div>
-    </div>
+    </div> -->
 
     <!-- プロジェクト別進捗の一覧表示 -->
     <div class="row mb-4">

@@ -27,6 +27,7 @@ export function useDashboard() {
   const priorityFilter = ref("all");     // 'all' | 'urgent' | 'high-up'
   const deadlineFilter = ref("all");     // 'all' | 'within-3days' | 'within-7days' | 'overdue'
   const projectFilter = ref("all");      // 'all' | project name
+  const tagFilter = ref<string[]>([]);   // 選択されたタグの配列
 
   // 日付基準（メモ化）
   const today = computed(() => {
@@ -122,6 +123,17 @@ export function useDashboard() {
       filtered = filtered.filter((t) => t.projectName === projectFilter.value);
     }
 
+    // タグフィルタ（選択したタグのいずれかを含むタスクを表示）
+    if (tagFilter.value.length > 0) {
+      filtered = filtered.filter((task) => {
+        const taskTags = task.tags || [];
+        // 選択されたタグのいずれかがタスクに含まれているかチェック
+        return tagFilter.value.some(selectedTag => 
+          Array.isArray(taskTags) && taskTags.includes(selectedTag)
+        );
+      });
+    }
+
     return filtered;
   });
 
@@ -136,6 +148,23 @@ export function useDashboard() {
     });
     
     return Array.from(projects).sort();
+  });
+
+  // 利用可能なタグ一覧（フィルタ用）
+  const availableTags = computed(() => {
+    const tags = new Set<string>();
+    
+    taskProgressList.value.forEach((t) => {
+      if (t.tags && Array.isArray(t.tags)) {
+        t.tags.forEach(tag => {
+          if (tag && tag.trim()) {
+            tags.add(tag);
+          }
+        });
+      }
+    });
+    
+    return Array.from(tags).sort();
   });
 
   // 統計
@@ -283,6 +312,7 @@ export function useDashboard() {
     priorityFilter.value = "all";
     deadlineFilter.value = "all";
     projectFilter.value = "all";
+    tagFilter.value = [];
   };
 
   return {
@@ -298,11 +328,13 @@ export function useDashboard() {
     priorityFilter,
     deadlineFilter,
     projectFilter,
+    tagFilter,
     clearFilters,
     // computed lists
     filteredProjects,
     filteredTasks,
     availableProjects,
+    availableTags,
     // stats
     inProgressCount,
     completedCount,

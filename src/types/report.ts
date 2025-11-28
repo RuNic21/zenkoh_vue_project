@@ -60,6 +60,17 @@ export interface PriorityReport {
   completionRate: number;
 }
 
+// タグ別タスクレポート
+export interface TagReport {
+  tag: string; // タグ名
+  taskCount: number; // タスク数
+  completedCount: number; // 完了タスク数
+  inProgressCount: number; // 進行中タスク数
+  notStartedCount: number; // 未開始タスク数
+  averageProgress: number; // 平均進捗率
+  completionRate: number; // 完了率
+}
+
 // レポート生成オプション
 export interface ReportOptions {
   projectIds?: number[]; // 特定のプロジェクトのみ
@@ -78,6 +89,7 @@ export interface ReportData {
   userWorkload: UserWorkloadReport[];
   deadlineReport: DeadlineReport[];
   priorityReport: PriorityReport[];
+  tagReport: TagReport[]; // タグ別レポート
   generatedAt: Date;
   options: ReportOptions;
 }
@@ -119,11 +131,12 @@ export interface ChartData {
 }
 
 export interface ChartDataset {
-  label: string;
+  label?: string; // チャートのラベル（オプション）
   data: number[];
   backgroundColor?: string | string[];
   borderColor?: string | string[];
   borderWidth?: number;
+  [key: string]: unknown; // チャートライブラリの追加プロパティに対応
 }
 
 // レポートフィルター
@@ -165,15 +178,25 @@ export interface GanttChartOptions {
 
 // 依存性グラフ用のノード
 export interface DependencyNode {
-  id: string; // ノードID (タスクID)
+  id: string; // ノードID (タスクID または プロジェクトID)
   label: string; // ノード表示名
   title?: string; // ツールチップ
   group?: string; // グループ（プロジェクト別色分け）
   level?: number; // 階層レベル
   color?: string; // ノード色
-  status: string; // タスクステータス
-  priority: string; // タスク優先度
-  progress: number; // 進捗率
+  nodeType: "task" | "project"; // ノードタイプ（タスクまたはプロジェクト）
+  // タスク情報（タスクの場合のみ）
+  status?: string; // タスクステータス
+  priority?: string; // タスク優先度
+  progress?: number; // 進捗率
+  projectName?: string; // プロジェクト名
+  description?: string; // タスク説明
+  assigneeName?: string; // 担当者名
+  plannedStart?: string | null; // 計画開始日
+  plannedEnd?: string | null; // 計画終了日
+  actualStart?: string | null; // 実際開始日
+  actualEnd?: string | null; // 実際終了日
+  wbsCode?: string | null; // WBSコード
 }
 
 // 依存性グラフ用のエッジ

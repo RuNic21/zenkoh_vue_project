@@ -35,7 +35,7 @@
 
 import { ref, computed } from "vue";
 import type { ScheduleItem } from "../types/schedule";
-import { listTasksWithProject, createTask, updateTask, deleteTask, getTaskById } from "../services/taskService";
+import { listTasksWithProject, createTask, updateTask, deleteTask, getTaskById, listTasks } from "../services/taskService";
 import { listUsers } from "../services/dbServices";
 import { listProjects } from "../services/projectService";
 import { tasksToScheduleItems, scheduleItemToTaskInsert, scheduleItemToTaskUpdate, findUserIdByName } from "../utils/taskAdapter";
@@ -125,8 +125,8 @@ export const useScheduleStore = () => ({
       const usersResult = await listUsers();
       const users = usersResult.success && usersResult.data ? usersResult.data : [];
       
-      // Task を ScheduleItem に変換
-      const scheduleItems = tasksToScheduleItems(tasksResult.data, users);
+      // Task を ScheduleItem に変換（親タスク名を取得するために全タスクリストを渡す）
+      const scheduleItems = tasksToScheduleItems(tasksResult.data, users, tasksResult.data);
       
       schedules.value = scheduleItems;
       console.log("スケジュールデータを DB から読み込みました:", scheduleItems.length, "件");
@@ -207,7 +207,12 @@ export const useScheduleStore = () => ({
         try {
           const usersRes = await listUsers();
           const users = usersRes.success && usersRes.data ? usersRes.data : [];
-          const updatedItems = tasksToScheduleItems([result.data as unknown as TaskWithProject], users);
+          
+          // 親タスク名を取得するために同じプロジェクトの全タスクを取得
+          const allTasksRes = await listTasks({ project_id: result.data.project_id });
+          const allTasks = allTasksRes.success && allTasksRes.data ? allTasksRes.data : [];
+          
+          const updatedItems = tasksToScheduleItems([result.data as unknown as TaskWithProject], users, allTasks);
           if (updatedItems.length) {
             updateSchedule(updatedItems[0]);
           } else {
@@ -262,7 +267,12 @@ export const useScheduleStore = () => ({
         // 作成されたタスクを ScheduleItem に変換してストアに追加
         const usersResult = await listUsers();
         const users = usersResult.success && usersResult.data ? usersResult.data : [];
-        const scheduleItems = tasksToScheduleItems([result.data], users);
+        
+        // 親タスク名を取得するために同じプロジェクトの全タスクを取得
+        const allTasksRes = await listTasks({ project_id: result.data.project_id });
+        const allTasks = allTasksRes.success && allTasksRes.data ? allTasksRes.data : [];
+        
+        const scheduleItems = tasksToScheduleItems([result.data], users, allTasks);
         
         if (scheduleItems.length > 0) {
           const scheduleItem = scheduleItems[0];

@@ -49,6 +49,7 @@ export function useScheduleList() {
       searchQuery.value = "";
       assigneeQuery.value = "";
       selectedProjectId.value = null;
+      tagFilter.value = [];
     } catch (e) {
       console.error("フィルター初期化に失敗", e);
     }
@@ -59,6 +60,7 @@ export function useScheduleList() {
   const searchQuery = ref("");
   const assigneeQuery = ref("");
   const selectedProjectId = ref<number | null>(null);
+  const tagFilter = ref<string[]>([]);   // 選択されたタグの配列
   
   // プロジェクトビューの選択状態（初期はnull: プロジェクト一覧表示）
   const selectedProjectView = ref<string | null>(null);
@@ -109,6 +111,17 @@ export function useScheduleList() {
       }
     }
     
+    // タグフィルタ（選択したタグのいずれかを含むタスクを表示）
+    if (tagFilter.value.length > 0) {
+      filtered = filtered.filter((s) => {
+        const taskTags = s.tags || [];
+        // 選択されたタグのいずれかがタスクに含まれているかチェック
+        return tagFilter.value.some(selectedTag => 
+          Array.isArray(taskTags) && taskTags.includes(selectedTag)
+        );
+      });
+    }
+    
     // プロジェクト別にグループ化
     const groups: { [key: string]: ScheduleItem[] } = {};
     filtered.forEach((s) => {
@@ -116,6 +129,16 @@ export function useScheduleList() {
       if (!groups[projectName]) groups[projectName] = [];
       groups[projectName].push(s);
     });
+    
+    // 各プロジェクトのタスクを更新日時順（降順：最新が上）でソート
+    Object.keys(groups).forEach((projectName) => {
+      groups[projectName].sort((a, b) => {
+        const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+        const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+        return dateB - dateA; // 降順（新しい順）
+      });
+    });
+    
     return groups;
   });
 
@@ -135,6 +158,23 @@ export function useScheduleList() {
   // フィルター適用済みのタスク一覧（統計表示用）
   const filteredSchedules = computed(() => {
     return Object.values(groupedSchedules.value).flat();
+  });
+
+  // 利用可能なタグ一覧（フィルタ用）
+  const availableTags = computed(() => {
+    const tags = new Set<string>();
+    
+    schedules.value.forEach((s) => {
+      if (s.tags && Array.isArray(s.tags)) {
+        s.tags.forEach(tag => {
+          if (tag && tag.trim()) {
+            tags.add(tag);
+          }
+        });
+      }
+    });
+    
+    return Array.from(tags).sort();
   });
 
   // 新規タスク作成モーダルを開く
@@ -292,6 +332,8 @@ export function useScheduleList() {
     searchQuery,
     assigneeQuery,
     selectedProjectId,
+    tagFilter,
+    availableTags,
     handleFilterUpdate,
     resetFilters,
     loadSchedulesFromDb,

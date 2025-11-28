@@ -9,8 +9,9 @@ Zenkoh のプロジェクト/スケジュール管理用 Web アプリケーシ�
 - **UI ヘルパー**: `src/utils/uiHelpers.ts` - ステータス/進捗のクラス一元管理
 - **データベース統合**: Supabase を基盤とした完全な DB 連携
 - **エラーハンドリング**: `src/utils/errorHandler.ts` - 統一されたエラー処理
+- **Composables**: `src/composables/` - 14 個の Composition API（useReportPage, useProjectManagement, useNotifications など）で画面ロジックと副作用を集約
 
-### サービス層（12個の専門サービス）
+### サービス層（14個の専門サービス）
 - `src/services/supabaseClient.ts` - Supabase 接続クライアント
 - `src/services/authService.ts` - 認証サービス（Supabase Auth - ログイン・会員登録・セッション管理）
 - `src/services/taskService.ts` - タスク専用サービス
@@ -20,7 +21,9 @@ Zenkoh のプロジェクト/スケジュール管理用 Web アプリケーシ�
 - `src/services/dbServices.ts` - 自動生成CRUDリポジトリ
 - `src/services/dashboardService.ts` - ダッシュボード統計・分析
 - `src/services/activityService.ts` - 活動フィード・通知管理
+- `src/services/commentService.ts` - コメント管理・ディスカッション履歴
 - `src/services/reportService.ts` - レポート生成・エクスポート
+- `src/services/taskStatusHistoryService.ts` - タスクステータス履歴トラッキング
 - `src/services/teamService.ts` - チーム管理
 - `src/services/notificationService.ts` - 通知システム
 
@@ -95,6 +98,7 @@ npm run preview      # ビルド結果プレビュー
 ### データベース管理
 ```bash
 npm run test:env              # 環境変数・DB接続テスト
+npm run test:crud             # 単一テーブルCRUDテスト
 npm run test:crud:all         # 全テーブルCRUDテスト
 npm run test:projects         # プロジェクトテスト
 npm run test:tasks            # タスクテスト
@@ -102,10 +106,12 @@ npm run test:tasks:join       # タスク結合テスト
 npm run seed:all              # 全テーブルシードデータ生成
 npm run seed:projects         # プロジェクトシード
 npm run seed:tasks            # タスクシード
+npm run demo:reset            # デモデータ再生成・初期化
 npm run export:csv            # CSVエクスポート
 npm run debug:count           # レコード数確認
 npm run probe:alert           # アラートルール型確認
 npm run probe:task:priority   # タスク優先度確認
+npm run check:schema          # usersテーブルスキーマ検証
 ```
 
 ### 型生成・管理
@@ -159,7 +165,7 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
      ↓
   Activity Service → 通知データ → 活動フィード → リアルタイム更新
      ↓
-  Report Service → 分析データ → CSV/PDF → エクスポート機能
+  Report Service → 分析データ → CSV/PDF/Excel → エクスポート機能
 ```
 
 ## 📊 主要機能詳細
@@ -190,7 +196,8 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 ### レポート機能
 - **進捗レポート**: プロジェクト・タスクの進捗分析
 - **統計レポート**: 各種統計データの集計・分析
-- **エクスポート**: CSV、PDF 形式でのデータ出力
+- **エクスポート**: CSV/Excel/PDF 形式でのデータ出力（html2canvas + jsPDF + XLSX）
+- **高度な可視化**: Frappe Gantt と vis-network によるタイムライン/依存関係グラフ
 - **カスタムレポート**: 条件指定によるレポート生成
 
 ### 活動フィード
@@ -215,9 +222,8 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 
 ### ユーティリティ・ライブラリ
 - **UI コンポーネント**: Perfect Scrollbar, noUiSlider, Flatpickr
-- **日付処理**: Flatpickr
-- **スライダー**: noUiSlider
-- **スクロール**: Perfect Scrollbar
+- **可視化**: Frappe Gantt, vis-network（standalone）
+- **エクスポート**: html2canvas, jsPDF, jspdf-autotable, XLSX
 
 ## 🌟 特徴
 
@@ -225,13 +231,14 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 - **モダンな UI**: Material Design 3 準拠のレスポンシブレイアウト
 - **SPA ルーティング**: Vue Router 4 によるシームレスなページ遷移（9つのページ）
 - **セキュアな認証**: Supabase Auth による安全なログイン・会員登録・セッション管理・ルーターガード
-- **完全なデータベース統合**: Supabase によるリアルタイムデータ同期（12個の専門サービス）
+- **完全なデータベース統合**: Supabase によるリアルタイムデータ同期（14個の専門サービス）
 - **包括的なプロジェクト管理**: プロジェクト、タスク、チーム、レポートの一元管理
 
 ### 高度な機能
 - **ダッシュボード分析**: プロジェクト進捗、統計情報、チャート表示
 - **活動フィード**: リアルタイム活動ログ・通知システム
-- **レポート生成**: CSV/PDF エクスポート、分析レポート
+- **レポート生成**: CSV/Excel/PDF エクスポート、分析レポート
+- **依存関係・タイムライン可視化**: vis-network と Frappe Gantt によるタスク関係の可視化
 - **チーム管理**: ユーザー管理、権限設定、担当者割り当て
 - **カンバンボードサポート**: タスク状態管理、WIP制限
 - **アラート・通知システム**: 締切監視、自動通知
@@ -240,7 +247,7 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 - **型安全性**: TypeScript による完全な型定義（15個の型定義ファイル）
 - **SPA アーキテクチャ**: Vue Router 4 によるクライアントサイドルーティング
 - **認証システム**: Supabase Auth + ルーターガードによるアクセス制御
-- **Composables**: 12個のComposition API関数（useAuth, useDashboard, useMessage 等）
+- **Composables**: 14個のComposition API関数（useAuth, useDashboard, useReportPage 等）
 - **パフォーマンス最適化**: Lazy Loading、効率的なデータ取得・表示、最適化されたテーブルコンポーネント
 - **エラーハンドリング**: 統一されたエラー処理・ユーザーフレンドリーなメッセージ
 - **定数管理**: 7つの定数ファイルによる一貫したUI・ロジック（pagination, format, messages, database, validation, ui, chart）
@@ -255,11 +262,11 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 - **型安全性**: `src/types/db/*.ts` は自動生成ファイル（編集禁止）
 
 ### アーキテクチャ
-- **サービス層**: 12個の専門サービス（認証サービス追加）、クリーンなコードベース
+- **サービス層**: 14個の専門サービス（認証・コメント・履歴サービス含む）、クリーンなコードベース
 - **ページ構成**: 9つのページ（ダッシュボード、認証、プロジェクト、タスク、チーム、レポート）
 - **Vue Router 4**: SPA アーキテクチャ、Lazy Loading、ルーターガード
 - **コンポーネント設計**: カテゴリ別に整理された再利用可能コンポーネント（9つのカテゴリ）
-- **Composables**: 12個の Composition API 関数（useAuth 等）
+- **Composables**: 14個の Composition API 関数（useAuth, useReportPage 等）
 - **定数管理**: 一貫した定数管理（7つの定数ファイル）
 - **データフロー**: コンポーネント → Composable/Store → Service → Supabase の一方向フロー
 
@@ -270,7 +277,7 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 ## 📖 ドキュメント
 
 ### データベース
-- [データベーススキーマ](./docs/database-schema.md) - 詳細なDB構造説明（2025年1月更新 - 12サービス・9ページ対応）
+- [データベーススキーマ](./docs/database-schema.md) - 詳細なDB構造説明（2025年1月更新 - 14サービス・9ページ対応）
 - [データベース統合ガイド](./docs/database-integration-guide.md) - クイックスタートガイド
 
 ### UI/UX・レイアウト
@@ -287,7 +294,7 @@ Supabase DB → Service層 → Store/State → Vue Components → UI表示
 - [Vue Router統合ガイド](./docs/vue-router-integration.md) - Vue Router 4 完全統合（9ページ・ルーターガード）
 
 ### 開発ガイド
-- [スケジュール管理設計書](./docs/schedule-management-design.md) - 画面設計・データフロー（12サービス・9ページ対応）
+- [スケジュール管理設計書](./docs/schedule-management-design.md) - 画面設計・データフロー（14サービス・9ページ対応）
 - [定数リファクタリング](./docs/constants-refactoring.md) - 定数管理の統一化
 
 ## 🔗 リンク

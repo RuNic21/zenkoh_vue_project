@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import router from "@/router";
 import { useScheduleDetail } from "@/composables/useScheduleDetail";
 import { getCurrentUserInfo } from "@/utils/userHelper";
@@ -9,6 +9,9 @@ import type { ScheduleItem, ScheduleStatus, SchedulePriority, ScheduleAttachment
 import { listUsers } from "../services/dbServices";
 import type { Users } from "../types/db/users";
 import type { TaskStatusHistory } from "../types/taskStatusHistory";
+import GitHubRepositoryCard from "@/components/github/GitHubRepositoryCard.vue";
+import { getRepositoryBranches, getRepositoryCommits } from "@/services/githubService";
+import type { GitHubBranch, GitHubCommit } from "@/types/github";
 
 // Router props (router/index.tsでprops: trueが設定されているため)
 interface Props {
@@ -67,6 +70,72 @@ const { confirm: confirmDialog } = useConfirm();
 // スケジュールストアを取得
 const store = useScheduleStore();
 
+// GitHub 連携テスト用のリポジトリ情報（環境変数で未設定の場合はVue公式を利用）
+const githubOwner = ref(import.meta.env.VITE_GITHUB_DEFAULT_OWNER || "vuejs");
+const githubRepo = ref(import.meta.env.VITE_GITHUB_DEFAULT_REPO || "vue");
+const githubBranch = ref(import.meta.env.VITE_GITHUB_DEFAULT_BRANCH || "main");
+
+// GitHub ブランチ/コミット表示用の状態管理
+const githubBranches = ref<GitHubBranch[]>([]);
+const githubCommits = ref<GitHubCommit[]>([]);
+const isBranchesLoading = ref(false);
+const isCommitsLoading = ref(false);
+const branchError = ref<string | null>(null);
+const commitError = ref<string | null>(null);
+
+// GitHub ブランチ一覧を取得してセレクタに反映
+const loadGitHubBranches = async () => {
+  if (!githubOwner.value || !githubRepo.value) {
+    branchError.value = "リポジトリ情報が不足しています";
+    return;
+  }
+  isBranchesLoading.value = true;
+  branchError.value = null;
+  const result = await getRepositoryBranches(githubOwner.value, githubRepo.value);
+  if (result.success && result.data) {
+    githubBranches.value = result.data;
+    if (!githubBranches.value.some(branch => branch.name === githubBranch.value)) {
+      githubBranch.value = githubBranches.value[0]?.name || "main";
+    }
+  } else {
+    branchError.value = result.error || "ブランチ情報の取得に失敗しました";
+  }
+  isBranchesLoading.value = false;
+};
+
+// 選択中ブランチの最新コミットを取得
+const loadGitHubCommits = async (branchName: string) => {
+  if (!githubOwner.value || !githubRepo.value) {
+    commitError.value = "リポジトリ情報が不足しています";
+    return;
+  }
+  isCommitsLoading.value = true;
+  commitError.value = null;
+  const result = await getRepositoryCommits(githubOwner.value, githubRepo.value, {
+    sha: branchName,
+    per_page: 5,
+  });
+  if (result.success && result.data) {
+    githubCommits.value = result.data;
+  } else {
+    commitError.value = result.error || "コミット履歴の取得に失敗しました";
+    githubCommits.value = [];
+  }
+  isCommitsLoading.value = false;
+};
+
+// ブランチ一覧を再読込
+const refreshGitHubBranches = async () => {
+  await loadGitHubBranches();
+  await loadGitHubCommits(githubBranch.value);
+};
+
+// コミット表示用の日時フォーマッタ
+const formatCommitDate = (iso: string | undefined) => {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("ja-JP");
+};
+
 // コメント追加（composable 関数に入力値を渡すラッパー）
 const onAddComment = () => {
   addComment(newComment.value);
@@ -77,6 +146,19 @@ const currentUserId = ref<number | null>(null);
 onMounted(async () => {
   const info = await getCurrentUserInfo();
   currentUserId.value = info?.id ?? null;
+  await refreshGitHubBranches();
+});
+
+// ブランチが変更されたら最新コミットを取得
+watch(githubBranch, async newBranch => {
+  if (newBranch) {
+    await loadGitHubCommits(newBranch);
+  }
+});
+
+// リポジトリ情報が変わった際は一覧を再読込
+watch([githubOwner, githubRepo], async () => {
+  await refreshGitHubBranches();
 });
 
 // 編集モードの切り替え
@@ -673,6 +755,77 @@ const getHeaderActions = () => {
           </div>
         </div>
 
+        <!-- GitHub 連携カード -->
+        <div class="card mb-4">
+          <CardHeader title="GitHub 連携" subtitle="紐づくリポジトリの状態を確認します" />
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label text-sm">表示ブランチ</label>
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <select
+                  class="form-select form-select-sm github-branch-select"
+                  v-model="githubBranch"
+                  :disabled="isBranchesLoading"
+                >
+                  <option
+                    v-for="branch in githubBranches"
+                    :key="branch.name"
+                    :value="branch.name"
+                  >
+                    {{ branch.name }}
+                  </option>
+                </select>
+                <button
+                  class="btn btn-outline-secondary btn-sm"
+                  type="button"
+                  :disabled="isBranchesLoading"
+                  @click="refreshGitHubBranches"
+                >
+                  <i class="material-symbols-rounded me-1" style="font-size: 0.875rem;">refresh</i>
+                  再読込
+                </button>
+              </div>
+              <p v-if="branchError" class="text-danger text-xs mt-2">{{ branchError }}</p>
+            </div>
+            <GitHubRepositoryCard :owner="githubOwner" :repo="githubRepo" />
+            <p class="text-xs text-muted mt-3">
+              環境変数 <code>VITE_GITHUB_DEFAULT_OWNER</code> / <code>VITE_GITHUB_DEFAULT_REPO</code> で対象リポジトリを変更できます。
+            </p>
+            <div class="mt-4">
+              <label class="form-label text-sm d-flex align-items-center gap-2">
+                最新コミット ({{ githubBranch }})
+                <span v-if="isCommitsLoading" class="text-muted text-xs d-flex align-items-center gap-1">
+                  <i class="material-symbols-rounded" style="font-size: 0.875rem;">sync</i>
+                  取得中...
+                </span>
+              </label>
+              <p v-if="commitError" class="text-danger text-xs">{{ commitError }}</p>
+              <ul v-else-if="githubCommits.length > 0" class="list-unstyled mb-0">
+                <li
+                  v-for="commit in githubCommits"
+                  :key="commit.sha"
+                  class="mb-3 github-commit-item"
+                >
+                  <p class="mb-1 fw-semibold">{{ commit.commit.message }}</p>
+                  <small class="text-muted d-block">
+                    {{ commit.commit.author?.name || "不明な作者" }} • {{ formatCommitDate(commit.commit.author?.date) }}
+                  </small>
+                  <a
+                    class="text-xs d-inline-flex align-items-center mt-1"
+                    :href="commit.html_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    コミットを表示
+                    <i class="material-symbols-rounded ms-1" style="font-size: 0.875rem;">open_in_new</i>
+                  </a>
+                </li>
+              </ul>
+              <p v-else class="text-muted text-sm">コミット履歴が見つかりません。</p>
+            </div>
+          </div>
+        </div>
+
         <!-- 添付ファイル（共通コンポーネントに分離） -->
         <AttachmentManager
           :attachments="scheduleDetail.attachments"
@@ -879,6 +1032,21 @@ const getHeaderActions = () => {
   background: linear-gradient(310deg, #c00505, #e05566);
   transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(234, 6, 6, 0.3);
+}
+
+/* GitHubカードのカスタムスタイル */
+.github-branch-select {
+  min-width: 180px;
+}
+
+.github-commit-item {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding-bottom: 0.5rem;
+}
+
+.github-commit-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 /* レスポンシブデザイン */

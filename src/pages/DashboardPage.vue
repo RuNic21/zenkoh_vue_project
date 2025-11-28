@@ -21,6 +21,8 @@ import type { ProjectProgressRow, TaskProgressRow } from "@/services/dashboardSe
 import type { ScheduleItem, ScheduleStatus, SchedulePriority } from "@/types/schedule";
 import type { Task } from "@/types/task";
 import StatCards from "@/components/common/StatCards.vue";
+import SlackMessageSender from "@/components/slack/SlackMessageSender.vue";
+import SlackChannelMessageViewer from "@/components/slack/SlackChannelMessageViewer.vue";
 
 const store = useScheduleStore();
 
@@ -370,6 +372,16 @@ usePageActivation(async () => {
     <div class="row mb-4">
       <div class="col-12">
         <RecentActivities :activities="recentActivities" :isLoading="isActivityLoading" />
+      </div>
+    </div>
+
+    <!-- Slack連携テストセクション -->
+    <div class="row mb-4">
+      <div class="col-12 col-lg-6">
+        <SlackChannelMessageViewer />
+      </div>
+      <div class="col-12 col-lg-6">
+        <SlackMessageSender initial-channel="#general" />
       </div>
     </div>
 

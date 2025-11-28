@@ -103,6 +103,7 @@ import { ref } from "vue";
 - [src/services/notificationService.ts](mdc:src/services/notificationService.ts): 通知システム
 - [src/services/commentService.ts](mdc:src/services/commentService.ts): コメント管理サービス
 - [src/services/taskStatusHistoryService.ts](mdc:src/services/taskStatusHistoryService.ts): タスクステータス履歴サービス
+- [src/services/githubService.ts](mdc:src/services/githubService.ts): GitHub API 連携サービス
 
 ### 状態管理
 - [src/store/schedule.ts](mdc:src/store/schedule.ts): スケジュール状態管理、DB 連携
@@ -121,6 +122,7 @@ import { ref } from "vue";
 - [src/types/notification.ts](mdc:src/types/notification.ts): 通知システム用型
 - [src/types/comment.ts](mdc:src/types/comment.ts): コメント用型
 - [src/types/taskStatusHistory.ts](mdc:src/types/taskStatusHistory.ts): タスクステータス履歴用型
+- [src/types/github.ts](mdc:src/types/github.ts): GitHub API 用型
 
 ### ユーティリティ（16個）
 - [src/utils/taskAdapter.ts](mdc:src/utils/taskAdapter.ts): DB ↔ UI 型変換
@@ -204,4 +206,5 @@ npm run types:fromcsv         # CSVから型生成
 - [認証システム統合ガイド](../docs/auth-system-guide.md)
 - [マイグレーションガイド](../docs/migration-guide.md)
 - [タグ機能ガイド](../docs/tag-feature-guide.md)
+- [GitHub API 連携ガイド](../docs/github-api-guide.md)
 - [README](../README.md)
